@@ -15,6 +15,7 @@ function formatWeekLabel(start: Date, end: Date): string {
 export function TrainingPlan({ race, berg }: TrainingPlanProps) {
   const [targetPercent, setTargetPercent] = useState(100)
   const [sessionsPerWeek, setSessionsPerWeek] = useState(1)
+  const [startPercent, setStartPercent] = useState(40)
   const [raceDate, setRaceDate] = useState('')
 
   const session = useMemo(
@@ -26,8 +27,8 @@ export function TrainingPlan({ race, berg }: TrainingPlanProps) {
     if (!raceDate) return []
     const parsed = new Date(raceDate)
     if (Number.isNaN(parsed.getTime())) return []
-    return buildWeeklyPlan(race, berg, parsed, new Date(), sessionsPerWeek)
-  }, [race, berg, raceDate, sessionsPerWeek])
+    return buildWeeklyPlan(race, berg, parsed, new Date(), sessionsPerWeek, 110, startPercent)
+  }, [race, berg, raceDate, sessionsPerWeek, startPercent])
 
   if (berg.gainM <= 0) {
     return (
@@ -51,14 +52,22 @@ export function TrainingPlan({ race, berg }: TrainingPlanProps) {
             type="range"
             min={20}
             max={150}
-            step={5}
+            step={1}
             value={targetPercent}
             onChange={(e) => setTargetPercent(Number(e.target.value))}
             className="w-full accent-emerald-400"
           />
-          <span className="w-16 shrink-0 text-right text-sm text-slate-300">
-            {targetPercent}%
-          </span>
+          <div className="flex shrink-0 items-center gap-1">
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={targetPercent}
+              onChange={(e) => setTargetPercent(Math.max(1, Number(e.target.value)))}
+              className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100"
+            />
+            <span className="text-sm text-slate-400">%</span>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -112,6 +121,18 @@ export function TrainingPlan({ race, berg }: TrainingPlanProps) {
               max={7}
               value={sessionsPerWeek}
               onChange={(e) => setSessionsPerWeek(Math.max(1, Number(e.target.value)))}
+              className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-300">
+            Startpercentage
+            <input
+              type="number"
+              min={10}
+              max={100}
+              step={5}
+              value={startPercent}
+              onChange={(e) => setStartPercent(Math.max(10, Number(e.target.value)))}
               className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
             />
           </label>

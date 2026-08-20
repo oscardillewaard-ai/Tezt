@@ -22,6 +22,7 @@ type RaceMode = 'gpx' | 'preset'
 function App() {
   const [race, setRace] = useState<RouteStats | null>(null)
   const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
+  const [raceDistanceKm, setRaceDistanceKm] = useState<number>(0)
   const [raceMode, setRaceMode] = useState<RaceMode>('gpx')
   const [berg, setBerg] = useState<RouteStats | null>(null)
   const [hill, setHill] = useState<TrainingHill | null>(BUILTIN_HILLS[0] ?? null)
@@ -30,7 +31,11 @@ function App() {
   const [savedBergen, setSavedBergen] = useState(listBergen)
 
   const effectiveRace: RouteStats | null =
-    raceMode === 'preset' ? (racePreset ? generateSyntheticRace(racePreset) : null) : race
+    raceMode === 'preset'
+      ? racePreset
+        ? generateSyntheticRace(racePreset, raceDistanceKm || racePreset.defaultDistanceKm)
+        : null
+      : race
 
   return (
     <div className="min-h-svh bg-slate-950 text-slate-100">
@@ -90,7 +95,12 @@ function App() {
               <RacePresetPanel
                 archetypes={BUILTIN_RACE_ARCHETYPES}
                 selected={racePreset}
-                onSelect={setRacePreset}
+                onSelect={(a) => {
+                  setRacePreset(a)
+                  setRaceDistanceKm(a.defaultDistanceKm)
+                }}
+                distanceKm={raceDistanceKm || (racePreset?.defaultDistanceKm ?? 0)}
+                onDistanceChange={setRaceDistanceKm}
               />
             )}
           </div>

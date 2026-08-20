@@ -7,10 +7,18 @@ interface RacePresetPanelProps {
   archetypes: RaceArchetype[]
   selected: RaceArchetype | null
   onSelect: (archetype: RaceArchetype) => void
+  distanceKm: number
+  onDistanceChange: (distanceKm: number) => void
 }
 
-export function RacePresetPanel({ archetypes, selected, onSelect }: RacePresetPanelProps) {
-  const route: RouteStats | null = selected ? generateSyntheticRace(selected) : null
+export function RacePresetPanel({
+  archetypes,
+  selected,
+  onSelect,
+  distanceKm,
+  onDistanceChange,
+}: RacePresetPanelProps) {
+  const route: RouteStats | null = selected ? generateSyntheticRace(selected, distanceKm) : null
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
@@ -47,6 +55,21 @@ export function RacePresetPanel({ archetypes, selected, onSelect }: RacePresetPa
             </div>
             <p className="mt-1 text-xs text-slate-500">{selected.note}</p>
           </div>
+
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-slate-500">
+              Afstand: {distanceKm} km
+            </span>
+            <input
+              type="range"
+              min={selected.minDistanceKm}
+              max={selected.maxDistanceKm}
+              step={5}
+              value={distanceKm}
+              onChange={(e) => onDistanceChange(Number(e.target.value))}
+              className="mt-1 w-full accent-orange-400"
+            />
+          </label>
 
           <div className="grid grid-cols-3 gap-3">
             <StatCard label="Afstand" value={`${route.distanceKm.toFixed(0)} km`} />

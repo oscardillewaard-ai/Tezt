@@ -54,6 +54,8 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
 export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
   const [targetPercent, setTargetPercent] = useState(100)
   const [raceDate, setRaceDate] = useState('')
+  const [startPercent, setStartPercent] = useState(40)
+  const [sessionsPerWeek, setSessionsPerWeek] = useState(1)
 
   const session = useMemo(
     () => computeFlankSession(race, hill, targetPercent),
@@ -64,8 +66,8 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
     if (!raceDate) return []
     const parsed = new Date(raceDate)
     if (Number.isNaN(parsed.getTime())) return []
-    return buildFlankWeeklyPlan(race, hill, parsed, new Date())
-  }, [race, hill, raceDate])
+    return buildFlankWeeklyPlan(race, hill, parsed, new Date(), sessionsPerWeek, 110, startPercent)
+  }, [race, hill, raceDate, sessionsPerWeek, startPercent])
 
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
@@ -92,14 +94,22 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
             type="range"
             min={20}
             max={150}
-            step={5}
+            step={1}
             value={targetPercent}
             onChange={(e) => setTargetPercent(Number(e.target.value))}
             className="w-full accent-emerald-400"
           />
-          <span className="w-16 shrink-0 text-right text-sm text-slate-300">
-            {targetPercent}%
-          </span>
+          <div className="flex shrink-0 items-center gap-1">
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={targetPercent}
+              onChange={(e) => setTargetPercent(Math.max(1, Number(e.target.value)))}
+              className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100"
+            />
+            <span className="text-sm text-slate-400">%</span>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -141,14 +151,37 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
           daarna afbouwt (taper), met dezelfde flankverdeling als hierboven.
         </p>
 
-        <div className="mt-4">
-          <label className="flex w-fit flex-col gap-1 text-sm text-slate-300">
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1 text-sm text-slate-300">
             Wedstrijddatum
             <input
               type="date"
               value={raceDate}
               onChange={(e) => setRaceDate(e.target.value)}
               className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-300">
+            Startpercentage
+            <input
+              type="number"
+              min={10}
+              max={100}
+              step={5}
+              value={startPercent}
+              onChange={(e) => setStartPercent(Math.max(10, Number(e.target.value)))}
+              className="w-28 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-300">
+            Trainingen per week
+            <input
+              type="number"
+              min={1}
+              max={7}
+              value={sessionsPerWeek}
+              onChange={(e) => setSessionsPerWeek(Math.max(1, Number(e.target.value)))}
+              className="w-28 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
             />
           </label>
         </div>
@@ -185,9 +218,9 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
                     <td className="py-2 pr-4">
                       {w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`}
                     </td>
-                    {w.session.allocations.map((a) => (
-                      <td key={a.flank.id} className="py-2 pr-4">
-                        {a.reps}×
+                    {w.splits.map((s) => (
+                      <td key={s.flank.id} className="py-2 pr-4">
+                        {s.repsPerSession.join('+')}×
                       </td>
                     ))}
                     <td className="py-2 pr-4">{w.session.totalHmM.toFixed(0)} m</td>

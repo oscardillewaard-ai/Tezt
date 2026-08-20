@@ -128,8 +128,27 @@ export function computeFlankSession(
   }
 }
 
+export interface FlankSessionSplit {
+  flank: Flank
+  repsPerSession: number[]
+}
+
 export interface FlankWeekPlan extends WeekTarget {
+  /** Week totals — reps here are the full week's, not one session's. */
   session: FlankSessionPlan
+  sessionsPerWeek: number
+  splits: FlankSessionSplit[]
+  warmupSplit: FlankSessionSplit | null
+}
+
+/** Distributes a weekly rep count evenly across sessions, remainder going to the first ones. */
+function splitReps(total: number, sessions: number): number[] {
+  const perSession = new Array(sessions).fill(Math.floor(total / sessions))
+  let remainder = total - perSession.reduce((a, b) => a + b, 0)
+  for (let i = 0; i < perSession.length && remainder > 0; i++, remainder--) {
+    perSession[i] += 1
+  }
+  return perSession
 }
 
 export function buildFlankWeeklyPlan(
@@ -137,10 +156,21 @@ export function buildFlankWeeklyPlan(
   hill: TrainingHill,
   raceDate: Date,
   today: Date,
+  sessionsPerWeek = 1,
   peakPercent = 110,
   startPercent = 40,
   taperPercent = 30,
 ): FlankWeekPlan[] {
   const weeks = computeWeeklyTargets(raceDate, today, peakPercent, startPercent, taperPercent)
-  return weeks.map((w) => ({ ...w, session: computeFlankSession(race, hill, w.targetPercent) }))
+  return weeks.map((w) => {
+    const session = computeFlankSession(race, hill, w.targetPercent)
+    const splits = session.allocations.map((a) => ({
+      flank: a.flank,
+      repsPerSession: splitReps(a.reps, sessionsPerWeek),
+    }))
+    const warmupSplit = session.warmup
+      ? { flank: session.warmup.flank, repsPerSession: splitReps(session.warmup.reps, sessionsPerWeek) }
+      : null
+    return { ...w, session, sessionsPerWeek, splits, warmupSplit }
+  })
 }
