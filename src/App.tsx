@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { RouteStats } from './lib/gpx'
 import { BUILTIN_HILLS, type TrainingHill } from './lib/hills'
+import { BUILTIN_RACE_ARCHETYPES, generateSyntheticRace, type RaceArchetype } from './lib/syntheticRaces'
 import {
   deleteBerg,
   deleteRace,
@@ -11,18 +12,25 @@ import {
 } from './lib/storage'
 import { RoutePanel } from './components/RoutePanel'
 import { HillPanel } from './components/HillPanel'
+import { RacePresetPanel } from './components/RacePresetPanel'
 import { TrainingPlan } from './components/TrainingPlan'
 import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 
 type BergMode = 'gpx' | 'hill'
+type RaceMode = 'gpx' | 'preset'
 
 function App() {
   const [race, setRace] = useState<RouteStats | null>(null)
+  const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
+  const [raceMode, setRaceMode] = useState<RaceMode>('gpx')
   const [berg, setBerg] = useState<RouteStats | null>(null)
   const [hill, setHill] = useState<TrainingHill | null>(BUILTIN_HILLS[0] ?? null)
   const [bergMode, setBergMode] = useState<BergMode>('hill')
   const [savedRaces, setSavedRaces] = useState(listRaces)
   const [savedBergen, setSavedBergen] = useState(listBergen)
+
+  const effectiveRace: RouteStats | null =
+    raceMode === 'preset' ? (racePreset ? generateSyntheticRace(racePreset) : null) : race
 
   return (
     <div className="min-h-svh bg-slate-950 text-slate-100">
@@ -37,20 +45,55 @@ function App() {
         </header>
 
         <div className="grid gap-6 sm:grid-cols-2">
-          <RoutePanel
-            title="Ultrarace"
-            description="De GPX-track van de wedstrijd waar je je op voorbereidt."
-            color="#f97316"
-            accentClass="border-orange-400 bg-orange-400/5"
-            route={race}
-            onRouteChange={setRace}
-            saved={savedRaces}
-            onSave={(r) => setSavedRaces([saveRace(r), ...savedRaces])}
-            onDeleteSaved={(id) => {
-              deleteRace(id)
-              setSavedRaces(savedRaces.filter((s) => s.id !== id))
-            }}
-          />
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRaceMode('gpx')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  raceMode === 'gpx'
+                    ? 'bg-orange-400 text-slate-900'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Eigen GPX
+              </button>
+              <button
+                type="button"
+                onClick={() => setRaceMode('preset')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  raceMode === 'preset'
+                    ? 'bg-orange-400 text-slate-900'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Voorbeeldwedstrijd
+              </button>
+            </div>
+
+            {raceMode === 'gpx' ? (
+              <RoutePanel
+                title="Ultrarace"
+                description="De GPX-track van de wedstrijd waar je je op voorbereidt."
+                color="#f97316"
+                accentClass="border-orange-400 bg-orange-400/5"
+                route={race}
+                onRouteChange={setRace}
+                saved={savedRaces}
+                onSave={(r) => setSavedRaces([saveRace(r), ...savedRaces])}
+                onDeleteSaved={(id) => {
+                  deleteRace(id)
+                  setSavedRaces(savedRaces.filter((s) => s.id !== id))
+                }}
+              />
+            ) : (
+              <RacePresetPanel
+                archetypes={BUILTIN_RACE_ARCHETYPES}
+                selected={racePreset}
+                onSelect={setRacePreset}
+              />
+            )}
+          </div>
 
           <div className="flex flex-col gap-3">
             <div className="flex gap-2">
@@ -100,15 +143,15 @@ function App() {
         </div>
 
         <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          {bergMode === 'hill' && race && hill ? (
-            <FlankTrainingPlan race={race} hill={hill} />
-          ) : bergMode === 'gpx' && race && berg ? (
-            <TrainingPlan race={race} berg={berg} />
+          {bergMode === 'hill' && effectiveRace && hill ? (
+            <FlankTrainingPlan race={effectiveRace} hill={hill} />
+          ) : bergMode === 'gpx' && effectiveRace && berg ? (
+            <TrainingPlan race={effectiveRace} berg={berg} />
           ) : (
             <p className="text-sm text-slate-500">
               {bergMode === 'hill'
-                ? 'Upload een wedstrijd-GPX en kies een heuvel om een trainingsplan te zien.'
-                : 'Upload zowel een wedstrijd-GPX als een trainingsberg-GPX om een trainingsplan te zien.'}
+                ? 'Kies een wedstrijd en een heuvel om een trainingsplan te zien.'
+                : 'Kies zowel een wedstrijd als een trainingsberg-GPX om een trainingsplan te zien.'}
             </p>
           )}
         </div>
