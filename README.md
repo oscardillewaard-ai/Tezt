@@ -5,17 +5,32 @@ skiberg), en Bergtrainer rekent uit hoeveel keer je die berg op moet om
 dezelfde hoeveelheid hoogtemeters te trainen. Daarnaast genereert het een
 wekelijks opbouwschema (met piek en taper) richting je wedstrijddatum.
 
+Er zijn twee manieren om de trainingsberg te kiezen:
+
+- **Vaste heuvel (met flanken)**: een heuvel met meerdere flanken die alleen
+  op de top samenkomen (een "pendelheuvel" — top → voet → top, geen ronde).
+  Ingebouwd staat de Lührs Heuvel (Hoge Bergse Bos) met de vier flanken uit
+  het heuvelschema: D (NW, 7.7%), K− (ZO, 16%), K (O, 21%) en de in/uit
+  warming-up/cooling-down flank (ZZW).
+- **Eigen GPX**: upload de GPX van één beklimming/ronde van een andere berg.
+
 ## Hoe het werkt
 
 1. **Ultrarace**: upload de GPX-track van de wedstrijd. De app berekent
-   afstand en totale hoogtewinst (D+).
-2. **Trainingsberg**: upload de GPX van één beklimming/ronde van je
-   trainingsberg. Zelfde berekening, maar dan per ronde.
-3. De app rekent uit hoeveel herhalingen van de berg nodig zijn om een
-   gekozen percentage van de hoogtemeters van de wedstrijd te evenaren.
-4. Vul optioneel een wedstrijddatum en aantal trainingen per week in voor een
-   wekelijks schema dat opbouwt naar een piek (~110% van de wedstrijd-D+) en
-   afbouwt in de laatste week(en) voor de wedstrijd.
+   afstand, totale hoogtewinst (D+) en splitst het profiel op in losse
+   klimmen (elk met hun eigen lengte en helling).
+2. **Trainingsberg**: kies de vaste heuvel of upload je eigen GPX.
+3. Bij een vaste heuvel matcht de app elke klim uit de wedstrijd op de flank
+   met de dichtstbijzijnde helling — steile korte klimmen in de wedstrijd
+   sturen dus meer herhalingen naar de steile flank, lange geleidelijke
+   klimmen naar de flauwe flank. Bij een eigen GPX (één beklimming) wordt
+   simpelweg uitgerekend hoeveel herhalingen nodig zijn.
+4. De app rekent uit hoeveel herhalingen nodig zijn om een gekozen percentage
+   van de hoogtemeters van de wedstrijd te evenaren, inclusief tijdsduur en
+   (bij een vaste heuvel) de verdeling rennende versus stijl lopende afdaling.
+5. Vul optioneel een wedstrijddatum in voor een wekelijks schema dat opbouwt
+   naar een piek (~110% van de wedstrijd-D+) en afbouwt in de laatste
+   week(en) voor de wedstrijd, met dezelfde flankverdeling per week.
 
 Alles draait client-side; er wordt niets naar een server verstuurd. Opgeslagen
 routes staan lokaal in de browser (`localStorage`).

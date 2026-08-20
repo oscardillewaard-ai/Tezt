@@ -1,0 +1,140 @@
+import type { ClimbSegment, RouteStats } from './gpx'
+import type { Flank, TrainingHill } from './hills'
+import { computeWeeklyTargets, type WeekTarget } from './plan'
+
+export interface FlankAllocation {
+  flank: Flank
+  /** Share (0..1) of the race's total climbing gain matched to this flank's gradient. */
+  shareOfClimb: number
+  reps: number
+  hmM: number
+  minutes: number
+}
+
+export interface FlankSessionPlan {
+  targetPercent: number
+  targetHmM: number
+  allocations: FlankAllocation[]
+  warmup: FlankAllocation | null
+  totalHmM: number
+  totalMinutes: number
+  runningDescentHmM: number
+  steepDescentHmM: number
+  percentOfRace: number
+}
+
+/**
+ * For each race climb, finds the flank whose one-way gradient is closest and
+ * credits that flank with the climb's elevation gain. The resulting shares
+ * describe how much of the race's vertical is "gentle" vs "steep" so the
+ * session can be built from the same mix instead of one generic climb type.
+ */
+export function matchClimbShares(
+  climbSegments: ClimbSegment[],
+  climbFlanks: Flank[],
+): Map<string, number> {
+  const totals = new Map<string, number>(climbFlanks.map((f) => [f.id, 0]))
+  let totalGain = 0
+
+  for (const seg of climbSegments) {
+    let best = climbFlanks[0]
+    let bestDiff = Infinity
+    for (const f of climbFlanks) {
+      const diff = Math.abs(f.gradientPercent - seg.gradientPercent)
+      if (diff < bestDiff) {
+        bestDiff = diff
+        best = f
+      }
+    }
+    if (!best) continue
+    totals.set(best.id, (totals.get(best.id) ?? 0) + seg.gainM)
+    totalGain += seg.gainM
+  }
+
+  const shares = new Map<string, number>()
+  for (const f of climbFlanks) {
+    shares.set(
+      f.id,
+      totalGain > 0 ? (totals.get(f.id) ?? 0) / totalGain : 1 / Math.max(1, climbFlanks.length),
+    )
+  }
+  return shares
+}
+
+function descentMode(mode: Flank['descendMode']): 'running' | 'steep' {
+  return mode === 'run' || mode === 'jog' ? 'running' : 'steep'
+}
+
+export function computeFlankSession(
+  race: RouteStats,
+  hill: TrainingHill,
+  targetPercent: number,
+): FlankSessionPlan {
+  const climbFlanks = hill.flanks.filter((f) => f.role === 'climb')
+  const warmupFlank = hill.flanks.find((f) => f.role === 'warmup') ?? null
+
+  const shares = matchClimbShares(race.climbSegments, climbFlanks)
+  const targetHmM = (race.gainM * targetPercent) / 100
+
+  const allocations: FlankAllocation[] = climbFlanks.map((flank) => {
+    const shareOfClimb = shares.get(flank.id) ?? 0
+    const hmTarget = targetHmM * shareOfClimb
+    const reps = flank.hmOneWay > 0 ? Math.round(hmTarget / flank.hmOneWay) : 0
+    return {
+      flank,
+      shareOfClimb,
+      reps,
+      hmM: reps * flank.hmOneWay,
+      minutes: reps * flank.minutesPerRep,
+    }
+  })
+
+  const warmup: FlankAllocation | null = warmupFlank
+    ? {
+        flank: warmupFlank,
+        shareOfClimb: 0,
+        reps: 1,
+        hmM: warmupFlank.hmOneWay,
+        minutes: warmupFlank.minutesPerRep,
+      }
+    : null
+
+  const totalHmM = allocations.reduce((s, a) => s + a.hmM, 0) + (warmup?.hmM ?? 0)
+  const totalMinutes = allocations.reduce((s, a) => s + a.minutes, 0) + (warmup?.minutes ?? 0)
+
+  let runningDescentHmM = 0
+  let steepDescentHmM = 0
+  for (const a of [...allocations, ...(warmup ? [warmup] : [])]) {
+    if (descentMode(a.flank.descendMode) === 'running') runningDescentHmM += a.hmM
+    else steepDescentHmM += a.hmM
+  }
+
+  return {
+    targetPercent,
+    targetHmM,
+    allocations,
+    warmup,
+    totalHmM,
+    totalMinutes,
+    runningDescentHmM,
+    steepDescentHmM,
+    percentOfRace: race.gainM > 0 ? (totalHmM / race.gainM) * 100 : 0,
+  }
+}
+
+export interface FlankWeekPlan extends WeekTarget {
+  session: FlankSessionPlan
+}
+
+export function buildFlankWeeklyPlan(
+  race: RouteStats,
+  hill: TrainingHill,
+  raceDate: Date,
+  today: Date,
+  peakPercent = 110,
+  startPercent = 40,
+  taperPercent = 30,
+): FlankWeekPlan[] {
+  const weeks = computeWeeklyTargets(raceDate, today, peakPercent, startPercent, taperPercent)
+  return weeks.map((w) => ({ ...w, session: computeFlankSession(race, hill, w.targetPercent) }))
+}

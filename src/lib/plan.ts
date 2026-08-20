@@ -21,19 +21,22 @@ export function computeSession(
   return { targetPercent, reps, totalDistanceKm, totalGainM, percentOfRace }
 }
 
-export interface WeekPlan {
+export interface WeekTarget {
   weekIndex: number
   weekStart: Date
   weekEnd: Date
   targetPercent: number
+  isTaper: boolean
+  isRaceWeek: boolean
+}
+
+export interface WeekPlan extends WeekTarget {
   repsPerSession: number[]
   sessionsPerWeek: number
   totalReps: number
   totalDistanceKm: number
   totalGainM: number
   percentOfRace: number
-  isTaper: boolean
-  isRaceWeek: boolean
 }
 
 function startOfWeek(d: Date): Date {
@@ -45,20 +48,19 @@ function startOfWeek(d: Date): Date {
 }
 
 /**
- * Builds a progressive climbing plan: reps ramp from a light starting load up
- * to a peak that slightly overreaches the race's elevation gain, then tapers
- * down in the final week(s) before race day.
+ * Shared progressive-load curve: ramps from a light starting percentage of
+ * the race's elevation gain up to a peak that slightly overreaches it, then
+ * tapers down in the final week(s) before race day. Used by both the plain
+ * reps-based weekly plan and the flank-based weekly plan so they ramp the
+ * same way.
  */
-export function buildWeeklyPlan(
-  race: RouteStats,
-  berg: RouteStats,
+export function computeWeeklyTargets(
   raceDate: Date,
   today: Date,
-  sessionsPerWeek: number,
   peakPercent = 110,
   startPercent = 40,
   taperPercent = 30,
-): WeekPlan[] {
+): WeekTarget[] {
   const firstWeekStart = startOfWeek(today)
   const raceWeekStart = startOfWeek(raceDate)
   const msPerWeek = 7 * 24 * 60 * 60 * 1000
@@ -71,7 +73,7 @@ export function buildWeeklyPlan(
   const buildWeeks = weeksTotal - taperWeeks
   const peakWeekIndex = Math.max(0, buildWeeks - 1)
 
-  const weeks: WeekPlan[] = []
+  const weeks: WeekTarget[] = []
   for (let i = 0; i < weeksTotal; i++) {
     let targetPercent: number
     const isRaceWeek = i === weeksTotal - 1
@@ -94,8 +96,31 @@ export function buildWeeklyPlan(
 
     targetPercent = Math.round(targetPercent)
 
-    const targetGainM = (race.gainM * targetPercent) / 100
-    const totalReps = berg.gainM > 0 ? Math.max(sessionsPerWeek, Math.ceil(targetGainM / berg.gainM)) : 0
+    const weekStart = new Date(firstWeekStart.getTime() + i * msPerWeek)
+    const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
+
+    weeks.push({ weekIndex: i, weekStart, weekEnd, targetPercent, isTaper, isRaceWeek })
+  }
+
+  return weeks
+}
+
+export function buildWeeklyPlan(
+  race: RouteStats,
+  berg: RouteStats,
+  raceDate: Date,
+  today: Date,
+  sessionsPerWeek: number,
+  peakPercent = 110,
+  startPercent = 40,
+  taperPercent = 30,
+): WeekPlan[] {
+  const weeks = computeWeeklyTargets(raceDate, today, peakPercent, startPercent, taperPercent)
+
+  return weeks.map((w) => {
+    const targetGainM = (race.gainM * w.targetPercent) / 100
+    const totalReps =
+      berg.gainM > 0 ? Math.max(sessionsPerWeek, Math.ceil(targetGainM / berg.gainM)) : 0
 
     const repsPerSession: number[] = new Array(sessionsPerWeek).fill(
       Math.floor(totalReps / sessionsPerWeek),
@@ -106,24 +131,15 @@ export function buildWeeklyPlan(
     }
 
     const actualTotalReps = repsPerSession.reduce((a, b) => a + b, 0)
-    const weekStart = new Date(firstWeekStart.getTime() + i * msPerWeek)
-    const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
 
-    weeks.push({
-      weekIndex: i,
-      weekStart,
-      weekEnd,
-      targetPercent,
+    return {
+      ...w,
       repsPerSession,
       sessionsPerWeek,
       totalReps: actualTotalReps,
       totalDistanceKm: actualTotalReps * berg.distanceKm,
       totalGainM: actualTotalReps * berg.gainM,
       percentOfRace: race.gainM > 0 ? ((actualTotalReps * berg.gainM) / race.gainM) * 100 : 0,
-      isTaper,
-      isRaceWeek,
-    })
-  }
-
-  return weeks
+    }
+  })
 }
