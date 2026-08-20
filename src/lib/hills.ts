@@ -31,6 +31,14 @@ export interface TrainingHill {
   location: string
   source: string
   note: string
+  /**
+   * 'measured' hills come from a real GPS survey of one specific spot (exact
+   * distances/gradients). 'generic' hills are indicative archetypes for a
+   * type of terrain — useful as a stand-in when you don't have your own
+   * pendelheuvel with GPS data, but the numbers are round/typical, not a
+   * measurement of one real place.
+   */
+  kind: 'measured' | 'generic'
   flanks: Flank[]
 }
 
@@ -40,6 +48,7 @@ export const LUHRS_HEUVEL: TrainingHill = {
   location: 'Uitkijkpunt Lührs, Hoge Bergse Bos',
   source: 'Heuvelschema, GPS-log 29 juli 2026 · top 51,9765 / 4,5485',
   note: 'Pendelheuvel: geen ronde. Elke herhaling is top → voet → top over dezelfde flank; wisselen kan alleen boven. Klim en afdaling zitten 1:1 vast.',
+  kind: 'measured',
   flanks: [
     {
       id: 'D-NW',
@@ -96,4 +105,165 @@ export const LUHRS_HEUVEL: TrainingHill = {
   ],
 }
 
-export const BUILTIN_HILLS: TrainingHill[] = [LUHRS_HEUVEL]
+/**
+ * Generic regional archetypes: indicative flank profiles for a type of
+ * terrain, not a GPS survey of one real hill. Useful if you don't have your
+ * own pendelheuvel but want to build a session around gradients typical of
+ * where you're racing.
+ */
+export const ARDENNEN_GENERIEK: TrainingHill = {
+  id: 'ardennen-generiek',
+  name: 'Ardennen / Voerstreek (generiek)',
+  location: 'België — Voerstreek, Ardennen',
+  source: 'Generiek profiel, geen GPS-meting van één specifieke plek',
+  note: 'Indicatief profiel voor het glooiende Belgische heuvellandschap waar veel trailraces gehouden worden (o.a. Voerstreek, Ardennen): overwegend korte tot middellange hellingen, zelden echt lang of extreem steil.',
+  kind: 'generic',
+  flanks: [
+    {
+      id: 'ard-zacht',
+      pendelType: 'Zacht',
+      name: 'Zachte flank',
+      aspect: '—',
+      distanceM: 280,
+      gradientPercent: 6,
+      hmOneWay: 17,
+      climbMode: 'jog',
+      descendMode: 'jog',
+      minutesPerRep: 4,
+      role: 'climb',
+    },
+    {
+      id: 'ard-midden',
+      pendelType: 'Midden',
+      name: 'Middelsteile flank',
+      aspect: '—',
+      distanceM: 220,
+      gradientPercent: 11,
+      hmOneWay: 24,
+      climbMode: 'jog',
+      descendMode: 'run',
+      minutesPerRep: 4.5,
+      role: 'climb',
+    },
+    {
+      id: 'ard-steil',
+      pendelType: 'Steil',
+      name: 'Steile flank',
+      aspect: '—',
+      distanceM: 160,
+      gradientPercent: 17,
+      hmOneWay: 27,
+      climbMode: 'powerhike',
+      descendMode: 'hike',
+      minutesPerRep: 5,
+      role: 'climb',
+    },
+  ],
+}
+
+export const MIDDELGEBERGTE_GENERIEK: TrainingHill = {
+  id: 'middelgebergte-generiek',
+  name: 'Middelgebergte (generiek)',
+  location: 'bv. Eifel, Vogezen, hoger Ardennen-reliëf',
+  source: 'Generiek profiel, geen GPS-meting van één specifieke plek',
+  note: 'Indicatief profiel voor middelgebergte: langere en iets zwaardere hellingen dan een puur heuvelparcours, maar nog geen alpien terrein.',
+  kind: 'generic',
+  flanks: [
+    {
+      id: 'mg-zacht',
+      pendelType: 'Zacht',
+      name: 'Zachte flank',
+      aspect: '—',
+      distanceM: 450,
+      gradientPercent: 7,
+      hmOneWay: 32,
+      climbMode: 'jog',
+      descendMode: 'jog',
+      minutesPerRep: 6,
+      role: 'climb',
+    },
+    {
+      id: 'mg-midden',
+      pendelType: 'Midden',
+      name: 'Middelsteile flank',
+      aspect: '—',
+      distanceM: 320,
+      gradientPercent: 13,
+      hmOneWay: 42,
+      climbMode: 'jog',
+      descendMode: 'run',
+      minutesPerRep: 6.5,
+      role: 'climb',
+    },
+    {
+      id: 'mg-steil',
+      pendelType: 'Steil',
+      name: 'Steile flank',
+      aspect: '—',
+      distanceM: 220,
+      gradientPercent: 19,
+      hmOneWay: 42,
+      climbMode: 'powerhike',
+      descendMode: 'hike',
+      minutesPerRep: 7,
+      role: 'climb',
+    },
+  ],
+}
+
+export const ALPIEN_GENERIEK: TrainingHill = {
+  id: 'alpien-generiek',
+  name: 'Alpien (generiek)',
+  location: 'bv. Alpen, Pyreneeën — hooggebergte-ultra\'s',
+  source: 'Generiek profiel, geen GPS-meting van één specifieke plek',
+  note: 'Indicatief profiel voor lange, aanhoudende alpiene beklimmingen zoals bij hooggebergte-ultra\'s. Duidelijk langer en steiler dan een Belgisch heuvelparcours — gebruik dit als je richting een alpine race traint maar zelf geen berg met dat karakter kunt beklimmen.',
+  kind: 'generic',
+  flanks: [
+    {
+      id: 'alp-zacht',
+      pendelType: 'Zacht',
+      name: 'Zachte flank',
+      aspect: '—',
+      distanceM: 700,
+      gradientPercent: 9,
+      hmOneWay: 63,
+      climbMode: 'jog',
+      descendMode: 'jog',
+      minutesPerRep: 9,
+      role: 'climb',
+    },
+    {
+      id: 'alp-midden',
+      pendelType: 'Midden',
+      name: 'Middelsteile flank',
+      aspect: '—',
+      distanceM: 500,
+      gradientPercent: 16,
+      hmOneWay: 80,
+      climbMode: 'powerhike',
+      descendMode: 'run',
+      minutesPerRep: 10,
+      role: 'climb',
+    },
+    {
+      id: 'alp-steil',
+      pendelType: 'Steil',
+      name: 'Steile flank',
+      aspect: '—',
+      distanceM: 350,
+      gradientPercent: 24,
+      hmOneWay: 84,
+      climbMode: 'powerhike',
+      descendMode: 'hike',
+      minutesPerRep: 11,
+      role: 'climb',
+    },
+  ],
+}
+
+export const BUILTIN_HILLS: TrainingHill[] = [
+  LUHRS_HEUVEL,
+  ARDENNEN_GENERIEK,
+  MIDDELGEBERGTE_GENERIEK,
+  ALPIEN_GENERIEK,
+]

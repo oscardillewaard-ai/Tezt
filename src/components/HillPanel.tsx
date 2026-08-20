@@ -42,7 +42,18 @@ export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
       {selected && (
         <div className="mt-5 space-y-4">
           <div>
-            <p className="text-sm font-medium text-slate-200">{selected.location}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-slate-200">{selected.location}</p>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  selected.kind === 'measured'
+                    ? 'bg-emerald-400/15 text-emerald-300'
+                    : 'bg-amber-400/15 text-amber-300'
+                }`}
+              >
+                {selected.kind === 'measured' ? 'GPS-gemeten' : 'Generiek profiel'}
+              </span>
+            </div>
             <p className="mt-1 text-xs text-slate-500">{selected.source}</p>
           </div>
           <p className="rounded-lg bg-slate-800/60 px-4 py-3 text-sm text-slate-300">

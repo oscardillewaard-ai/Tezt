@@ -9,9 +9,13 @@ Er zijn twee manieren om de trainingsberg te kiezen:
 
 - **Vaste heuvel (met flanken)**: een heuvel met meerdere flanken die alleen
   op de top samenkomen (een "pendelheuvel" — top → voet → top, geen ronde).
-  Ingebouwd staat de Lührs Heuvel (Hoge Bergse Bos) met de vier flanken uit
-  het heuvelschema: D (NW, 7,7%), K− (ZO, 16%), K (O, 21%) en in/uit (ZZW,
-  ~10%).
+  Ingebouwd staat de **Lührs Heuvel** (Hoge Bergse Bos, GPS-gemeten) met de
+  vier flanken uit het heuvelschema: D (NW, 7,7%), K− (ZO, 16%), K (O, 21%)
+  en in/uit (ZZW, ~10%). Daarnaast staan er drie **generieke** profielen in
+  (indicatief, geen GPS-meting van één specifieke plek) voor als je geen
+  eigen pendelheuvel hebt: **Ardennen/Voerstreek** (België, waar veel
+  trailraces gehouden worden), **Middelgebergte** en **Alpien**, elk met een
+  zachte, middelsteile en steile flank passend bij dat type terrein.
 - **Eigen GPX**: upload de GPX van één beklimming/ronde van een andere berg.
 
 ## Hoe het werkt
