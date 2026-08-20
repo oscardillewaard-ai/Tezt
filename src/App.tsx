@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { RouteStats } from './lib/gpx'
 import { BUILTIN_HILLS, type TrainingHill } from './lib/hills'
 import { BUILTIN_RACE_ARCHETYPES, generateSyntheticRace, type RaceArchetype } from './lib/syntheticRaces'
+import { useLocalStorageState } from './lib/useLocalStorageState'
 import {
   deleteBerg,
   deleteRace,
@@ -18,8 +19,10 @@ import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 
 type BergMode = 'gpx' | 'hill'
 type RaceMode = 'gpx' | 'preset'
+type UiMode = 'simple' | 'advanced'
 
 function App() {
+  const [uiMode, setUiMode] = useLocalStorageState<UiMode>('bergtrainer:ui-mode', 'simple')
   const [race, setRace] = useState<RouteStats | null>(null)
   const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
   const [raceDistanceKm, setRaceDistanceKm] = useState<number>(0)
@@ -41,12 +44,48 @@ function App() {
     <div className="min-h-svh bg-slate-950 text-slate-100">
       <div className="mx-auto max-w-4xl px-4 py-10">
         <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-100">Bergtrainer</h1>
-          <p className="mt-2 text-slate-400">
-            Upload de GPX van je ultrarace en kies je trainingsberg. Bergtrainer matcht elke klim
-            uit de wedstrijd op de flank met de dichtstbijzijnde helling en bouwt daar een
-            trainingsschema omheen tot wedstrijddag.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-100">Bergtrainer</h1>
+              <p className="mt-2 text-slate-400">
+                Upload de GPX van je ultrarace en kies je trainingsberg. Bergtrainer matcht elke
+                klim uit de wedstrijd op de flank met de dichtstbijzijnde helling en bouwt daar een
+                trainingsschema omheen tot wedstrijddag.
+              </p>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Weergavemodus"
+              className="flex shrink-0 gap-1 rounded-full bg-slate-900 p-1"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={uiMode === 'simple'}
+                onClick={() => setUiMode('simple')}
+                className={`rounded-full px-3 py-1.5 text-sm ${
+                  uiMode === 'simple'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Eenvoudig
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={uiMode === 'advanced'}
+                onClick={() => setUiMode('advanced')}
+                className={`rounded-full px-3 py-1.5 text-sm ${
+                  uiMode === 'advanced'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Uitgebreid
+              </button>
+            </div>
+          </div>
         </header>
 
         <div className="grid gap-6 sm:grid-cols-2">
@@ -154,9 +193,9 @@ function App() {
 
         <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
           {bergMode === 'hill' && effectiveRace && hill ? (
-            <FlankTrainingPlan race={effectiveRace} hill={hill} />
+            <FlankTrainingPlan race={effectiveRace} hill={hill} advanced={uiMode === 'advanced'} />
           ) : bergMode === 'gpx' && effectiveRace && berg ? (
-            <TrainingPlan race={effectiveRace} berg={berg} />
+            <TrainingPlan race={effectiveRace} berg={berg} advanced={uiMode === 'advanced'} />
           ) : (
             <p className="text-sm text-slate-500">
               {bergMode === 'hill'

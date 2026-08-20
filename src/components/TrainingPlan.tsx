@@ -5,6 +5,7 @@ import { buildWeeklyPlan, computeSession } from '../lib/plan'
 interface TrainingPlanProps {
   race: RouteStats
   berg: RouteStats
+  advanced: boolean
 }
 
 function formatWeekLabel(start: Date, end: Date): string {
@@ -12,11 +13,16 @@ function formatWeekLabel(start: Date, end: Date): string {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
-export function TrainingPlan({ race, berg }: TrainingPlanProps) {
+const DEFAULT_START_PERCENT = 40
+const DEFAULT_SESSIONS_PER_WEEK = 1
+
+export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
   const [targetPercent, setTargetPercent] = useState(100)
-  const [sessionsPerWeek, setSessionsPerWeek] = useState(1)
-  const [startPercent, setStartPercent] = useState(40)
+  const [sessionsPerWeekInput, setSessionsPerWeekInput] = useState(DEFAULT_SESSIONS_PER_WEEK)
+  const [startPercentInput, setStartPercentInput] = useState(DEFAULT_START_PERCENT)
   const [raceDate, setRaceDate] = useState('')
+  const sessionsPerWeek = advanced ? sessionsPerWeekInput : DEFAULT_SESSIONS_PER_WEEK
+  const startPercent = advanced ? startPercentInput : DEFAULT_START_PERCENT
 
   const session = useMemo(
     () => computeSession(race, berg, targetPercent),
@@ -113,29 +119,33 @@ export function TrainingPlan({ race, berg }: TrainingPlanProps) {
               className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-300">
-            Trainingen per week
-            <input
-              type="number"
-              min={1}
-              max={7}
-              value={sessionsPerWeek}
-              onChange={(e) => setSessionsPerWeek(Math.max(1, Number(e.target.value)))}
-              className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-300">
-            Startpercentage
-            <input
-              type="number"
-              min={10}
-              max={100}
-              step={5}
-              value={startPercent}
-              onChange={(e) => setStartPercent(Math.max(10, Number(e.target.value)))}
-              className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
-            />
-          </label>
+          {advanced && (
+            <>
+              <label className="flex flex-col gap-1 text-sm text-slate-300">
+                Trainingen per week
+                <input
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={sessionsPerWeekInput}
+                  onChange={(e) => setSessionsPerWeekInput(Math.max(1, Number(e.target.value)))}
+                  className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-slate-300">
+                Startpercentage
+                <input
+                  type="number"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={startPercentInput}
+                  onChange={(e) => setStartPercentInput(Math.max(10, Number(e.target.value)))}
+                  className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                />
+              </label>
+            </>
+          )}
         </div>
 
         {weeklyPlan.length > 0 && (
