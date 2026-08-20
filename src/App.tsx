@@ -16,6 +16,7 @@ import { HillPanel } from './components/HillPanel'
 import { RacePresetPanel } from './components/RacePresetPanel'
 import { TrainingPlan } from './components/TrainingPlan'
 import { FlankTrainingPlan } from './components/FlankTrainingPlan'
+import { OnboardingModal } from './components/OnboardingModal'
 
 type BergMode = 'gpx' | 'hill'
 type RaceMode = 'gpx' | 'preset'
@@ -27,6 +28,7 @@ function systemPrefersDark(): boolean {
 }
 
 function App() {
+  const [hasOnboarded, setHasOnboarded] = useLocalStorageState('bergtrainer:onboarded', false)
   const [uiMode, setUiMode] = useLocalStorageState<UiMode>('bergtrainer:ui-mode', 'simple')
   const [theme, setTheme] = useLocalStorageState<Theme>(
     'bergtrainer:theme',
@@ -59,6 +61,7 @@ function App() {
 
   return (
     <div className="min-h-svh bg-[var(--bg)] text-[var(--text)]">
+      {!hasOnboarded && <OnboardingModal onDismiss={() => setHasOnboarded(true)} />}
       <div className="mx-auto max-w-4xl px-4 py-10">
         <header className="mb-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
