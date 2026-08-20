@@ -11,6 +11,9 @@ import {
   type ScheduleEntry,
 } from '../lib/schedule'
 import { PrintChecklist } from './PrintChecklist'
+import { NumberField } from './NumberField'
+import { WeekdayPicker } from './WeekdayPicker'
+import { WeekAgendaRow, type DayCell } from './WeekAgenda'
 
 interface FlankTrainingPlanProps {
   race: RouteStats
@@ -84,7 +87,15 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     return buildFlankWeeklyPlan(race, hill, parsed, new Date(), sessionsPerWeek, 110, startPercent)
   }, [race, hill, raceDate, sessionsPerWeek, startPercent])
 
-  const weekdays = weekdaysForSessionsPerWeek(sessionsPerWeek)
+  const [customWeekdays, setCustomWeekdays] = useState<number[] | null>(null)
+  // A custom day selection only applies while it still matches how many
+  // sessions the week has; otherwise fall back to the evenly-spread default.
+  // Deriving this beats resetting it in an effect, which would render one
+  // frame with a stale mismatched selection first.
+  const weekdays =
+    customWeekdays && customWeekdays.length === sessionsPerWeek
+      ? customWeekdays
+      : weekdaysForSessionsPerWeek(sessionsPerWeek)
 
   function sessionParts(w: (typeof weeklyPlan)[number], i: number): string[] {
     const parts = w.splits
@@ -122,6 +133,38 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     }),
   }))
 
+  const weeklyAgenda = weeklyPlan.map((w) => {
+    const days: DayCell[] = Array.from({ length: 7 }, (_, i) => {
+      const iso = i + 1
+      const sessionIdx = weekdays.indexOf(iso)
+      if (sessionIdx === -1) {
+        return { iso, label: '', detail: 'Rustdag', isTrainingDay: false }
+      }
+      const parts = sessionParts(w, sessionIdx)
+      const totalReps = parts.reduce((sum, p) => {
+        const match = p.match(/(\d+)×$/)
+        return sum + (match ? Number(match[1]) : 0)
+      }, 0)
+      return {
+        iso,
+        label: totalReps > 0 ? `${totalReps}×` : '–',
+        detail: parts.length > 0 ? parts.join(', ') : 'Geen herhalingen deze sessie',
+        isTrainingDay: true,
+      }
+    })
+    return {
+      weekIndex: w.weekIndex,
+      weekLabel: formatWeekLabel(w.weekStart, w.weekEnd),
+      goalLabel: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+      emphasisClass: w.isRaceWeek
+        ? 'text-[var(--status-warn)]'
+        : w.isTaper
+          ? 'text-[var(--status-info)]'
+          : 'text-[var(--text-2)]',
+      days,
+    }
+  })
+
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
       <p className="text-sm text-[var(--status-warn)]">
@@ -153,12 +196,11 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             className="min-w-0 flex-1 accent-emerald-400"
           />
           <div className="flex shrink-0 items-center gap-1">
-            <input
-              type="number"
+            <NumberField
               min={1}
               max={500}
               value={targetPercent}
-              onChange={(e) => setTargetPercent(Math.max(1, Number(e.target.value)))}
+              onChange={setTargetPercent}
               className="w-16 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm text-[var(--text)]"
             />
             <span className="text-sm text-[var(--muted)]">%</span>
@@ -219,24 +261,22 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             <>
               <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Startpercentage
-                <input
-                  type="number"
+                <NumberField
                   min={10}
                   max={100}
                   step={5}
                   value={startPercentInput}
-                  onChange={(e) => setStartPercentInput(Math.max(10, Number(e.target.value)))}
+                  onChange={setStartPercentInput}
                   className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Trainingen per week
-                <input
-                  type="number"
+                <NumberField
                   min={1}
                   max={7}
                   value={sessionsPerWeekInput}
-                  onChange={(e) => setSessionsPerWeekInput(Math.max(1, Number(e.target.value)))}
+                  onChange={setSessionsPerWeekInput}
                   className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
@@ -244,49 +284,17 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
           )}
         </div>
 
-        {weeklyPlan.length > 0 && (
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[var(--muted)]">
-                  <th className="py-2 pr-4 font-medium">Week</th>
-                  <th className="py-2 pr-4 font-medium">Doel</th>
-                  {session.allocations.map((a) => (
-                    <th key={a.flank.id} className="py-2 pr-4 font-medium">
-                      {a.flank.pendelType} ({a.flank.aspect})
-                    </th>
-                  ))}
-                  <th className="py-2 pr-4 font-medium">D+</th>
-                  <th className="py-2 pr-4 font-medium">Duur</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weeklyPlan.map((w) => (
-                  <tr
-                    key={w.weekIndex}
-                    className={`border-b border-[var(--border-soft)] ${
-                      w.isRaceWeek
-                        ? 'text-[var(--status-warn)]'
-                        : w.isTaper
-                          ? 'text-[var(--status-info)]'
-                          : 'text-[var(--text-2)]'
-                    }`}
-                  >
-                    <td className="py-2 pr-4">{formatWeekLabel(w.weekStart, w.weekEnd)}</td>
-                    <td className="py-2 pr-4">
-                      {w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`}
-                    </td>
-                    {w.splits.map((s) => (
-                      <td key={s.flank.id} className="py-2 pr-4">
-                        {s.repsPerSession.join('+')}×
-                      </td>
-                    ))}
-                    <td className="py-2 pr-4">{w.session.totalHmM.toFixed(0)} m</td>
-                    <td className="py-2 pr-4">{w.session.totalMinutes.toFixed(0)}'</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {advanced && sessionsPerWeek > 1 && (
+          <div className="mt-4">
+            <WeekdayPicker selected={weekdays} count={sessionsPerWeek} onChange={setCustomWeekdays} />
+          </div>
+        )}
+
+        {weeklyAgenda.length > 0 && (
+          <div className="mt-5">
+            {weeklyAgenda.map((w) => (
+              <WeekAgendaRow key={w.weekIndex} {...w} />
+            ))}
           </div>
         )}
 

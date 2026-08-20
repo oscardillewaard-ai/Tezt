@@ -172,32 +172,96 @@ function haversineMeters(a: TrackPoint, b: { lat: number; lon: number }): number
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h))
 }
 
+/**
+ * Finds descendants by local name, ignoring any namespace prefix. GPX files
+ * are namespaced, and while a default xmlns leaves tagName bare ("trkpt"),
+ * exporters that use an explicit prefix produce "gpx:trkpt" — which
+ * getElementsByTagName(name) does not match, since on XML documents it
+ * compares the full qualified name.
+ */
+function byLocalName(root: Document | Element, localName: string): Element[] {
+  const all = root.getElementsByTagName('*')
+  const out: Element[] = []
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i]
+    if ((el.localName ?? el.nodeName).toLowerCase() === localName) out.push(el)
+  }
+  return out
+}
+
 export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
-  const parserError = doc.querySelector('parsererror')
+  const parserError = doc.getElementsByTagName('parsererror')[0]
   if (parserError) {
     throw new Error('Dit bestand kon niet als GPX worden gelezen.')
   }
 
-  const trkpts = Array.from(doc.getElementsByTagName('trkpt'))
-  const source = trkpts.length > 0 ? trkpts : Array.from(doc.getElementsByTagName('rtept'))
+  const trkpts = byLocalName(doc, 'trkpt')
+  const source = trkpts.length > 0 ? trkpts : byLocalName(doc, 'rtept')
   if (source.length < 2) {
     throw new Error('Geen (voldoende) trackpunten gevonden in dit GPX-bestand.')
   }
 
-  const rawName = doc.querySelector('trk > name, metadata > name')?.textContent?.trim()
+  // Prefer the track's own name, then the file metadata's. A bare "first
+  // <name> anywhere" would often pick up the author or a waypoint instead.
+  const trkEl = byLocalName(doc, 'trk')[0] ?? byLocalName(doc, 'rte')[0]
+  const metadataEl = byLocalName(doc, 'metadata')[0]
+  const rawName =
+    (trkEl ? byLocalName(trkEl, 'name')[0]?.textContent?.trim() : undefined) ??
+    (metadataEl ? byLocalName(metadataEl, 'name')[0]?.textContent?.trim() : undefined)
   const name = rawName && rawName.length > 0 ? rawName : fallbackName
+
+  // Read coordinates first, keeping elevation optional. A point without <ele>
+  // must not be dropped: plenty of exports carry elevation on only some
+  // points (or none at all), and discarding those points used to throw away
+  // the whole track. Missing values are interpolated from their neighbours
+  // below instead.
+  const raw: { lat: number; lon: number; ele: number | null }[] = []
+  for (const pt of source) {
+    const lat = parseFloat(pt.getAttribute('lat') ?? '')
+    const lon = parseFloat(pt.getAttribute('lon') ?? '')
+    if (Number.isNaN(lat) || Number.isNaN(lon)) continue
+    const eleText = byLocalName(pt, 'ele')[0]?.textContent
+    const parsed = eleText != null ? parseFloat(eleText) : NaN
+    raw.push({ lat, lon, ele: Number.isNaN(parsed) ? null : parsed })
+  }
+
+  if (raw.length < 2) {
+    throw new Error('Dit GPX-bestand bevat geen bruikbare coördinaten.')
+  }
+  if (raw.every((p) => p.ele === null)) {
+    throw new Error(
+      'Dit GPX-bestand bevat geen hoogtedata (alleen coördinaten). Exporteer de route opnieuw mét hoogteprofiel.',
+    )
+  }
+
+  // Fill gaps: interpolate between known elevations, extend flat at the ends.
+  const firstKnown = raw.findIndex((p) => p.ele !== null)
+  const lastKnown = raw.length - 1 - [...raw].reverse().findIndex((p) => p.ele !== null)
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i].ele !== null) continue
+    if (i < firstKnown) {
+      raw[i].ele = raw[firstKnown].ele
+      continue
+    }
+    if (i > lastKnown) {
+      raw[i].ele = raw[lastKnown].ele
+      continue
+    }
+    let left = i - 1
+    while (left >= 0 && raw[left].ele === null) left--
+    let right = i + 1
+    while (right < raw.length && raw[right].ele === null) right++
+    const lv = raw[left].ele as number
+    const rv = raw[right].ele as number
+    raw[i].ele = lv + ((rv - lv) * (i - left)) / (right - left)
+  }
 
   const points: TrackPoint[] = []
   let cumulativeDistanceM = 0
 
-  for (const pt of source) {
-    const lat = parseFloat(pt.getAttribute('lat') ?? '')
-    const lon = parseFloat(pt.getAttribute('lon') ?? '')
-    const eleText = pt.getElementsByTagName('ele')[0]?.textContent
-    const ele = eleText !== undefined && eleText !== null ? parseFloat(eleText) : NaN
-    if (Number.isNaN(lat) || Number.isNaN(lon) || Number.isNaN(ele)) continue
-
+  for (const { lat, lon, ele: maybeEle } of raw) {
+    const ele = maybeEle as number
     const prev = points[points.length - 1]
     if (prev) {
       cumulativeDistanceM += haversineMeters(prev, { lat, lon })

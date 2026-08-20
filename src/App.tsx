@@ -14,12 +14,13 @@ import {
 import { RoutePanel } from './components/RoutePanel'
 import { HillPanel } from './components/HillPanel'
 import { RacePresetPanel } from './components/RacePresetPanel'
+import { ImageRacePanel } from './components/ImageRacePanel'
 import { TrainingPlan } from './components/TrainingPlan'
 import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 import { OnboardingModal } from './components/OnboardingModal'
 
 type BergMode = 'gpx' | 'hill'
-type RaceMode = 'gpx' | 'preset'
+type RaceMode = 'gpx' | 'preset' | 'image'
 type UiMode = 'simple' | 'advanced'
 type Theme = 'light' | 'dark'
 
@@ -45,6 +46,7 @@ function App() {
   const [race, setRace] = useState<RouteStats | null>(null)
   const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
   const [raceDistanceKm, setRaceDistanceKm] = useState<number>(0)
+  const [imageRace, setImageRace] = useState<RouteStats | null>(null)
   const [raceMode, setRaceMode] = useState<RaceMode>('gpx')
   const [berg, setBerg] = useState<RouteStats | null>(null)
   const [hill, setHill] = useState<TrainingHill | null>(BUILTIN_HILLS[0] ?? null)
@@ -53,7 +55,9 @@ function App() {
   const [savedBergen, setSavedBergen] = useState(listBergen)
 
   const effectiveRace: RouteStats | null =
-    raceMode === 'preset'
+    raceMode === 'image'
+      ? imageRace
+      : raceMode === 'preset'
       ? racePreset
         ? generateSyntheticRace(racePreset, raceDistanceKm || racePreset.defaultDistanceKm)
         : null
@@ -142,9 +146,22 @@ function App() {
               >
                 Voorbeeldwedstrijd
               </button>
+              <button
+                type="button"
+                onClick={() => setRaceMode('image')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  raceMode === 'image'
+                    ? 'bg-orange-400 text-slate-900'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
+                }`}
+              >
+                Uit afbeelding
+              </button>
             </div>
 
-            {raceMode === 'gpx' ? (
+            {raceMode === 'image' ? (
+              <ImageRacePanel onRouteReady={setImageRace} />
+            ) : raceMode === 'gpx' ? (
               <RoutePanel
                 title="Ultrarace"
                 description="De GPX-track van de wedstrijd waar je je op voorbereidt."
