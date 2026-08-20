@@ -50,7 +50,7 @@ function App() {
         </header>
 
         <div className="grid gap-6 sm:grid-cols-2">
-          <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-3">
             <div className="flex gap-2">
               <button
                 type="button"
@@ -105,7 +105,7 @@ function App() {
             )}
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-3">
             <div className="flex gap-2">
               <button
                 type="button"

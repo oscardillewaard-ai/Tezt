@@ -55,7 +55,7 @@ export function TrainingPlan({ race, berg }: TrainingPlanProps) {
             step={1}
             value={targetPercent}
             onChange={(e) => setTargetPercent(Number(e.target.value))}
-            className="w-full accent-emerald-400"
+            className="min-w-0 flex-1 accent-emerald-400"
           />
           <div className="flex shrink-0 items-center gap-1">
             <input
