@@ -2,6 +2,15 @@ import { useMemo, useState } from 'react'
 import type { RouteStats } from '../lib/gpx'
 import type { TrainingHill } from '../lib/hills'
 import { buildFlankWeeklyPlan, computeFlankSession, type FlankSessionPlan } from '../lib/flankPlan'
+import {
+  buildIcsCalendar,
+  downloadTextFile,
+  sessionDate,
+  weekdayName,
+  weekdaysForSessionsPerWeek,
+  type ScheduleEntry,
+} from '../lib/schedule'
+import { PrintChecklist } from './PrintChecklist'
 
 interface FlankTrainingPlanProps {
   race: RouteStats
@@ -75,6 +84,44 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     return buildFlankWeeklyPlan(race, hill, parsed, new Date(), sessionsPerWeek, 110, startPercent)
   }, [race, hill, raceDate, sessionsPerWeek, startPercent])
 
+  const weekdays = weekdaysForSessionsPerWeek(sessionsPerWeek)
+
+  function sessionParts(w: (typeof weeklyPlan)[number], i: number): string[] {
+    const parts = w.splits
+      .filter((s) => s.repsPerSession[i] > 0)
+      .map((s) => `${s.flank.name} ${s.repsPerSession[i]}×`)
+    if (w.warmupSplit && w.warmupSplit.repsPerSession[i] > 0) {
+      parts.push(`${w.warmupSplit.flank.name} ${w.warmupSplit.repsPerSession[i]}×`)
+    }
+    return parts
+  }
+
+  const scheduleEntries: ScheduleEntry[] = useMemo(
+    () =>
+      weeklyPlan.flatMap((w) =>
+        Array.from({ length: sessionsPerWeek }, (_, i) => {
+          const parts = sessionParts(w, i)
+          if (parts.length === 0) return null
+          return {
+            date: sessionDate(w.weekStart, weekdays[i] ?? weekdays[0]),
+            title: `Bergtraining: ${parts.join(', ')}`,
+            description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : `${w.targetPercent}% van D+`}. Deze sessie: ${parts.join(', ')}. Hele week: ${w.session.totalHmM.toFixed(0)} m D+, ${w.session.totalMinutes.toFixed(0)} min.`,
+          }
+        }).filter((e): e is ScheduleEntry => e !== null),
+      ),
+    [weeklyPlan, weekdays, sessionsPerWeek],
+  )
+
+  const printWeeks = weeklyPlan.map((w) => ({
+    label: formatWeekLabel(w.weekStart, w.weekEnd),
+    goal: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+    sessions: Array.from({ length: sessionsPerWeek }, (_, i) => {
+      const parts = sessionParts(w, i)
+      const day = weekdayName(weekdays[i] ?? weekdays[0])
+      return parts.length > 0 ? `${day}: ${parts.join(', ')}` : `${day}: rust`
+    }),
+  }))
+
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
       <p className="text-sm text-[var(--status-warn)]">
@@ -86,7 +133,7 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="no-print">
         <h3 className="text-base font-semibold text-[var(--text)]">Eén training</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Elke klim én afdaling uit de wedstrijd-GPX is gematcht op de flank met de
@@ -151,6 +198,7 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
       </div>
 
       <div>
+      <div className="no-print">
         <h3 className="text-base font-semibold text-[var(--text)]">Opbouwschema naar wedstrijddag</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Vul de datum van je wedstrijd in voor een wekelijks schema dat opbouwt naar een piek en
@@ -241,6 +289,41 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             </table>
           </div>
         )}
+
+        {scheduleEntries.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                downloadTextFile(
+                  'bergtrainer-schema.ics',
+                  buildIcsCalendar(scheduleEntries, 'Bergtrainer schema'),
+                  'text/calendar',
+                )
+              }
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Toevoegen aan agenda (.ics)
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Printen als A4-checklist
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-[var(--faint)]">
+          Sessies gepland op {weekdays.map(weekdayName).join(', ')}.
+        </p>
+      </div>
+
+      <PrintChecklist
+        title="Bergtrainer — trainingsschema"
+        subtitle={`${hill.name} · ${sessionsPerWeek}× per week op ${weekdays.map(weekdayName).join(', ')}`}
+        weeks={printWeeks}
+      />
       </div>
     </div>
   )

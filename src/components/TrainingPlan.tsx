@@ -1,6 +1,15 @@
 import { useMemo, useState } from 'react'
 import type { RouteStats } from '../lib/gpx'
 import { buildWeeklyPlan, computeSession } from '../lib/plan'
+import {
+  buildIcsCalendar,
+  downloadTextFile,
+  sessionDate,
+  weekdayName,
+  weekdaysForSessionsPerWeek,
+  type ScheduleEntry,
+} from '../lib/schedule'
+import { PrintChecklist } from './PrintChecklist'
 
 interface TrainingPlanProps {
   race: RouteStats
@@ -36,6 +45,28 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
     return buildWeeklyPlan(race, berg, parsed, new Date(), sessionsPerWeek, 110, startPercent)
   }, [race, berg, raceDate, sessionsPerWeek, startPercent])
 
+  const weekdays = weekdaysForSessionsPerWeek(sessionsPerWeek)
+
+  const scheduleEntries: ScheduleEntry[] = useMemo(
+    () =>
+      weeklyPlan.flatMap((w) =>
+        w.repsPerSession.map((reps, i) => ({
+          date: sessionDate(w.weekStart, weekdays[i] ?? weekdays[0]),
+          title: `Bergtraining: ${reps}× herhaling`,
+          description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : `${w.targetPercent}% van D+`}. Deze sessie: ${reps}× (${(reps * berg.distanceKm).toFixed(1)} km, ${(reps * berg.gainM).toFixed(0)} m D+). Hele week: ${w.repsPerSession.join(' + ')}×, ${w.totalGainM.toFixed(0)} m D+.`,
+        })),
+      ),
+    [weeklyPlan, weekdays, berg.distanceKm, berg.gainM],
+  )
+
+  const printWeeks = weeklyPlan.map((w) => ({
+    label: formatWeekLabel(w.weekStart, w.weekEnd),
+    goal: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+    sessions: w.repsPerSession.map(
+      (reps, i) => `${weekdayName(weekdays[i] ?? weekdays[0])}: ${reps}× herhaling`,
+    ),
+  }))
+
   if (berg.gainM <= 0) {
     return (
       <p className="text-sm text-[var(--status-warn)]">
@@ -46,7 +77,7 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="no-print">
         <h3 className="text-base font-semibold text-[var(--text)]">Eén training</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Hoeveel keer moet je de berg op om (een deel van) de hoogtemeters van de wedstrijd na te
@@ -103,6 +134,7 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
       </div>
 
       <div>
+      <div className="no-print">
         <h3 className="text-base font-semibold text-[var(--text)]">Opbouwschema naar wedstrijddag</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Vul de datum van je wedstrijd in voor een wekelijks schema dat opbouwt naar een piek en
@@ -185,6 +217,41 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
             </table>
           </div>
         )}
+
+        {scheduleEntries.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                downloadTextFile(
+                  'bergtrainer-schema.ics',
+                  buildIcsCalendar(scheduleEntries, 'Bergtrainer schema'),
+                  'text/calendar',
+                )
+              }
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Toevoegen aan agenda (.ics)
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Printen als A4-checklist
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-[var(--faint)]">
+          Sessies gepland op {weekdays.map(weekdayName).join(', ')}.
+        </p>
+      </div>
+
+      <PrintChecklist
+        title="Bergtrainer — trainingsschema"
+        subtitle={`${berg.name} · ${sessionsPerWeek}× per week op ${weekdays.map(weekdayName).join(', ')}`}
+        weeks={printWeeks}
+      />
       </div>
     </div>
   )

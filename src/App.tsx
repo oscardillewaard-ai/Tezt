@@ -63,7 +63,7 @@ function App() {
     <div className="min-h-svh bg-[var(--bg)] text-[var(--text)]">
       {!hasOnboarded && <OnboardingModal onDismiss={() => setHasOnboarded(true)} />}
       <div className="mx-auto max-w-4xl px-4 py-10">
-        <header className="mb-8">
+        <header className="no-print mb-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-[var(--text)]">Bergtrainer</h1>
@@ -117,7 +117,7 @@ function App() {
           </div>
         </header>
 
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="no-print grid gap-6 sm:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-3">
             <div className="flex gap-2">
               <button
@@ -220,7 +220,7 @@ function App() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 print:border-0 print:bg-white print:p-0">
           {bergMode === 'hill' && effectiveRace && hill ? (
             <FlankTrainingPlan race={effectiveRace} hill={hill} advanced={uiMode === 'advanced'} />
           ) : bergMode === 'gpx' && effectiveRace && berg ? (

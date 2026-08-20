@@ -43,6 +43,12 @@ Er zijn ook twee manieren om de trainingsberg te kiezen:
 5. Vul optioneel een wedstrijddatum in voor een wekelijks schema dat opbouwt
    naar een piek (~110% van de wedstrijd-D+) en afbouwt in de laatste
    week(en) voor de wedstrijd, met dezelfde flankverdeling per week.
+6. Exporteer het schema als agenda-bestand (.ics, één sessie per geplande
+   trainingsdag) of print het als afvinkbare A4-checklist.
+
+Rechtsboven kun je schakelen tussen **Eenvoudig** (standaard) en
+**Uitgebreid** — uitgebreid toont extra knoppen zoals startpercentage en
+trainingen per week — en tussen **licht en donker thema**.
 
 Alles draait client-side; er wordt niets naar een server verstuurd. Opgeslagen
 routes staan lokaal in de browser (`localStorage`).
