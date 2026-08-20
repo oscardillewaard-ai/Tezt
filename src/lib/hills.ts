@@ -16,7 +16,12 @@ export interface Flank {
   descendMode: DirectionMode
   /** Round-trip (top -> foot -> top) time in minutes. */
   minutesPerRep: number
-  /** 'climb' flanks are matched against the race profile; 'warmup' flanks are fixed once per session. */
+  /**
+   * 'climb' flanks take part in the race-gradient matching and can be
+   * repeated any number of times. 'warmup' is for a flank that's only ever
+   * walked once per session (e.g. a fixed in/out approach route) and is
+   * excluded from the matched allocation.
+   */
   role: 'climb' | 'warmup'
 }
 
@@ -78,7 +83,7 @@ export const LUHRS_HEUVEL: TrainingHill = {
     {
       id: 'ZZW',
       pendelType: 'in/uit',
-      name: 'in/uit — ZZW-flank',
+      name: 'in/uit-pendel — ZZW-flank',
       aspect: 'ZZW',
       distanceM: 301,
       gradientPercent: 10,
@@ -86,7 +91,7 @@ export const LUHRS_HEUVEL: TrainingHill = {
       climbMode: 'jog',
       descendMode: 'jog',
       minutesPerRep: 15,
-      role: 'warmup',
+      role: 'climb',
     },
   ],
 }
