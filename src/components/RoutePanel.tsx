@@ -17,6 +17,15 @@ interface RoutePanelProps {
   onDeleteSaved: (id: string) => void
 }
 
+function isSaved(route: RouteStats, saved: SavedRoute[]): boolean {
+  return saved.some(
+    (s) =>
+      s.stats.name === route.name &&
+      Math.abs(s.stats.distanceKm - route.distanceKm) < 0.01 &&
+      Math.abs(s.stats.gainM - route.gainM) < 1,
+  )
+}
+
 export function RoutePanel({
   title,
   description,
@@ -29,6 +38,7 @@ export function RoutePanel({
   onDeleteSaved,
 }: RoutePanelProps) {
   const [error, setError] = useState<string | null>(null)
+  const [showUpload, setShowUpload] = useState(false)
 
   function handleFile(text: string, filename: string) {
     try {
@@ -46,38 +56,30 @@ export function RoutePanel({
       <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
       <p className="mt-0.5 text-sm text-slate-400">{description}</p>
 
-      <div className="mt-4">
-        <FileDrop
-          label={route ? 'Ander GPX-bestand kiezen' : 'Sleep een GPX-bestand hierheen'}
-          hint="of klik om te bladeren"
-          onFile={handleFile}
-          accentClass={accentClass}
-        />
-      </div>
-
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-
-      {saved.length > 0 && (
+      {!route && saved.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Opgeslagen routes</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Kies een route</p>
+          <div className="space-y-2">
             {saved.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-1.5 rounded-full bg-slate-800 py-1 pl-3 pr-1.5 text-sm text-slate-300"
+                className="flex items-center justify-between gap-3 rounded-lg bg-slate-800/60 px-4 py-2.5"
               >
                 <button
                   type="button"
                   onClick={() => onRouteChange(s.stats)}
-                  className="hover:text-white"
+                  className="min-w-0 flex-1 text-left"
                 >
-                  {s.stats.name}
+                  <p className="truncate text-sm font-medium text-slate-200">{s.stats.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {s.stats.distanceKm.toFixed(1)} km · D+ {s.stats.gainM.toFixed(0)} m
+                  </p>
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteSaved(s.id)}
                   aria-label={`${s.stats.name} verwijderen`}
-                  className="rounded-full px-1.5 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
+                  className="shrink-0 rounded-full px-2 py-1 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
                 >
                   ×
                 </button>
@@ -87,22 +89,56 @@ export function RoutePanel({
         </div>
       )}
 
+      {!route && saved.length > 0 && !showUpload && (
+        <button
+          type="button"
+          onClick={() => setShowUpload(true)}
+          className="mt-3 text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+        >
+          Nieuwe GPX toevoegen
+        </button>
+      )}
+
+      {(showUpload || saved.length === 0 || route) && (
+        <div className="mt-4">
+          <FileDrop
+            label={route ? 'Ander GPX-bestand kiezen' : 'Sleep een GPX-bestand hierheen'}
+            hint="of klik om te bladeren"
+            onFile={handleFile}
+            accentClass={accentClass}
+          />
+        </div>
+      )}
+
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+
       {route && (
         <div className="mt-5 space-y-4">
-          <p className="truncate text-sm font-medium text-slate-200">{route.name}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-sm font-medium text-slate-200">{route.name}</p>
+            <button
+              type="button"
+              onClick={() => onRouteChange(null)}
+              className="shrink-0 text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+            >
+              Andere route kiezen
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <StatCard label="Afstand" value={`${route.distanceKm.toFixed(1)} km`} />
             <StatCard label="D+" value={`${route.gainM.toFixed(0)} m`} />
             <StatCard label="D-" value={`${route.lossM.toFixed(0)} m`} />
           </div>
           <ElevationChart profile={route.profile} color={color} />
-          <button
-            type="button"
-            onClick={() => onSave(route)}
-            className="text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
-          >
-            Route bewaren voor later
-          </button>
+          {!isSaved(route, saved) && (
+            <button
+              type="button"
+              onClick={() => onSave(route)}
+              className="text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+            >
+              Route bewaren voor later
+            </button>
+          )}
         </div>
       )}
     </div>
