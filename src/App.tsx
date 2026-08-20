@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { RouteStats } from './lib/gpx'
 import { BUILTIN_HILLS, type TrainingHill } from './lib/hills'
 import { BUILTIN_RACE_ARCHETYPES, generateSyntheticRace, type RaceArchetype } from './lib/syntheticRaces'
@@ -20,9 +20,26 @@ import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 type BergMode = 'gpx' | 'hill'
 type RaceMode = 'gpx' | 'preset'
 type UiMode = 'simple' | 'advanced'
+type Theme = 'light' | 'dark'
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
 
 function App() {
   const [uiMode, setUiMode] = useLocalStorageState<UiMode>('bergtrainer:ui-mode', 'simple')
+  const [theme, setTheme] = useLocalStorageState<Theme>(
+    'bergtrainer:theme',
+    systemPrefersDark() ? 'dark' : 'light',
+  )
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#020617' : '#f8fafc')
+  }, [theme])
+
   const [race, setRace] = useState<RouteStats | null>(null)
   const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
   const [raceDistanceKm, setRaceDistanceKm] = useState<number>(0)
@@ -41,13 +58,13 @@ function App() {
       : race
 
   return (
-    <div className="min-h-svh bg-slate-950 text-slate-100">
+    <div className="min-h-svh bg-[var(--bg)] text-[var(--text)]">
       <div className="mx-auto max-w-4xl px-4 py-10">
         <header className="mb-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-100">Bergtrainer</h1>
-              <p className="mt-2 text-slate-400">
+              <h1 className="text-3xl font-semibold tracking-tight text-[var(--text)]">Bergtrainer</h1>
+              <p className="mt-2 text-[var(--muted)]">
                 Upload de GPX van je ultrarace en kies je trainingsberg. Bergtrainer matcht elke
                 klim uit de wedstrijd op de flank met de dichtstbijzijnde helling en bouwt daar een
                 trainingsschema omheen tot wedstrijddag.
@@ -56,7 +73,7 @@ function App() {
             <div
               role="radiogroup"
               aria-label="Weergavemodus"
-              className="flex shrink-0 gap-1 rounded-full bg-slate-900 p-1"
+              className="flex shrink-0 gap-1 rounded-full bg-[var(--nav-bg)] p-1"
             >
               <button
                 type="button"
@@ -65,8 +82,8 @@ function App() {
                 onClick={() => setUiMode('simple')}
                 className={`rounded-full px-3 py-1.5 text-sm ${
                   uiMode === 'simple'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-[var(--surface-2-active)] text-[var(--text)]'
+                    : 'text-[var(--muted)] hover:text-[var(--text-2)]'
                 }`}
               >
                 Eenvoudig
@@ -78,13 +95,22 @@ function App() {
                 onClick={() => setUiMode('advanced')}
                 className={`rounded-full px-3 py-1.5 text-sm ${
                   uiMode === 'advanced'
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-[var(--surface-2-active)] text-[var(--text)]'
+                    : 'text-[var(--muted)] hover:text-[var(--text-2)]'
                 }`}
               >
                 Uitgebreid
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label={theme === 'dark' ? 'Licht thema' : 'Donker thema'}
+              title={theme === 'dark' ? 'Licht thema' : 'Donker thema'}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--nav-bg)] text-[var(--text-2)] hover:text-[var(--text)]"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
           </div>
         </header>
 
@@ -97,7 +123,7 @@ function App() {
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   raceMode === 'gpx'
                     ? 'bg-orange-400 text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
                 }`}
               >
                 Eigen GPX
@@ -108,7 +134,7 @@ function App() {
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   raceMode === 'preset'
                     ? 'bg-orange-400 text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
                 }`}
               >
                 Voorbeeldwedstrijd
@@ -152,7 +178,7 @@ function App() {
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   bergMode === 'hill'
                     ? 'bg-emerald-400 text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
                 }`}
               >
                 Vaste heuvel
@@ -163,7 +189,7 @@ function App() {
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   bergMode === 'gpx'
                     ? 'bg-emerald-400 text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
                 }`}
               >
                 Eigen GPX
@@ -191,13 +217,13 @@ function App() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
           {bergMode === 'hill' && effectiveRace && hill ? (
             <FlankTrainingPlan race={effectiveRace} hill={hill} advanced={uiMode === 'advanced'} />
           ) : bergMode === 'gpx' && effectiveRace && berg ? (
             <TrainingPlan race={effectiveRace} berg={berg} advanced={uiMode === 'advanced'} />
           ) : (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-[var(--faint)]">
               {bergMode === 'hill'
                 ? 'Kies een wedstrijd en een heuvel om een trainingsplan te zien.'
                 : 'Kies zowel een wedstrijd als een trainingsberg-GPX om een trainingsplan te zien.'}

@@ -38,7 +38,7 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
 
   if (berg.gainM <= 0) {
     return (
-      <p className="text-sm text-amber-400">
+      <p className="text-sm text-[var(--status-warn)]">
         Deze trainingsberg heeft geen meetbare hoogtewinst. Kies een ander GPX-bestand.
       </p>
     )
@@ -47,8 +47,8 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="text-base font-semibold text-slate-100">Eén training</h3>
-        <p className="mt-1 text-sm text-slate-400">
+        <h3 className="text-base font-semibold text-[var(--text)]">Eén training</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Hoeveel keer moet je de berg op om (een deel van) de hoogtemeters van de wedstrijd na te
           bootsen?
         </p>
@@ -70,32 +70,32 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
               max={500}
               value={targetPercent}
               onChange={(e) => setTargetPercent(Math.max(1, Number(e.target.value)))}
-              className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100"
+              className="w-16 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm text-[var(--text)]"
             />
-            <span className="text-sm text-slate-400">%</span>
+            <span className="text-sm text-[var(--muted)]">%</span>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Herhalingen</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-400">{session.reps}×</p>
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Herhalingen</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--accent-emerald-text)]">{session.reps}×</p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Totale D+</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Totale D+</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.totalGainM.toFixed(0)} m
             </p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Afstand</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Afstand</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.totalDistanceKm.toFixed(1)} km
             </p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">% van wedstrijd</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">% van wedstrijd</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.percentOfRace.toFixed(0)}%
             </p>
           </div>
@@ -103,25 +103,25 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
       </div>
 
       <div>
-        <h3 className="text-base font-semibold text-slate-100">Opbouwschema naar wedstrijddag</h3>
-        <p className="mt-1 text-sm text-slate-400">
+        <h3 className="text-base font-semibold text-[var(--text)]">Opbouwschema naar wedstrijddag</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Vul de datum van je wedstrijd in voor een wekelijks schema dat opbouwt naar een piek en
           daarna afbouwt (taper).
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1 text-sm text-slate-300">
+          <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
             Wedstrijddatum
             <input
               type="date"
               value={raceDate}
               onChange={(e) => setRaceDate(e.target.value)}
-              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
             />
           </label>
           {advanced && (
             <>
-              <label className="flex flex-col gap-1 text-sm text-slate-300">
+              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Trainingen per week
                 <input
                   type="number"
@@ -129,10 +129,10 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
                   max={7}
                   value={sessionsPerWeekInput}
                   onChange={(e) => setSessionsPerWeekInput(Math.max(1, Number(e.target.value)))}
-                  className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                  className="w-24 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-sm text-slate-300">
+              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Startpercentage
                 <input
                   type="number"
@@ -141,7 +141,7 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
                   step={5}
                   value={startPercentInput}
                   onChange={(e) => setStartPercentInput(Math.max(10, Number(e.target.value)))}
-                  className="w-24 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                  className="w-24 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
             </>
@@ -152,7 +152,7 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-[var(--border)] text-[var(--muted)]">
                   <th className="py-2 pr-4 font-medium">Week</th>
                   <th className="py-2 pr-4 font-medium">Doel</th>
                   <th className="py-2 pr-4 font-medium">Herhalingen</th>
@@ -164,12 +164,12 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
                 {weeklyPlan.map((w) => (
                   <tr
                     key={w.weekIndex}
-                    className={`border-b border-slate-800/60 ${
+                    className={`border-b border-[var(--border-soft)] ${
                       w.isRaceWeek
-                        ? 'text-amber-300'
+                        ? 'text-[var(--status-warn)]'
                         : w.isTaper
-                          ? 'text-sky-300'
-                          : 'text-slate-200'
+                          ? 'text-[var(--status-info)]'
+                          : 'text-[var(--text-2)]'
                     }`}
                   >
                     <td className="py-2 pr-4">{formatWeekLabel(w.weekStart, w.weekEnd)}</td>

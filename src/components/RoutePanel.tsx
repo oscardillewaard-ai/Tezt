@@ -52,26 +52,26 @@ export function RoutePanel({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-      <p className="mt-0.5 text-sm text-slate-400">{description}</p>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <h2 className="text-lg font-semibold text-[var(--text)]">{title}</h2>
+      <p className="mt-0.5 text-sm text-[var(--muted)]">{description}</p>
 
       {!route && saved.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Kies een route</p>
+          <p className="mb-2 text-xs uppercase tracking-wide text-[var(--faint)]">Kies een route</p>
           <div className="space-y-2">
             {saved.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-lg bg-slate-800/60 px-4 py-2.5"
+                className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-3)] px-4 py-2.5"
               >
                 <button
                   type="button"
                   onClick={() => onRouteChange(s.stats)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <p className="truncate text-sm font-medium text-slate-200">{s.stats.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="truncate text-sm font-medium text-[var(--text-2)]">{s.stats.name}</p>
+                  <p className="text-xs text-[var(--faint)]">
                     {s.stats.distanceKm.toFixed(1)} km · D+ {s.stats.gainM.toFixed(0)} m
                   </p>
                 </button>
@@ -79,7 +79,7 @@ export function RoutePanel({
                   type="button"
                   onClick={() => onDeleteSaved(s.id)}
                   aria-label={`${s.stats.name} verwijderen`}
-                  className="shrink-0 rounded-full px-2 py-1 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
+                  className="shrink-0 rounded-full px-2 py-1 text-[var(--faint)] hover:bg-[var(--surface-2-hover)] hover:text-[var(--text-2)]"
                 >
                   ×
                 </button>
@@ -93,7 +93,7 @@ export function RoutePanel({
         <button
           type="button"
           onClick={() => setShowUpload(true)}
-          className="mt-3 text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+          className="mt-3 text-sm text-[var(--muted)] underline decoration-dotted hover:text-[var(--text-2)]"
         >
           Nieuwe GPX toevoegen
         </button>
@@ -115,11 +115,11 @@ export function RoutePanel({
       {route && (
         <div className="mt-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-sm font-medium text-slate-200">{route.name}</p>
+            <p className="min-w-0 truncate text-sm font-medium text-[var(--text-2)]">{route.name}</p>
             <button
               type="button"
               onClick={() => onRouteChange(null)}
-              className="shrink-0 text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+              className="shrink-0 text-sm text-[var(--muted)] underline decoration-dotted hover:text-[var(--text-2)]"
             >
               Andere route kiezen
             </button>
@@ -134,7 +134,7 @@ export function RoutePanel({
             <button
               type="button"
               onClick={() => onSave(route)}
-              className="text-sm text-slate-400 underline decoration-dotted hover:text-slate-200"
+              className="text-sm text-[var(--muted)] underline decoration-dotted hover:text-[var(--text-2)]"
             >
               Route bewaren voor later
             </button>

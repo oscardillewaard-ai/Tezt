@@ -32,11 +32,11 @@ export function FileDrop({ label, hint, onFile, accentClass }: FileDropProps) {
       }}
       onClick={() => inputRef.current?.click()}
       className={`cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
-        isOver ? accentClass : 'border-slate-700 hover:border-slate-500'
+        isOver ? accentClass : 'border-[var(--border-2)] hover:border-[var(--muted)]'
       }`}
     >
-      <p className="font-medium text-slate-200">{label}</p>
-      <p className="mt-1 text-sm text-slate-400">{hint}</p>
+      <p className="font-medium text-[var(--text-2)]">{label}</p>
+      <p className="mt-1 text-sm text-[var(--muted)]">{hint}</p>
       <input
         ref={inputRef}
         type="file"

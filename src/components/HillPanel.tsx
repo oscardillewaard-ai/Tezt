@@ -15,9 +15,9 @@ interface HillPanelProps {
 
 export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <h2 className="text-lg font-semibold text-slate-100">Trainingsberg</h2>
-      <p className="mt-0.5 text-sm text-slate-400">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <h2 className="text-lg font-semibold text-[var(--text)]">Trainingsberg</h2>
+      <p className="mt-0.5 text-sm text-[var(--muted)]">
         Vaste heuvel met meerdere flanken. Elke flank heeft een eigen lengte, helling en
         pendeltype.
       </p>
@@ -31,7 +31,7 @@ export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
             className={`rounded-full px-3 py-1.5 text-sm ${
               selected?.id === hill.id
                 ? 'bg-emerald-400 text-slate-900'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
             }`}
           >
             {hill.name}
@@ -42,17 +42,17 @@ export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
       {selected && (
         <div className="mt-5 space-y-4">
           <div>
-            <p className="text-sm font-medium text-slate-200">{selected.location}</p>
-            <p className="mt-1 text-xs text-slate-500">{selected.source}</p>
+            <p className="text-sm font-medium text-[var(--text-2)]">{selected.location}</p>
+            <p className="mt-1 text-xs text-[var(--faint)]">{selected.source}</p>
           </div>
-          <p className="rounded-lg bg-slate-800/60 px-4 py-3 text-sm text-slate-300">
+          <p className="rounded-lg bg-[var(--surface-3)] px-4 py-3 text-sm text-[var(--text-3)]">
             {selected.note}
           </p>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-[var(--border)] text-[var(--muted)]">
                   <th className="py-2 pr-4 font-medium">Flank</th>
                   <th className="py-2 pr-4 font-medium">Lengte</th>
                   <th className="py-2 pr-4 font-medium">Helling</th>
@@ -62,12 +62,12 @@ export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
               </thead>
               <tbody>
                 {selected.flanks.map((f) => (
-                  <tr key={f.id} className="border-b border-slate-800/60 text-slate-200">
+                  <tr key={f.id} className="border-b border-[var(--border-soft)] text-[var(--text-2)]">
                     <td className="py-2 pr-4">{f.name}</td>
                     <td className="py-2 pr-4">{f.distanceM} m</td>
                     <td className="py-2 pr-4">{f.gradientPercent}%</td>
                     <td className="py-2 pr-4">{f.hmOneWay} m</td>
-                    <td className="py-2 pr-4 text-slate-400">
+                    <td className="py-2 pr-4 text-[var(--muted)]">
                       {modeLabel[f.climbMode]} / {modeLabel[f.descendMode]}
                     </td>
                   </tr>

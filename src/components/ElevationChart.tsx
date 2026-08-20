@@ -27,21 +27,26 @@ export function ElevationChart({ profile, color }: ElevationChartProps) {
             <stop offset="100%" stopColor={color} stopOpacity={0.03} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-2)" />
         <XAxis
           dataKey="distanceKm"
           tickFormatter={(v: number) => `${v.toFixed(decimals)}km`}
-          stroke="#64748b"
+          stroke="var(--muted)"
           fontSize={12}
         />
         <YAxis
           tickFormatter={(v: number) => `${v.toFixed(0)}m`}
-          stroke="#64748b"
+          stroke="var(--muted)"
           fontSize={12}
           width={50}
         />
         <Tooltip
-          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+          contentStyle={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-2)',
+            borderRadius: 8,
+            color: 'var(--text)',
+          }}
           labelFormatter={(v) => `${Number(v).toFixed(2)} km`}
           formatter={(v) => [`${Number(v).toFixed(0)} m`, 'hoogte']}
         />

@@ -21,9 +21,9 @@ export function RacePresetPanel({
   const route: RouteStats | null = selected ? generateSyntheticRace(selected, distanceKm) : null
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <h2 className="text-lg font-semibold text-slate-100">Ultrarace</h2>
-      <p className="mt-0.5 text-sm text-slate-400">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <h2 className="text-lg font-semibold text-[var(--text)]">Ultrarace</h2>
+      <p className="mt-0.5 text-sm text-[var(--muted)]">
         Voorbeeldwedstrijd: een indicatief profiel voor een type terrein, geen echte race-GPX.
       </p>
 
@@ -36,7 +36,7 @@ export function RacePresetPanel({
             className={`rounded-full px-3 py-1.5 text-sm ${
               selected?.id === a.id
                 ? 'bg-orange-400 text-slate-900'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
             }`}
           >
             {a.name}
@@ -48,16 +48,16 @@ export function RacePresetPanel({
         <div className="mt-5 space-y-4">
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-slate-200">{selected.location}</p>
-              <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+              <p className="text-sm font-medium text-[var(--text-2)]">{selected.location}</p>
+              <span className="shrink-0 rounded-full bg-[var(--badge-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--badge-text)]">
                 Generiek profiel
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{selected.note}</p>
+            <p className="mt-1 text-xs text-[var(--faint)]">{selected.note}</p>
           </div>
 
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-slate-500">
+            <span className="text-xs uppercase tracking-wide text-[var(--faint)]">
               Afstand: {distanceKm} km
             </span>
             <input

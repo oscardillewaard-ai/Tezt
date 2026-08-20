@@ -19,7 +19,7 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[520px] border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-slate-800 text-slate-400">
+          <tr className="border-b border-[var(--border)] text-[var(--muted)]">
             <th className="py-2 pr-4 font-medium">Flank</th>
             <th className="py-2 pr-4 font-medium">Aandeel wedstrijdterrein</th>
             <th className="py-2 pr-4 font-medium">Herhalingen</th>
@@ -29,7 +29,7 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
         </thead>
         <tbody>
           {session.allocations.map((a) => (
-            <tr key={a.flank.id} className="border-b border-slate-800/60 text-slate-200">
+            <tr key={a.flank.id} className="border-b border-[var(--border-soft)] text-[var(--text-2)]">
               <td className="py-2 pr-4">{a.flank.name}</td>
               <td className="py-2 pr-4">{(a.shareOfClimb * 100).toFixed(0)}%</td>
               <td className="py-2 pr-4">{a.reps}×</td>
@@ -38,7 +38,7 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
             </tr>
           ))}
           {session.warmup && (
-            <tr className="text-slate-400">
+            <tr className="text-[var(--muted)]">
               <td className="py-2 pr-4">{session.warmup.flank.name}</td>
               <td className="py-2 pr-4">—</td>
               <td className="py-2 pr-4">{session.warmup.reps}×</td>
@@ -77,7 +77,7 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
 
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
-      <p className="text-sm text-amber-400">
+      <p className="text-sm text-[var(--status-warn)]">
         Er zijn geen losse klimmen of afdalingen te herkennen in deze wedstrijd-GPX, dus kan de mix
         niet over de flanken verdeeld worden.
       </p>
@@ -87,8 +87,8 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="text-base font-semibold text-slate-100">Eén training</h3>
-        <p className="mt-1 text-sm text-slate-400">
+        <h3 className="text-base font-semibold text-[var(--text)]">Eén training</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Elke klim én afdaling uit de wedstrijd-GPX is gematcht op de flank met de
           dichtstbijzijnde helling — een pendel ga je op én af over dezelfde flank, dus een steile
           afdaling in de wedstrijd telt net zo zwaar mee als een steile klim. De herhalingen per
@@ -112,34 +112,34 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
               max={500}
               value={targetPercent}
               onChange={(e) => setTargetPercent(Math.max(1, Number(e.target.value)))}
-              className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100"
+              className="w-16 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm text-[var(--text)]"
             />
-            <span className="text-sm text-slate-400">%</span>
+            <span className="text-sm text-[var(--muted)]">%</span>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Totale D+</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Totale D+</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.totalHmM.toFixed(0)} m
             </p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">% van wedstrijd</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">% van wedstrijd</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.percentOfRace.toFixed(0)}%
             </p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Duur</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Duur</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
               {session.totalMinutes.toFixed(0)}'
             </p>
           </div>
-          <div className="rounded-lg bg-slate-800/60 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Rennend / stijl af</p>
-            <p className="mt-1 text-lg font-semibold text-slate-100">
+          <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Rennend / stijl af</p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text)]">
               {session.runningDescentHmM.toFixed(0)} / {session.steepDescentHmM.toFixed(0)} m
             </p>
           </div>
@@ -151,25 +151,25 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
       </div>
 
       <div>
-        <h3 className="text-base font-semibold text-slate-100">Opbouwschema naar wedstrijddag</h3>
-        <p className="mt-1 text-sm text-slate-400">
+        <h3 className="text-base font-semibold text-[var(--text)]">Opbouwschema naar wedstrijddag</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Vul de datum van je wedstrijd in voor een wekelijks schema dat opbouwt naar een piek en
           daarna afbouwt (taper), met dezelfde flankverdeling als hierboven.
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1 text-sm text-slate-300">
+          <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
             Wedstrijddatum
             <input
               type="date"
               value={raceDate}
               onChange={(e) => setRaceDate(e.target.value)}
-              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
             />
           </label>
           {advanced && (
             <>
-              <label className="flex flex-col gap-1 text-sm text-slate-300">
+              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Startpercentage
                 <input
                   type="number"
@@ -178,10 +178,10 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
                   step={5}
                   value={startPercentInput}
                   onChange={(e) => setStartPercentInput(Math.max(10, Number(e.target.value)))}
-                  className="w-28 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                  className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-sm text-slate-300">
+              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
                 Trainingen per week
                 <input
                   type="number"
@@ -189,7 +189,7 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
                   max={7}
                   value={sessionsPerWeekInput}
                   onChange={(e) => setSessionsPerWeekInput(Math.max(1, Number(e.target.value)))}
-                  className="w-28 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-100"
+                  className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
                 />
               </label>
             </>
@@ -200,7 +200,7 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-[var(--border)] text-[var(--muted)]">
                   <th className="py-2 pr-4 font-medium">Week</th>
                   <th className="py-2 pr-4 font-medium">Doel</th>
                   {session.allocations.map((a) => (
@@ -216,12 +216,12 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
                 {weeklyPlan.map((w) => (
                   <tr
                     key={w.weekIndex}
-                    className={`border-b border-slate-800/60 ${
+                    className={`border-b border-[var(--border-soft)] ${
                       w.isRaceWeek
-                        ? 'text-amber-300'
+                        ? 'text-[var(--status-warn)]'
                         : w.isTaper
-                          ? 'text-sky-300'
-                          : 'text-slate-200'
+                          ? 'text-[var(--status-info)]'
+                          : 'text-[var(--text-2)]'
                     }`}
                   >
                     <td className="py-2 pr-4">{formatWeekLabel(w.weekStart, w.weekEnd)}</td>

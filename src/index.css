@@ -1,5 +1,53 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-2-hover: #e2e8f0;
+  --surface-2-active: #e2e8f0;
+  --surface-3: #f1f5f9;
+  --nav-bg: #f1f5f9;
+  --border: #e2e8f0;
+  --border-soft: #eef2f6;
+  --border-2: #cbd5e1;
+  --text: #0f172a;
+  --text-2: #1e293b;
+  --text-3: #475569;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --status-warn: #b45309;
+  --status-info: #0369a1;
+  --badge-bg: rgba(180, 83, 9, 0.1);
+  --badge-text: #92400e;
+  --accent-emerald-text: #059669;
+}
+
+.dark {
+  --bg: #020617;
+  --surface: rgba(15, 23, 42, 0.6);
+  --surface-2: #1e293b;
+  --surface-2-hover: #334155;
+  --surface-2-active: #334155;
+  --surface-3: rgba(30, 41, 59, 0.6);
+  --nav-bg: #0f172a;
+  --border: #1e293b;
+  --border-soft: rgba(30, 41, 59, 0.6);
+  --border-2: #334155;
+  --text: #f1f5f9;
+  --text-2: #e2e8f0;
+  --text-3: #cbd5e1;
+  --muted: #94a3b8;
+  --faint: #64748b;
+  --status-warn: #fcd34d;
+  --status-info: #7dd3fc;
+  --badge-bg: rgba(251, 191, 36, 0.15);
+  --badge-text: #fcd34d;
+  --accent-emerald-text: #34d399;
+}
+
 body {
   margin: 0;
   font-family:
@@ -8,4 +56,28 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+input[type='range'] {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--border-2);
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--border-2);
+}
+input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--border-2);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }
