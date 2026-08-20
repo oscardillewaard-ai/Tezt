@@ -24,19 +24,23 @@ export interface FlankSessionPlan {
 }
 
 /**
- * For each race climb, finds the flank whose one-way gradient is closest and
- * credits that flank with the climb's elevation gain. The resulting shares
- * describe how much of the race's vertical is "gentle" vs "steep" so the
- * session can be built from the same mix instead of one generic climb type.
+ * For each race climb AND descent, finds the flank whose one-way gradient is
+ * closest and credits that flank with the segment's vertical magnitude. Both
+ * directions count: a pendel flank is climbed and descended over the same
+ * ground, so a steep race descent needs just as much of a match as a steep
+ * race climb — matching only climbs would ignore how the way down actually
+ * rides. The resulting shares describe how much of the race's vertical (up
+ * and down combined) is "gentle" vs "steep" so the session mirrors that mix.
  */
 export function matchClimbShares(
   climbSegments: ClimbSegment[],
+  descentSegments: ClimbSegment[],
   climbFlanks: Flank[],
 ): Map<string, number> {
   const totals = new Map<string, number>(climbFlanks.map((f) => [f.id, 0]))
-  let totalGain = 0
+  let totalVertical = 0
 
-  for (const seg of climbSegments) {
+  for (const seg of [...climbSegments, ...descentSegments]) {
     let best = climbFlanks[0]
     let bestDiff = Infinity
     for (const f of climbFlanks) {
@@ -48,14 +52,16 @@ export function matchClimbShares(
     }
     if (!best) continue
     totals.set(best.id, (totals.get(best.id) ?? 0) + seg.gainM)
-    totalGain += seg.gainM
+    totalVertical += seg.gainM
   }
 
   const shares = new Map<string, number>()
   for (const f of climbFlanks) {
     shares.set(
       f.id,
-      totalGain > 0 ? (totals.get(f.id) ?? 0) / totalGain : 1 / Math.max(1, climbFlanks.length),
+      totalVertical > 0
+        ? (totals.get(f.id) ?? 0) / totalVertical
+        : 1 / Math.max(1, climbFlanks.length),
     )
   }
   return shares
@@ -73,7 +79,7 @@ export function computeFlankSession(
   const climbFlanks = hill.flanks.filter((f) => f.role === 'climb')
   const warmupFlank = hill.flanks.find((f) => f.role === 'warmup') ?? null
 
-  const shares = matchClimbShares(race.climbSegments, climbFlanks)
+  const shares = matchClimbShares(race.climbSegments, race.descentSegments, climbFlanks)
   const targetHmM = (race.gainM * targetPercent) / 100
 
   const allocations: FlankAllocation[] = climbFlanks.map((flank) => {

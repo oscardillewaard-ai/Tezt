@@ -20,7 +20,7 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
         <thead>
           <tr className="border-b border-slate-800 text-slate-400">
             <th className="py-2 pr-4 font-medium">Flank</th>
-            <th className="py-2 pr-4 font-medium">Aandeel wedstrijdklim</th>
+            <th className="py-2 pr-4 font-medium">Aandeel wedstrijdterrein</th>
             <th className="py-2 pr-4 font-medium">Herhalingen</th>
             <th className="py-2 pr-4 font-medium">HM</th>
             <th className="py-2 pr-4 font-medium">Tijd</th>
@@ -67,11 +67,11 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
     return buildFlankWeeklyPlan(race, hill, parsed, new Date())
   }, [race, hill, raceDate])
 
-  if (race.climbSegments.length === 0) {
+  if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
       <p className="text-sm text-amber-400">
-        Er zijn geen losse klimmen te herkennen in deze wedstrijd-GPX, dus kan de mix niet over de
-        flanken verdeeld worden.
+        Er zijn geen losse klimmen of afdalingen te herkennen in deze wedstrijd-GPX, dus kan de mix
+        niet over de flanken verdeeld worden.
       </p>
     )
   }
@@ -81,8 +81,10 @@ export function FlankTrainingPlan({ race, hill }: FlankTrainingPlanProps) {
       <div>
         <h3 className="text-base font-semibold text-slate-100">Eén training</h3>
         <p className="mt-1 text-sm text-slate-400">
-          Elke klim in de wedstrijd-GPX is gematcht op de flank met de dichtstbijzijnde helling.
-          De herhalingen per flank volgen die verdeling.
+          Elke klim én afdaling uit de wedstrijd-GPX is gematcht op de flank met de
+          dichtstbijzijnde helling — een pendel ga je op én af over dezelfde flank, dus een steile
+          afdaling in de wedstrijd telt net zo zwaar mee als een steile klim. De herhalingen per
+          flank volgen die verdeling.
         </p>
 
         <div className="mt-4 flex items-center gap-3">

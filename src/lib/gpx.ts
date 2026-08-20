@@ -13,6 +13,7 @@ export interface ProfilePoint {
 export interface ClimbSegment {
   startDistanceKm: number
   endDistanceKm: number
+  /** Vertical magnitude in meters — elevation gained (climbs) or lost (descents). Always positive. */
   gainM: number
   lengthM: number
   gradientPercent: number
@@ -25,6 +26,13 @@ export interface RouteStats {
   lossM: number
   profile: ProfilePoint[]
   climbSegments: ClimbSegment[]
+  /**
+   * Individual descents, same shape as climbSegments. A pendel flank is
+   * climbed and descended over the same ground, so a race descent needs a
+   * flank match just as much as a race climb does — matching climbs alone
+   * would ignore how steep the way down actually is.
+   */
+  descentSegments: ClimbSegment[]
 }
 
 interface ElevationSwing {
@@ -96,23 +104,25 @@ function segmentSwings(
   return swings
 }
 
-function swingsToClimbSegments(
+function swingsToSegments(
   points: { distanceKm: number; ele: number }[],
   swings: ElevationSwing[],
+  direction: 'climb' | 'descent',
 ): ClimbSegment[] {
   const segments: ClimbSegment[] = []
   for (const swing of swings) {
-    if (swing.deltaM <= 0) continue
+    if (direction === 'climb' ? swing.deltaM <= 0 : swing.deltaM >= 0) continue
     const start = points[swing.startIdx]
     const end = points[swing.endIdx]
     const lengthM = (end.distanceKm - start.distanceKm) * 1000
     if (lengthM <= 0) continue
+    const magnitudeM = Math.abs(swing.deltaM)
     segments.push({
       startDistanceKm: start.distanceKm,
       endDistanceKm: end.distanceKm,
-      gainM: swing.deltaM,
+      gainM: magnitudeM,
       lengthM,
-      gradientPercent: (swing.deltaM / lengthM) * 100,
+      gradientPercent: (magnitudeM / lengthM) * 100,
     })
   }
   return segments
@@ -123,7 +133,15 @@ export function segmentClimbs(
   points: { distanceKm: number; ele: number }[],
   reversalThresholdM = 8,
 ): ClimbSegment[] {
-  return swingsToClimbSegments(points, segmentSwings(points, reversalThresholdM))
+  return swingsToSegments(points, segmentSwings(points, reversalThresholdM), 'climb')
+}
+
+/** Splits an elevation trace into individual descents, filtering out reversals under the threshold. */
+export function segmentDescents(
+  points: { distanceKm: number; ele: number }[],
+  reversalThresholdM = 8,
+): ClimbSegment[] {
+  return swingsToSegments(points, segmentSwings(points, reversalThresholdM), 'descent')
 }
 
 /** Total elevation gain and loss from the same reversal-filtered swings, so totals stay consistent with the climb list. */
@@ -209,6 +227,7 @@ export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
   // fragmented by noise-sized micro-segments.
   const { gainM, lossM } = totalGainLoss(smoothedTrace, 3)
   const climbSegments = segmentClimbs(smoothedTrace, 8)
+  const descentSegments = segmentDescents(smoothedTrace, 8)
 
   // Resample to a bounded number of points for charting/storage.
   const maxProfilePoints = 300
@@ -222,5 +241,5 @@ export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
     profile.push({ distanceKm: last.distanceKm, ele: last.ele })
   }
 
-  return { name, distanceKm, gainM, lossM, profile, climbSegments }
+  return { name, distanceKm, gainM, lossM, profile, climbSegments, descentSegments }
 }
