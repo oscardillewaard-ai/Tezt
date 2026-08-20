@@ -10,21 +10,22 @@ Er zijn twee manieren om de trainingsberg te kiezen:
 - **Vaste heuvel (met flanken)**: een heuvel met meerdere flanken die alleen
   op de top samenkomen (een "pendelheuvel" — top → voet → top, geen ronde).
   Ingebouwd staat de Lührs Heuvel (Hoge Bergse Bos) met de vier flanken uit
-  het heuvelschema: D (NW, 7.7%), K− (ZO, 16%), K (O, 21%) en de in/uit
-  warming-up/cooling-down flank (ZZW).
+  het heuvelschema: D (NW, 7,7%), K− (ZO, 16%), K (O, 21%) en in/uit (ZZW,
+  ~10%).
 - **Eigen GPX**: upload de GPX van één beklimming/ronde van een andere berg.
 
 ## Hoe het werkt
 
 1. **Ultrarace**: upload de GPX-track van de wedstrijd. De app berekent
    afstand, totale hoogtewinst (D+) en splitst het profiel op in losse
-   klimmen (elk met hun eigen lengte en helling).
+   klimmen én afdalingen (elk met hun eigen lengte en helling).
 2. **Trainingsberg**: kies de vaste heuvel of upload je eigen GPX.
-3. Bij een vaste heuvel matcht de app elke klim uit de wedstrijd op de flank
-   met de dichtstbijzijnde helling — steile korte klimmen in de wedstrijd
-   sturen dus meer herhalingen naar de steile flank, lange geleidelijke
-   klimmen naar de flauwe flank. Bij een eigen GPX (één beklimming) wordt
-   simpelweg uitgerekend hoeveel herhalingen nodig zijn.
+3. Bij een vaste heuvel matcht de app elke klim én afdaling uit de wedstrijd
+   op de flank met de dichtstbijzijnde helling — een pendel ga je op én af
+   over dezelfde flank, dus een steile wedstrijdafdaling stuurt evenveel
+   herhalingen naar de steile flank als een steile wedstrijdklim. Bij een
+   eigen GPX (één beklimming) wordt simpelweg uitgerekend hoeveel
+   herhalingen nodig zijn.
 4. De app rekent uit hoeveel herhalingen nodig zijn om een gekozen percentage
    van de hoogtemeters van de wedstrijd te evenaren, inclusief tijdsduur en
    (bij een vaste heuvel) de verdeling rennende versus stijl lopende afdaling.
@@ -34,6 +35,14 @@ Er zijn twee manieren om de trainingsberg te kiezen:
 
 Alles draait client-side; er wordt niets naar een server verstuurd. Opgeslagen
 routes staan lokaal in de browser (`localStorage`).
+
+## Installeren als app (Android/iOS/desktop)
+
+Bergtrainer is een PWA (progressive web app): open de gehoste site in Chrome
+op Android en kies "App installeren" / "Toevoegen aan startscherm" (Safari op
+iOS: deel-icoon → "Zet op beginscherm"). De app werkt dan met een eigen icoon
+vanaf het startscherm, in een eigen venster zonder browserbalk, en blijft de
+laatst geladen versie tonen als je offline bent.
 
 ## Ontwikkelen
 
@@ -47,3 +56,6 @@ npm run dev
 ```bash
 npm run build
 ```
+
+De PWA-service-worker wordt alleen in de productiebuild gegenereerd; test hem
+lokaal met `npm run build && npx vite preview`.
