@@ -38,20 +38,26 @@ export const LUHRS_HEUVEL: TrainingHill = {
   id: 'luhrs',
   name: 'Lührs Heuvel',
   location: 'Uitkijkpunt Lührs, Hoge Bergse Bos',
-  source: 'Heuvelschema, GPS-log 29 juli 2026 · top 51,9765 / 4,5485',
-  note: 'Pendelheuvel: geen ronde. Elke herhaling is top → voet → top over dezelfde flank; wisselen kan alleen boven. Klim en afdaling zitten 1:1 vast.',
+  source:
+    'Gekalibreerd op GPS-log 5 augustus 2026 (63 min, 14 pendels) · top 51,9765 / 4,5485',
+  note: 'Pendelheuvel: geen ronde. Elke herhaling is top → voet → top over dezelfde flank; wisselen kan alleen boven. Klim en afdaling zitten 1:1 vast. Reken op ~75 m vlak van/naar de parkeerplaats, buiten de flank zelf.',
   flanks: [
+    // Lengte, hoogtewinst en rondtijd komen uit de GPS-log van 5 aug 2026:
+    // klim/afdaling-paren automatisch uit het spoor gesegmenteerd en per
+    // flanktype gemiddeld. Waar het heuvelschema afwijkt staat dat erbij.
     {
       id: 'D-NW',
       pendelType: 'Lang',
       name: 'Lange flank — NW',
       aspect: 'NW',
-      distanceM: 317,
-      gradientPercent: 7.7,
+      // 3 pendels gemeten: 305/329/304 m, 22,8–25,7 hm. Vrijwel gelijk aan
+      // het schema (317 m, 7,7%, 25 hm) — alleen de rondtijd valt sneller uit.
+      distanceM: 312,
+      gradientPercent: 7.9,
       hmOneWay: 25,
       climbMode: 'jog',
       descendMode: 'run',
-      minutesPerRep: 5.5,
+      minutesPerRep: 4.6,
       role: 'climb',
     },
     {
@@ -59,12 +65,15 @@ export const LUHRS_HEUVEL: TrainingHill = {
       pendelType: 'Middel',
       name: 'Middelsteile flank — ZO',
       aspect: 'ZO',
+      // Niet gelopen in de gekalibreerde sessie, dus lengte/helling/hm blijven
+      // die van het heuvelschema. Alleen de rondtijd is bijgesteld: op de twee
+      // wél gemeten flanken lag het tempo consistent op ~0,8× de schematijd.
       distanceM: 174,
       gradientPercent: 16,
       hmOneWay: 28,
       climbMode: 'powerhike',
       descendMode: 'hike',
-      minutesPerRep: 5.5,
+      minutesPerRep: 4.5,
       role: 'climb',
     },
     {
@@ -72,12 +81,14 @@ export const LUHRS_HEUVEL: TrainingHill = {
       pendelType: 'Steil',
       name: 'Steile flank — O',
       aspect: 'O',
-      distanceM: 132,
-      gradientPercent: 21,
-      hmOneWay: 28,
+      // 10 pendels gemeten: 126–129 m, voet ~-7 m tot top ~26 m. Steiler en
+      // meer hoogtewinst dan het schema aangaf (132 m, 21%, 28 hm, 5').
+      distanceM: 128,
+      gradientPercent: 25.7,
+      hmOneWay: 33,
       climbMode: 'powerhike',
       descendMode: 'hike',
-      minutesPerRep: 5,
+      minutesPerRep: 3.9,
       role: 'climb',
     },
     {
@@ -85,15 +96,16 @@ export const LUHRS_HEUVEL: TrainingHill = {
       pendelType: 'In/uit',
       name: 'In/uit-flank — ZZW',
       aspect: 'ZZW',
-      distanceM: 301,
-      gradientPercent: 10,
-      hmOneWay: 30,
+      // Gemeten als inloop (omhoog) en uitloop (omlaag) van de sessie, met het
+      // vlakke parkeerplaatsstuk (~75 m) eruit gefilterd: de flank begint waar
+      // het terrein gaat stijgen. Het schema's 261–341 m / 9–11% telde dat
+      // vlakke stuk mee, waardoor de flank flauwer leek dan hij is.
+      distanceM: 264,
+      gradientPercent: 13.8,
+      hmOneWay: 35,
       climbMode: 'jog',
       descendMode: 'jog',
-      // The schema's 15' is the one-off gentle inloop/uitloop pace, not a
-      // pace you'd hold for repeated pendels — estimated at a controlled jog
-      // both ways instead, in line with this flank's distance/gradient.
-      minutesPerRep: 6,
+      minutesPerRep: 4.8,
       role: 'climb',
     },
   ],
