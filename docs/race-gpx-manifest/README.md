@@ -5,20 +5,64 @@ Bergtrainer (today `RacePresetPanel`/`syntheticRaces.ts` only ship three
 **generic, non-real** indicative profiles — Ardennen/Voerstreek,
 Middelgebergte, Alpien — explicitly not real race GPX).
 
-This folder captures where official/unofficial GPX tracks for well-known
-ultra trail races can be found, so that a future feature can point users at
-the right source instead of guessing.
-
-**Coverage**: this only contains entries 79–100 of a planned 100-row core
-table, plus a handful of "overflow" races. Entries 1–78 were not supplied to
-the session that wrote this file and are **not** included — do not treat
-`races.json` as a complete manifest.
+This folder maps 100 famous trail/ultra races to their best GPX-download
+source, favouring the organiser's own site, plus 6 "overflow" races
+documented for completeness. It exists so that a future feature can point
+users at the right source instead of guessing, without yet committing to
+redistributing anyone's course file.
 
 ## Files
 
-- `races.json` — the 22 core rows (79–100) plus the overflow races, as
-  structured data (name, organizer, location, distance, elevation, category,
-  date, GPX source, login requirement, access notes).
+- `races.json` — the full 100-row core table, split into the same four
+  distance categories as the source research (`1_short_20k`, `2_50k`,
+  `3_100k`, `4_100m_multistage`), plus `overflow` for the 6 additional
+  races kept out of the core to preserve its distance-category balance
+  (~20 short / ~25 50K / ~30 100K / ~25 100M+multi-stage).
+
+## TL;DR
+
+- UTMB World Series events follow two consistent, machine-friendly URL
+  patterns (`[event].utmb.world/race/tracks` or
+  `[event].utmb.world/races/[CODE]`); most independent classics either
+  host a direct GPX or rely on tracedetrail.fr / Wikiloc.
+- The single most reliable bulk/programmatic route is **tracedetrail.fr**
+  (stable numeric trace IDs, per-trace GPX, a published point-density
+  "quality index"), but its GPX download requires a free account and it's
+  a community mirror, not always the official line.
+- Organiser-stated distance/D+ and GPX-computed values routinely diverge by
+  1–5% (and up to ~500 m of D+) because of track-point density, altimeter
+  vs. GPS vs. DEM elevation sources, and each platform's smoothing
+  threshold — so a comparable 100-course database must recompute all D+
+  from raw GPX with one consistent DEM and smoothing rule.
+
+## Key findings
+
+- **UTMB World Series is the most programmatically tractable.** Every
+  event sits on its own subdomain and exposes GPX either at `/race/tracks`
+  (older template — mallorca, tenerife, valdaran, istria, kullamannen,
+  chianti) or on each distance page under `/races/[CODE]` (montblanc,
+  lavaredo, uta, snowdonia, zugspitz, eiger, verbier, julianalps, nice,
+  andorra). GPX is free (no login); a MyUTMB account is only needed to
+  register. Standard UTMB terms warn courses cross private property with
+  seasonal passage limits.
+- **tracedetrail.fr is the backbone community source.** It carries
+  official ITRA-certified traces for a large share of European and world
+  races, with stable IDs (e.g. Sierre-Zinal 25180, Hardrock 224550,
+  Transgrancanaria 149184, Diagonale des Fous 308026). Viewing is open;
+  downloading the GPX requires a free account. It also displays a track
+  "quality index" (points per metre) and lets you pick the elevation
+  calculation method (raw vs. DEM).
+- **Several marquee US races self-host clean GPX with no login:** Western
+  States (wser.org/gps-info), Hardrock (hardrock100.com course page,
+  "Download GPX"). Barkley Marathons and Marathon des Sables deliberately
+  publish no GPX.
+- **A few classics have no confirmed official GPX button** and are best
+  served by community mirrors: Comrades (official dynamic map only),
+  Transvulcania, Ultra Pirineu, Grand Raid des Pyrénées (emailed),
+  Ultra-Trail Harricana, Ultra-Trail Cape Town.
+- **Benelux races** (Bear Trail/Grizzly 100, UTHA, Trail des Fantômes) post
+  GPX only a few days before the event and route it through community
+  platforms (tracedetrail.fr, betrail.run) or the organiser download page.
 
 ## Data quality: distance/D+ discrepancies
 
@@ -98,7 +142,8 @@ that region before trusting the number.
   scriptable, but no documented public JSON endpoint.
 - **tracedetrail.fr** — stable numeric trace IDs, per-trace GPX/GeoJSON
   exports; downloads require an authenticated (free) account, and it's a
-  community mirror, not an official source.
+  community mirror, not an official source. It advertises a Trail Connect
+  app/API surface for professional users.
 - **OpenStreetMap / Waymarked Trails / Overpass** — named long-distance
   route relations (GR20, Pennine Way, Camí de Cavalls GR-223, Penguin Cradle
   Trail relation 3110347, etc.) exportable to GPX; ODbL-licensed and
@@ -116,7 +161,9 @@ that region before trusting the number.
 Default assumption: **all rights reserved**. Organiser GPX is typically
 published for personal race-prep use, not redistribution.
 
-- Western States marks its material trademark/copyright explicitly.
+- Western States marks its material trademark/copyright explicitly
+  ("Western States is a registered trademark © Western States Endurance
+  Run Foundation").
 - Rennsteiglauf-associated hosts state tracks are "for personal use only,
   further distribution not permitted."
 - UTMB, Transgrancanaria and others attach passage/private-property
@@ -147,26 +194,42 @@ uploader's licence permits it.
 3. For US majors, prefer official self-hosted sources first (Western States
    `wser.org/gps-info`, Hardrock `hardrock100.com`) — clean, login-free.
 4. Flag deliberate no-GPX races (Barkley, Marathon des Sables) and
-   participant-gated races (Dragon's Back, Spine, MIUT-type "Legend" races)
-   so the UI degrades gracefully instead of showing a broken link.
+   participant-gated races (Dragon's Back, Spine, Legends Trail, MIUT-type
+   "Legend" races) so the UI degrades gracefully instead of showing a
+   broken link.
 5. Never display an organiser-stated and a GPX-computed figure
    interchangeably in the same UI slot — label which is which.
 6. Resolve licensing before bundling any GPX with the app itself; default to
    OSM/ODbL geometry with attribution, or a real agreement with UTMB Group.
-7. Re-verify any URL marked `verify` below by fetching the live race page
-   before shipping it — a wrong URL is worse than an empty field.
+7. Re-verify any URL marked `verify` in `races.json` by fetching the live
+   race page before shipping it — a wrong URL is worse than an empty field.
 
 ## Caveats
 
-- Rows marked `verify` (UTA-type/leadville/GRP-type "verify" entries here,
+- Rows marked `verify` (UTCT, Ultra Pirineu, Transvulcania, GRP, Harricana,
   and several UTMB subdomains) follow a confirmed URL pattern but the exact
   per-year GPX page was not individually loaded — treat as high-probability,
   not confirmed.
 - Distances/D+ are organiser-marketed figures where available; several are
-  explicitly approximate or year-variable (Diagonale des Fous, GRP,
-  Cocodona, Moab, Barkley) and will not match a GPX-derived value.
-  Hardrock's gain figure differs between clockwise and counter-clockwise
-  years (33,441 ft main course page vs. 33,197 ft in the 2025 CCW manual).
+  explicitly approximate or year-variable (UTMB, Diagonale des Fous, Ultra
+  Pirineu, GRP, Cocodona, Moab, Barkley) and will not match a GPX-derived
+  value. Hardrock's gain figure differs between clockwise and
+  counter-clockwise years (33,441 ft main course page vs. 33,197 ft in the
+  2025 CCW manual).
+- Dutch/German heathland events (Trail Almere, Amerongse Berg, Sallandse
+  Heuvelrug, Ultra Trail Veluwe/Drenthe) often lack a stable official GPX
+  page; community betrail.run/tracedetrail traces are the realistic source
+  and are marked "not found" for official.
+- Two named races needed disambiguation: "Legends Trail (Belgium)" is
+  organised by Legends Trails from **Bernardfagne (Ferrières)**, not
+  Bouillon — the Bouillon winter trails are the separate Trail Godefroy
+  Bouillon / Castle Trail Bouillon (trailrun.be), and there is a further,
+  unrelated "Legends Ardennes Trail" near Durbuy. UTS/Eryri by UTMB is held
+  in **May**, not July.
+- The core table is 100 rows; a handful of user-named races (Comrades,
+  Lakeland, Swiss Peaks, Wicklow Round, Art O'Neill) are documented in the
+  `overflow` array rather than as core rows to keep the balance across
+  distance categories (~20 short / ~25 50K / ~30 100K / ~25 100M+multi-stage).
 - Community mirrors (Wikiloc, Komoot, tracedetrail, betrail) frequently gate
   GPX behind a free login, and their traces are user-uploaded — always
   cross-check against the organiser line before relying on one for actual
@@ -174,7 +237,3 @@ uploader's licence permits it.
 - `robots.txt`/automated-blocking status could not be confirmed for most
   domains. Western States and Hardrock are not known to block; UTMB pages
   render GPX links via dynamic JS and may need a headless browser to scrape.
-- The overflow races (Comrades, Lakeland, UTS/Eryri, Swiss Peaks, Restonica
-  UTC, Wicklow Round/Art O'Neill) are documented for completeness but were
-  kept out of the 100-row core table to preserve its distance-category
-  balance (~20 short / ~25 50K / ~30 100K / ~25 100M+multi-stage).
