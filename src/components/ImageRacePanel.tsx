@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RouteStats } from '../lib/gpx'
 import { segmentClimbs, segmentDescents } from '../lib/gpx'
 import {
@@ -19,13 +19,44 @@ type Step = 'upload' | 'x1' | 'x2' | 'y1' | 'y2' | 'curve' | 'processing' | 'res
 
 const STEP_INSTRUCTIONS: Record<Step, string> = {
   upload: '',
-  x1: 'Klik op een punt op de x-as (afstand) waarvan je de waarde weet — bijvoorbeeld het beginpunt.',
-  x2: 'Klik op een tweede punt op de x-as, zo ver mogelijk van het eerste (bijv. het eindpunt).',
-  y1: 'Klik op een punt op de y-as (hoogte) waarvan je de waarde weet — bijvoorbeeld een gridlijn.',
-  y2: 'Klik op een tweede punt op de y-as, zo ver mogelijk van het eerste.',
-  curve: 'Klik ergens midden op de hoogtelijn zelf, zodat de kleur herkend kan worden.',
+  x1: 'Kies een punt op de x-as (afstand) waarvan je de waarde weet — bijvoorbeeld het beginpunt.',
+  x2: 'Kies een tweede punt op de x-as, zo ver mogelijk van het eerste (bijv. het eindpunt).',
+  y1: 'Kies een punt op de y-as (hoogte) waarvan je de waarde weet — bijvoorbeeld een gridlijn.',
+  y2: 'Kies een tweede punt op de y-as, zo ver mogelijk van het eerste.',
+  curve: 'Kies een punt midden op de hoogtelijn zelf. Controleer in het vergrootglas of het kleurbolletje de kleur van de lijn heeft — daarop wordt de lijn nagetekend.',
   processing: 'Bezig met verwerken…',
   result: '',
+}
+
+/**
+ * Loupe size in CSS pixels, and how much bigger things look inside it than
+ * on the page. Magnification is relative to the image *as displayed*, not to
+ * its stored pixels: a 900px-wide screenshot squeezed into a 320px phone
+ * column would otherwise blow up into a handful of giant blocks with no
+ * context around them.
+ */
+const LOUPE_SIZE = 104
+const LOUPE_MAGNIFY = 5
+
+function toHex({ r, g, b }: RgbColor): string {
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+/**
+ * Where the finger is, in both image pixels and CSS pixels over the canvas,
+ * plus the colour under it. Kept while the pointer is down so the loupe can
+ * follow the finger and the pick only lands on release — on a phone the
+ * finger covers exactly the pixel you're aiming at, so picking on touch-down
+ * means aiming blind.
+ */
+interface Probe {
+  px: number
+  py: number
+  cssX: number
+  cssY: number
+  /** Image pixels per CSS pixel, so the loupe can size its crop by what's on screen. */
+  scale: number
+  color: RgbColor
 }
 
 function nextStep(step: Step): Step {
@@ -35,6 +66,8 @@ function nextStep(step: Step): Step {
 
 export function ImageRacePanel({ onRouteReady }: ImageRacePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const loupeRef = useRef<HTMLCanvasElement>(null)
+  const [probe, setProbe] = useState<Probe | null>(null)
   const [step, setStep] = useState<Step>('upload')
   const [error, setError] = useState<string | null>(null)
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
@@ -72,27 +105,56 @@ export function ImageRacePanel({ onRouteReady }: ImageRacePanelProps) {
     reader.readAsDataURL(file)
   }
 
-  function handleCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+  const canPick = step !== 'upload' && step !== 'processing' && step !== 'result'
+
+  /** Reads the pointer position as image pixels, clamped to the image. */
+  function readProbe(e: React.PointerEvent<HTMLCanvasElement>): Probe | null {
     const canvas = canvasRef.current
-    if (!canvas || step === 'upload' || step === 'processing' || step === 'result') return
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return null
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const px = (e.clientX - rect.left) * scaleX
-    const py = (e.clientY - rect.top) * scaleY
+    const cssX = e.clientX - rect.left
+    const cssY = e.clientY - rect.top
+    const px = Math.min(canvas.width - 1, Math.max(0, (cssX * canvas.width) / rect.width))
+    const py = Math.min(canvas.height - 1, Math.max(0, (cssY * canvas.height) / rect.height))
+    return {
+      px,
+      py,
+      cssX,
+      cssY,
+      scale: canvas.width / rect.width,
+      color: sampleColorAt(ctx, px, py),
+    }
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!canPick) return
+    // Capture so the loupe keeps following even when the finger slides off
+    // the edge of the image.
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setProbe(readProbe(e))
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!canPick || !probe) return
+    setProbe(readProbe(e))
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!canPick) return
+    const p = readProbe(e) ?? probe
+    setProbe(null)
+    if (!p) return
 
     if (step === 'curve') {
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      const color = sampleColorAt(ctx, px, py)
-      setCurveColor(color)
-      void runDigitization(color)
+      setCurveColor(p.color)
+      void runDigitization(p.color)
       return
     }
 
     // x1/x2 steps use the horizontal pixel; y1/y2 use the vertical pixel.
     const isXStep = step === 'x1' || step === 'x2'
-    setPendingPx(isXStep ? px : py)
+    setPendingPx(isXStep ? p.px : p.py)
     setValueInput('')
   }
 
@@ -180,7 +242,56 @@ export function ImageRacePanel({ onRouteReady }: ImageRacePanelProps) {
     setResult(null)
     setError(null)
     setImgSize(null)
+    setProbe(null)
   }
+
+  // Paint the magnified crop under the finger. Drawing in an effect keeps it
+  // in step with the probe state without re-rendering the source canvas.
+  useEffect(() => {
+    const loupe = loupeRef.current
+    const source = canvasRef.current
+    if (!loupe || !source) return
+    const ctx = loupe.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE)
+    if (!probe) return
+    const cropSize = (LOUPE_SIZE / LOUPE_MAGNIFY) * probe.scale
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(
+      source,
+      probe.px - cropSize / 2,
+      probe.py - cropSize / 2,
+      cropSize,
+      cropSize,
+      0,
+      0,
+      LOUPE_SIZE,
+      LOUPE_SIZE,
+    )
+
+    // Guides: a vertical line for the x-axis steps, horizontal for the y-axis
+    // steps, a full crosshair when picking the line's colour. Each is drawn
+    // twice — a wide light stroke under a thin dark one — so it stays visible
+    // whether the crop is white paper or a dark fill.
+    const mid = LOUPE_SIZE / 2
+    const line = (x1p: number, y1p: number, x2p: number, y2p: number) => {
+      ctx.beginPath()
+      ctx.moveTo(x1p, y1p)
+      ctx.lineTo(x2p, y2p)
+      ctx.stroke()
+    }
+    const showVertical = step !== 'y1' && step !== 'y2'
+    const showHorizontal = step !== 'x1' && step !== 'x2'
+    for (const [width, color] of [
+      [3, 'rgba(255,255,255,0.85)'],
+      [1, 'rgba(17,24,39,0.85)'],
+    ] as const) {
+      ctx.lineWidth = width
+      ctx.strokeStyle = color
+      if (showVertical) line(mid, 0, mid, LOUPE_SIZE)
+      if (showHorizontal) line(0, mid, LOUPE_SIZE, mid)
+    }
+  }, [probe, step])
 
   // The canvas stays mounted even during the upload step: loadImage needs
   // canvasRef.current to draw into before it can advance the step, so
@@ -222,9 +333,17 @@ export function ImageRacePanel({ onRouteReady }: ImageRacePanelProps) {
       <div className={showCanvas ? 'mt-4' : 'hidden'}>
         <div>
           {step !== 'result' && step !== 'processing' && step !== 'upload' && (
-            <p className="mb-2 rounded-lg bg-[var(--surface-3)] px-3 py-2 text-sm text-[var(--text-2)]">
-              {STEP_INSTRUCTIONS[step]}
-            </p>
+            <>
+              <p className="mb-1 rounded-lg bg-[var(--surface-3)] px-3 py-2 text-sm text-[var(--text-2)]">
+                {STEP_INSTRUCTIONS[step]}
+              </p>
+              <p className="mb-2 text-xs text-[var(--faint)]">
+                Houd je vinger (of muisknop) op de afbeelding: het vergrootglas hierboven laat
+                uitvergroot zien waar je staat en welke kleur eronder zit. Sleep tot het kruis goed
+                staat en laat dan los — pas bij loslaten wordt het punt gekozen. Scrollen doe je
+                naast de afbeelding.
+              </p>
+            </>
           )}
           {step === 'processing' && (
             <p className="mb-2 rounded-lg bg-[var(--surface-3)] px-3 py-2 text-sm text-[var(--text-2)]">
@@ -232,13 +351,108 @@ export function ImageRacePanel({ onRouteReady }: ImageRacePanelProps) {
             </p>
           )}
 
-          <div className="overflow-x-auto">
+          {/* The loupe sits above the image in its own reserved row: a
+              phone's image is often shorter than the loupe, so an overlay
+              following the finger would spill out of the card, and letting
+              it appear only while probing would shift the image out from
+              under the finger that summoned it. */}
+          {canPick && (
+            <div className="mb-2 flex items-center gap-3">
+              <canvas
+                ref={loupeRef}
+                width={LOUPE_SIZE}
+                height={LOUPE_SIZE}
+                aria-label="Vergrootglas"
+                className="shrink-0 rounded-lg border border-[var(--border-2)] bg-[var(--surface-3)]"
+                style={{ width: LOUPE_SIZE, height: LOUPE_SIZE }}
+              />
+              <div className="min-w-0 text-xs">
+                {probe ? (
+                  <>
+                    <p className="flex items-center gap-1.5 font-medium text-[var(--text-2)]">
+                      <span
+                        className="inline-block h-4 w-4 rounded-full border border-[var(--border-2)]"
+                        style={{
+                          background: `rgb(${probe.color.r},${probe.color.g},${probe.color.b})`,
+                        }}
+                      />
+                      {toHex(probe.color)}
+                    </p>
+                    <p className="mt-1 text-[var(--faint)]">
+                      {step === 'curve'
+                        ? 'Dit is de kleur waarop de lijn wordt nagetekend.'
+                        : step === 'x1' || step === 'x2'
+                          ? 'Zet de verticale lijn precies op je ijkpunt.'
+                          : 'Zet de horizontale lijn precies op je ijkpunt.'}
+                    </p>
+                    <p className="mt-1 text-[var(--faint)]">Laat los om te kiezen.</p>
+                  </>
+                ) : (
+                  <p className="text-[var(--faint)]">
+                    Houd je vinger op de afbeelding — hier zie je uitvergroot waar je staat en welke
+                    kleur eronder zit.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="relative">
             <canvas
               ref={canvasRef}
-              onClick={handleCanvasClick}
-              className="w-full max-w-full cursor-crosshair rounded-lg border border-[var(--border-2)]"
+              aria-label="Hoogteprofiel-afbeelding"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={() => setProbe(null)}
+              className="w-full max-w-full cursor-crosshair touch-none select-none rounded-lg border border-[var(--border-2)]"
               style={{ imageRendering: 'pixelated' }}
             />
+
+            {/* Where the axis points landed, drawn over the image so you can
+                see what you picked instead of only reading the numbers. */}
+            {showCalibrationMarkers && imgSize && (
+              <>
+                {[x1, x2].map((m, i) =>
+                  m ? (
+                    <div
+                      key={`x${i}`}
+                      className="pointer-events-none absolute inset-y-0 w-px bg-orange-400/80"
+                      style={{ left: `${(m.px / imgSize.w) * 100}%` }}
+                    />
+                  ) : null,
+                )}
+                {[y1, y2].map((m, i) =>
+                  m ? (
+                    <div
+                      key={`y${i}`}
+                      className="pointer-events-none absolute inset-x-0 h-px bg-emerald-400/80"
+                      style={{ top: `${(m.px / imgSize.h) * 100}%` }}
+                    />
+                  ) : null,
+                )}
+              </>
+            )}
+
+            {/* Live crosshair: your fingertip covers the pixel you're aiming
+                at, so the lines run the full width and height of the image
+                and stay visible around it. */}
+            {probe && imgSize && (
+              <>
+                {step !== 'y1' && step !== 'y2' && (
+                  <div
+                    className="pointer-events-none absolute inset-y-0 w-px bg-orange-500"
+                    style={{ left: `${(probe.px / imgSize.w) * 100}%` }}
+                  />
+                )}
+                {step !== 'x1' && step !== 'x2' && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 h-px bg-orange-500"
+                    style={{ top: `${(probe.py / imgSize.h) * 100}%` }}
+                  />
+                )}
+              </>
+            )}
           </div>
 
           {pendingPx !== null && (

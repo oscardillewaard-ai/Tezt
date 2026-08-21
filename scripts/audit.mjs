@@ -180,6 +180,26 @@ ok('steilte-band toe te voegen', await p.locator('label:has-text("Aandeel D+ (%)
 await p.getByLabel('Wedstrijddatum').fill('2027-03-01'); await p.waitForTimeout(700);
 ok('handmatige wedstrijd geeft schema', await p.getByRole('button',{name:/agenda/i}).count()>0);
 
+// 14 afbeelding-loep
+await fresh(p);
+await p.getByRole('button',{name:'Uit afbeelding'}).click(); await p.waitForTimeout(300);
+await p.locator('input[type=file]').last().setInputFiles(SP+'chart_test.png'); await p.waitForTimeout(800);
+const imgCanvas=p.locator('canvas[aria-label="Hoogteprofiel-afbeelding"]');
+ok('afbeelding geladen in canvas', await imgCanvas.count()>0);
+ok('loep staat klaar voor het aanwijzen', await p.locator('canvas[aria-label="Vergrootglas"]').count()>0);
+await imgCanvas.scrollIntoViewIfNeeded(); await p.waitForTimeout(200);
+let ibox=await imgCanvas.boundingBox();
+await p.mouse.move(ibox.x+ibox.width*0.5, ibox.y+ibox.height*0.85);
+await p.mouse.down(); await p.waitForTimeout(250);
+const hexShown=await p.locator('text=/^#[0-9a-f]{6}$/').count();
+ok('kleur onder de vinger zichtbaar tijdens aanwijzen', hexShown>0);
+ok('nog niets gekozen zolang je vasthoudt', await p.locator('input[type=number]').count()===0);
+await p.mouse.move(ibox.x+ibox.width*0.5, ibox.y+ibox.height*0.1); await p.waitForTimeout(250);
+const hexTop=await p.locator('text=/^#[0-9a-f]{6}$/').first().innerText();
+await p.mouse.up(); await p.waitForTimeout(300);
+ok('kleur volgt het slepen', /^#[0-9a-f]{6}$/.test(hexTop), hexTop);
+ok('punt wordt pas bij loslaten gekozen', await p.locator('input[type=number]').count()>0);
+
 // 11 mobile
 const mp=await page(390,844);
 await fresh(mp);
