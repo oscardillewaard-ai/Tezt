@@ -10,6 +10,7 @@ import {
   listRaces,
   saveBerg,
   saveRace,
+  updateRaceMeta,
 } from './lib/storage'
 import { RoutePanel } from './components/RoutePanel'
 import { HillPanel } from './components/HillPanel'
@@ -184,6 +185,8 @@ function App() {
                   deleteRace(id)
                   setSavedRaces(savedRaces.filter((s) => s.id !== id))
                 }}
+                showRaceMeta
+                onUpdateMeta={(id, meta) => setSavedRaces(updateRaceMeta(id, meta))}
               />
             ) : (
               <RacePresetPanel

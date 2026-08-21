@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { parseGpx, type RouteStats } from '../lib/gpx'
-import type { SavedRoute } from '../lib/storage'
+import type { RacePriority, SavedRoute } from '../lib/storage'
 import { FileDrop } from './FileDrop'
 import { StatCard } from './StatCard'
 import { ElevationChart } from './ElevationChart'
@@ -15,6 +15,9 @@ interface RoutePanelProps {
   saved: SavedRoute[]
   onSave: (route: RouteStats) => void
   onDeleteSaved: (id: string) => void
+  /** Only races get a date and A/B/C priority; a training hill has neither. */
+  showRaceMeta?: boolean
+  onUpdateMeta?: (id: string, meta: { raceDate?: string; priority?: RacePriority }) => void
 }
 
 function isSaved(route: RouteStats, saved: SavedRoute[]): boolean {
@@ -36,6 +39,8 @@ export function RoutePanel({
   saved,
   onSave,
   onDeleteSaved,
+  showRaceMeta = false,
+  onUpdateMeta,
 }: RoutePanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
@@ -73,8 +78,43 @@ export function RoutePanel({
                   <p className="truncate text-sm font-medium text-[var(--text-2)]">{s.stats.name}</p>
                   <p className="text-xs text-[var(--faint)]">
                     {s.stats.distanceKm.toFixed(1)} km · D+ {s.stats.gainM.toFixed(0)} m
+                    {s.raceDate ? ` · ${new Date(s.raceDate).toLocaleDateString('nl-NL')}` : ''}
                   </p>
                 </button>
+                {showRaceMeta && onUpdateMeta && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex gap-0.5">
+                      {(['A', 'B', 'C'] as const).map((prio) => (
+                        <button
+                          key={prio}
+                          type="button"
+                          title={
+                            prio === 'A'
+                              ? 'Hoofddoel'
+                              : prio === 'B'
+                                ? 'Belangrijk'
+                                : 'Trainingswedstrijd'
+                          }
+                          onClick={() => onUpdateMeta(s.id, { priority: prio })}
+                          className={`h-6 w-6 rounded-full text-xs font-semibold ${
+                            s.priority === prio
+                              ? 'bg-orange-400 text-slate-900'
+                              : 'bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--text-2)]'
+                          }`}
+                        >
+                          {prio}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="date"
+                      value={s.raceDate ?? ''}
+                      onChange={(e) => onUpdateMeta(s.id, { raceDate: e.target.value })}
+                      aria-label={`Wedstrijddatum ${s.stats.name}`}
+                      className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--text)]"
+                    />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => onDeleteSaved(s.id)}

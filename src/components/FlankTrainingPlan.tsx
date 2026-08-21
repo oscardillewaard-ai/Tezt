@@ -16,6 +16,8 @@ import { WeekdayPicker } from './WeekdayPicker'
 import { WeekAgendaRow, type DayCell } from './WeekAgenda'
 import { WeeklyVolumePanel, type VolumeWeekRow } from './WeeklyVolumePanel'
 import { checkDescentBudget, densityHmPerKm } from '../lib/weeklyVolume'
+import { SessionReviewPanel } from './SessionReviewPanel'
+import { buildWorkout, workoutToJson, workoutToText } from '../lib/workoutExport'
 
 interface FlankTrainingPlanProps {
   race: RouteStats
@@ -378,11 +380,41 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             >
               Printen als A4-checklist
             </button>
+            <button
+              type="button"
+              onClick={() =>
+                downloadTextFile(
+                  'bergtraining.json',
+                  workoutToJson(buildWorkout(session, hill.name)),
+                  'application/json',
+                )
+              }
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Training naar horloge (.json)
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                downloadTextFile(
+                  'bergtraining.txt',
+                  workoutToText(buildWorkout(session, hill.name)),
+                  'text/plain',
+                )
+              }
+              className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2-hover)]"
+            >
+              Als tekst (.txt)
+            </button>
           </div>
         )}
         <p className="mt-2 text-xs text-[var(--faint)]">
           Sessies gepland op {weekdays.map(weekdayName).join(', ')}.
         </p>
+      </div>
+
+      <div className="mt-8">
+        <SessionReviewPanel plannedHmM={session.totalHmM} />
       </div>
 
       <PrintChecklist

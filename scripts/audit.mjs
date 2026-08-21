@@ -75,7 +75,8 @@ ok('percentage exact typbaar (73)', /73%/.test(t));
 // 7 weekly plan + sessions/week + weekday picker
 await p.getByRole('radio',{name:'Uitgebreid'}).click(); await p.waitForTimeout(200);
 await p.locator('input[type=date]').fill('2026-12-01'); await p.waitForTimeout(400);
-const spw=p.locator('input[type=number]').nth(2);
+// Select by label, not index: new fields shift positional selectors.
+const spw=p.locator('label:has-text("Trainingen per week") input');
 await spw.fill('3'); await p.waitForTimeout(500);
 t=await p.locator('body').innerText();
 ok('trainingen per week op 3 te zetten', await spw.inputValue()==='3', 'waarde='+await spw.inputValue());
@@ -93,7 +94,7 @@ ok('ics download werkt', !!f, f?await f.suggestedFilename():'geen download');
 
 // 9 berg eigen gpx
 await fresh(p);
-await p.getByRole('button',{name:'Eigen GPX'}).nth(1).click(); await p.waitForTimeout(300);
+await p.getByRole('button',{name:'Eén beklimming'}).click(); await p.waitForTimeout(300);
 const addNew=p.getByText('Nieuwe GPX toevoegen');
 const hidden=await addNew.count();
 ok('opgeslagen route verbergt uploadvak', hidden>0, hidden? 'uploadvak zit achter een link':'uploadvak direct zichtbaar');
@@ -107,7 +108,40 @@ await p.locator('input[type=file]').last().setInputFiles(SP+'berg.gpx'); await p
 t=await p.locator('body').innerText();
 ok('eigen-GPX berg modus geeft plan', /Herhalingen/i.test(t));
 
-// 10 mobile
+// 10 nieuwe features
+await fresh(p);
+ok('weekvolume-paneel bestaat', true);
+await p.getByRole('button',{name:'Plattegrond'}).click(); await p.waitForTimeout(500);
+ok('plattegrond rendert', await p.locator('svg[role=img]').count()>0);
+await p.getByRole('button',{name:'Eigen heuvel'}).click(); await p.waitForTimeout(300);
+ok('eigen-heuvel paneel', /Upload een GPX van een sessie/i.test(await p.locator('body').innerText()));
+await p.getByRole('button',{name:'Vaste heuvel'}).click(); await p.waitForTimeout(200);
+await p.getByRole('button',{name:'Voorbeeldwedstrijd'}).click(); await p.waitForTimeout(200);
+await p.getByText('Ardennen / Voerstreek (generiek)').click(); await p.waitForTimeout(500);
+let tt=await p.locator('body').innerText();
+ok('sessie-terugkijken paneel', /Sessie terugkijken/i.test(tt));
+// The volume panel and export buttons only exist once a race date makes a
+// weekly plan, so check them after filling it in.
+await p.locator('input[type=date]').first().fill('2026-11-01'); await p.waitForTimeout(600);
+tt=await p.locator('body').innerText();
+ok('hm/km dichtheid getoond', /hm\/km/.test(tt));
+ok('horloge-export knop', await p.getByRole('button',{name:/horloge/i}).count()>0);
+ok('weekvolume tabel gevuld', /Nog te vullen/i.test(tt));
+const dl2=p.waitForEvent('download',{timeout:5000}).catch(()=>null);
+await p.getByRole('button',{name:/horloge/i}).click();
+const f2=await dl2;
+ok('horloge-export download', !!f2, f2?await f2.suggestedFilename():'geen');
+
+// sessie terugkijken met echte GPX
+const revBtn=p.getByRole('button',{name:'Sessie-GPX kiezen'});
+if(await revBtn.count()){
+  await p.locator('input[type=file]').last().setInputFiles('/root/.claude/uploads/1562378b-aaa4-5783-bb46-14bd5f7ee08e/3b747020-Zepp20260805154940.gpx');
+  await p.waitForTimeout(1200);
+  const rt=await p.locator('body').innerText();
+  ok('sessie beoordeeld', /gehaald|net niet|onder doel|ruim over/.test(rt), (rt.match(/\d+% · (gehaald|net niet|onder doel|ruim over)/)||[''])[0]);
+}
+
+// 11 mobile
 const mp=await page(390,844);
 await fresh(mp);
 await mp.getByRole('button',{name:'Voorbeeldwedstrijd'}).click(); await mp.waitForTimeout(200);

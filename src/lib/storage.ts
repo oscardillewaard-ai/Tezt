@@ -1,9 +1,15 @@
 import type { RouteStats } from './gpx'
 
+export type RacePriority = 'A' | 'B' | 'C'
+
 export interface SavedRoute {
   id: string
   savedAt: string
   stats: RouteStats
+  /** Race day, when known — lets several races be planned toward at once. */
+  raceDate?: string
+  /** A = goal race, B = important, C = training race. */
+  priority?: RacePriority
 }
 
 const RACE_KEY = 'gpx-trainer:races'
@@ -35,8 +41,8 @@ export function listBergen(): SavedRoute[] {
   return readList(BERG_KEY)
 }
 
-export function saveRace(stats: RouteStats): SavedRoute {
-  const entry: SavedRoute = { id: makeId(), savedAt: new Date().toISOString(), stats }
+export function saveRace(stats: RouteStats, meta: { raceDate?: string; priority?: RacePriority } = {}): SavedRoute {
+  const entry: SavedRoute = { id: makeId(), savedAt: new Date().toISOString(), stats, ...meta }
   writeList(RACE_KEY, [entry, ...readList(RACE_KEY)])
   return entry
 }
@@ -53,4 +59,14 @@ export function deleteRace(id: string) {
 
 export function deleteBerg(id: string) {
   writeList(BERG_KEY, readList(BERG_KEY).filter((r) => r.id !== id))
+}
+
+/** Updates the race-day/priority metadata on a saved race. */
+export function updateRaceMeta(
+  id: string,
+  meta: { raceDate?: string; priority?: RacePriority },
+): SavedRoute[] {
+  const next = listRaces().map((r) => (r.id === id ? { ...r, ...meta } : r))
+  writeList(RACE_KEY, next)
+  return next
 }
