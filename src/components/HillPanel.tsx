@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import type { TrainingHill } from '../lib/hills'
-import { HillMap, type TracedFlank } from './HillMap'
+import { HillMap } from './HillMap'
+import type { TracedFlank } from '../lib/flankVisuals'
 
 // three.js roughly doubles the bundle, and most visits never open the 3D
 // view — so it only downloads once someone actually asks for it.

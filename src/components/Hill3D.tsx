@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { LocalPoint } from '../lib/hillFromGpx'
-import { FLANK_COLORS, type TracedFlank } from './HillMap'
+import { FLANK_COLORS, type TracedFlank } from '../lib/flankVisuals'
 
 interface Hill3DProps {
   flanks: TracedFlank[]

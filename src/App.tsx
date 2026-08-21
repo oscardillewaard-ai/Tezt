@@ -13,13 +13,16 @@ import {
 } from './lib/storage'
 import { RoutePanel } from './components/RoutePanel'
 import { HillPanel } from './components/HillPanel'
+import { HillBuilder } from './components/HillBuilder'
+import { deleteCustomHill, listCustomHills, saveCustomHill } from './lib/customHills'
+import type { DerivedHill } from './lib/hillFromGpx'
 import { RacePresetPanel } from './components/RacePresetPanel'
 import { ImageRacePanel } from './components/ImageRacePanel'
 import { TrainingPlan } from './components/TrainingPlan'
 import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 import { OnboardingModal } from './components/OnboardingModal'
 
-type BergMode = 'gpx' | 'hill'
+type BergMode = 'gpx' | 'hill' | 'eigen'
 type RaceMode = 'gpx' | 'preset' | 'image'
 type UiMode = 'simple' | 'advanced'
 type Theme = 'light' | 'dark'
@@ -51,8 +54,14 @@ function App() {
   const [berg, setBerg] = useState<RouteStats | null>(null)
   const [hill, setHill] = useState<TrainingHill | null>(BUILTIN_HILLS[0] ?? null)
   const [bergMode, setBergMode] = useState<BergMode>('hill')
+  const [customHills, setCustomHills] = useState<DerivedHill[]>(listCustomHills)
   const [savedRaces, setSavedRaces] = useState(listRaces)
   const [savedBergen, setSavedBergen] = useState(listBergen)
+
+  // A hill picked from the builder isn't in BUILTIN_HILLS, so offer it
+  // alongside them rather than letting the picker drop the current choice.
+  const hillOptions =
+    hill && !BUILTIN_HILLS.some((h) => h.id === hill.id) ? [...BUILTIN_HILLS, hill] : BUILTIN_HILLS
 
   const effectiveRace: RouteStats | null =
     raceMode === 'image'
@@ -205,6 +214,17 @@ function App() {
               </button>
               <button
                 type="button"
+                onClick={() => setBergMode('eigen')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  bergMode === 'eigen'
+                    ? 'bg-emerald-400 text-slate-900'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
+                }`}
+              >
+                Eigen heuvel
+              </button>
+              <button
+                type="button"
                 onClick={() => setBergMode('gpx')}
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   bergMode === 'gpx'
@@ -212,12 +232,24 @@ function App() {
                     : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
                 }`}
               >
-                Eigen GPX
+                Eén beklimming
               </button>
             </div>
 
             {bergMode === 'hill' ? (
-              <HillPanel hills={BUILTIN_HILLS} selected={hill} onSelect={setHill} />
+              <HillPanel hills={hillOptions} selected={hill} onSelect={setHill} />
+            ) : bergMode === 'eigen' ? (
+              <>
+                <HillBuilder
+                  saved={customHills}
+                  onSave={(h) => setCustomHills(saveCustomHill(h))}
+                  onDelete={(id) => setCustomHills(deleteCustomHill(id))}
+                  onUse={(h) => {
+                    setHill(h)
+                    setBergMode('hill')
+                  }}
+                />
+              </>
             ) : (
               <RoutePanel
                 title="Trainingsberg"
