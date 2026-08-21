@@ -74,7 +74,7 @@ ok('percentage exact typbaar (73)', /73%/.test(t));
 
 // 7 weekly plan + sessions/week + weekday picker
 await p.getByRole('radio',{name:'Uitgebreid'}).click(); await p.waitForTimeout(200);
-await p.locator('input[type=date]').fill('2026-12-01'); await p.waitForTimeout(400);
+await p.getByLabel('Wedstrijddatum').fill('2026-12-01'); await p.waitForTimeout(400);
 // Select by label, not index: new fields shift positional selectors.
 const spw=p.locator('label:has-text("Trainingen per week") input');
 await spw.fill('3'); await p.waitForTimeout(500);
@@ -122,7 +122,7 @@ let tt=await p.locator('body').innerText();
 ok('sessie-terugkijken paneel', /Sessie terugkijken/i.test(tt));
 // The volume panel and export buttons only exist once a race date makes a
 // weekly plan, so check them after filling it in.
-await p.locator('input[type=date]').first().fill('2026-11-01'); await p.waitForTimeout(600);
+await p.getByLabel('Wedstrijddatum').fill('2026-11-01'); await p.waitForTimeout(600);
 tt=await p.locator('body').innerText();
 ok('hm/km dichtheid getoond', /hm\/km/.test(tt));
 ok('horloge-export knop', await p.getByRole('button',{name:/horloge/i}).count()>0);
@@ -141,12 +141,51 @@ if(await revBtn.count()){
   ok('sessie beoordeeld', /gehaald|net niet|onder doel|ruim over/.test(rt), (rt.match(/\d+% · (gehaald|net niet|onder doel|ruim over)/)||[''])[0]);
 }
 
+// 12 schema-instellingen: rustweken, en welke pendels per dag
+await fresh(p);
+await p.getByRole('radio',{name:'Uitgebreid'}).click(); await p.waitForTimeout(200);
+await p.getByRole('button',{name:'Voorbeeldwedstrijd'}).click(); await p.waitForTimeout(200);
+await p.getByText('Alpien (generiek)').click(); await p.waitForTimeout(400);
+await p.getByLabel('Wedstrijddatum').fill('2027-06-01'); await p.waitForTimeout(700);
+t=await p.locator('body').innerText();
+ok('schema-instellingen paneel', /Schema-instellingen/i.test(t));
+ok('rustweek-instelling aanwezig', await p.locator('label:has-text("Rustweek elke") input').count()>0);
+// The badge is the only element whose whole text is exactly "Rustweek" —
+// matching loosely would also hit the "Rustweek elke" settings label.
+const restBadge=()=>p.getByText('Rustweek',{exact:true}).count();
+ok('rustweken in agenda', await restBadge()>0);
+const restEvery=p.locator('label:has-text("Rustweek elke") input');
+await restEvery.fill('0'); await restEvery.blur(); await p.waitForTimeout(600);
+ok('rustweken uit te zetten', await restBadge()===0);
+await restEvery.fill('4'); await restEvery.blur(); await p.waitForTimeout(600);
+t=await p.locator('body').innerText();
+ok('agenda noemt welke pendel', /Lange flank|Steile flank|Middelsteile flank|In\/uit-flank/i.test(t));
+ok('afdaalbudget verwijderd', !/afdaalbudget|Rennend \/ stijl af|Max\. afdaling/i.test(t));
+const taperW=p.locator('label:has-text("Taperweken") input');
+ok('taperweken instelbaar', await taperW.count()>0);
+ok('eerste trainingsweek instelbaar', await p.getByLabel('Eerste trainingsweek').count()>0);
+
+// 13 handmatige wedstrijd
+await fresh(p);
+await p.getByRole('button',{name:'Handmatig'}).click(); await p.waitForTimeout(400);
+t=await p.locator('body').innerText();
+ok('handmatige wedstrijd paneel', /Verdeling over steilte/i.test(t));
+const gainField=p.locator('label:has-text("D+ (m)") input');
+await gainField.fill('3500'); await gainField.blur(); await p.waitForTimeout(600);
+t=await p.locator('body').innerText();
+ok('handmatige D+ komt door in plan', /3500 m/.test(t), (t.match(/D\+\s*\n\s*\d+ m/)||[''])[0].replace(/\n/g,' '));
+const nBands=await p.locator('label:has-text("Aandeel D+ (%)") input').count();
+await p.getByRole('button',{name:'Steilte toevoegen'}).click(); await p.waitForTimeout(400);
+ok('steilte-band toe te voegen', await p.locator('label:has-text("Aandeel D+ (%)") input').count()===nBands+1);
+await p.getByLabel('Wedstrijddatum').fill('2027-03-01'); await p.waitForTimeout(700);
+ok('handmatige wedstrijd geeft schema', await p.getByRole('button',{name:/agenda/i}).count()>0);
+
 // 11 mobile
 const mp=await page(390,844);
 await fresh(mp);
 await mp.getByRole('button',{name:'Voorbeeldwedstrijd'}).click(); await mp.waitForTimeout(200);
 await mp.getByText('Ardennen / Voerstreek (generiek)').click(); await mp.waitForTimeout(500);
-await mp.locator('input[type=date]').fill('2026-12-01'); await mp.waitForTimeout(500);
+await mp.getByLabel('Wedstrijddatum').fill('2026-12-01'); await mp.waitForTimeout(500);
 const ov=await mp.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
 ok('geen horizontale overflow op mobiel', ov<=0, 'overflow='+ov+'px');
 await mp.close();

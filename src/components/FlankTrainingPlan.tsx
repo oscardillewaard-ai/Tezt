@@ -13,9 +13,11 @@ import {
 import { PrintChecklist } from './PrintChecklist'
 import { NumberField } from './NumberField'
 import { WeekdayPicker } from './WeekdayPicker'
-import { WeekAgendaRow, type DayCell } from './WeekAgenda'
+import { WeekAgendaRow, type AgendaSessionLine, type DayCell } from './WeekAgenda'
 import { WeeklyVolumePanel, type VolumeWeekRow } from './WeeklyVolumePanel'
-import { checkDescentBudget, densityHmPerKm } from '../lib/weeklyVolume'
+import { densityHmPerKm } from '../lib/weeklyVolume'
+import { PlanSettingsPanel } from './PlanSettingsPanel'
+import { DEFAULT_PLAN_SETTINGS, type PlanSettings } from '../lib/plan'
 import { SessionReviewPanel } from './SessionReviewPanel'
 import { buildWorkout, workoutToJson, workoutToText } from '../lib/workoutExport'
 
@@ -68,20 +70,21 @@ function SessionBreakdown({ session }: { session: FlankSessionPlan }) {
   )
 }
 
-const DEFAULT_START_PERCENT = 40
 const DEFAULT_SESSIONS_PER_WEEK = 1
 
 export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanProps) {
   const [targetPercent, setTargetPercent] = useState(100)
   const [raceDate, setRaceDate] = useState('')
-  const [startPercentInput, setStartPercentInput] = useState(DEFAULT_START_PERCENT)
+  const [settingsInput, setSettingsInput] = useState<PlanSettings>(DEFAULT_PLAN_SETTINGS)
   const [sessionsPerWeekInput, setSessionsPerWeekInput] = useState(DEFAULT_SESSIONS_PER_WEEK)
+  const [startDateInput, setStartDateInput] = useState('')
   const [weekGoalMultiplier, setWeekGoalMultiplier] = useState(2.5)
   const raceDensity = densityHmPerKm(race)
   const [longRunDensity, setLongRunDensity] = useState(Math.round(raceDensity) || 26)
-  const [descentLimit, setDescentLimit] = useState(225)
-  const startPercent = advanced ? startPercentInput : DEFAULT_START_PERCENT
+  // Simple mode hides every knob and just runs the defaults.
+  const settings = advanced ? settingsInput : DEFAULT_PLAN_SETTINGS
   const sessionsPerWeek = advanced ? sessionsPerWeekInput : DEFAULT_SESSIONS_PER_WEEK
+  const startDate = advanced ? startDateInput : ''
 
   const session = useMemo(
     () => computeFlankSession(race, hill, targetPercent),
@@ -92,8 +95,10 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     if (!raceDate) return []
     const parsed = new Date(raceDate)
     if (Number.isNaN(parsed.getTime())) return []
-    return buildFlankWeeklyPlan(race, hill, parsed, new Date(), sessionsPerWeek, 110, startPercent)
-  }, [race, hill, raceDate, sessionsPerWeek, startPercent])
+    const start = startDate ? new Date(startDate) : new Date()
+    if (Number.isNaN(start.getTime())) return []
+    return buildFlankWeeklyPlan(race, hill, parsed, start, sessionsPerWeek, settings)
+  }, [race, hill, raceDate, startDate, sessionsPerWeek, settings])
 
   const [customWeekdays, setCustomWeekdays] = useState<number[] | null>(null)
   // A custom day selection only applies while it still matches how many
@@ -124,16 +129,22 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
           return {
             date: sessionDate(w.weekStart, weekdays[i] ?? weekdays[0]),
             title: `Bergtraining: ${parts.join(', ')}`,
-            description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : `${w.targetPercent}% van D+`}. Deze sessie: ${parts.join(', ')}. Hele week: ${w.session.totalHmM.toFixed(0)} m D+, ${w.session.totalMinutes.toFixed(0)} min.`,
+            description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : w.isRestWeek ? `rustweek, ${w.targetPercent}% van D+` : `${w.targetPercent}% van D+`}. Deze sessie: ${parts.join(', ')}. Hele week: ${w.session.totalHmM.toFixed(0)} m D+, ${w.session.totalMinutes.toFixed(0)} min.`,
           }
         }).filter((e): e is ScheduleEntry => e !== null),
       ),
     [weeklyPlan, weekdays, sessionsPerWeek],
   )
 
+  function goalLabel(w: (typeof weeklyPlan)[number]): string {
+    if (w.isRaceWeek) return 'Wedstrijdweek'
+    if (w.isRestWeek) return `Rustweek — ${w.targetPercent}% van D+`
+    return `${w.targetPercent}% van D+`
+  }
+
   const printWeeks = weeklyPlan.map((w) => ({
     label: formatWeekLabel(w.weekStart, w.weekEnd),
-    goal: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+    goal: goalLabel(w),
     sessions: Array.from({ length: sessionsPerWeek }, (_, i) => {
       const parts = sessionParts(w, i)
       const day = weekdayName(weekdays[i] ?? weekdays[0])
@@ -142,6 +153,10 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
   }))
 
   const weeklyAgenda = weeklyPlan.map((w) => {
+    const sessions: AgendaSessionLine[] = Array.from({ length: sessionsPerWeek }, (_, i) => ({
+      dayLabel: weekdayName(weekdays[i] ?? weekdays[0]),
+      parts: sessionParts(w, i),
+    }))
     const days: DayCell[] = Array.from({ length: 7 }, (_, i) => {
       const iso = i + 1
       const sessionIdx = weekdays.indexOf(iso)
@@ -163,7 +178,9 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     return {
       weekIndex: w.weekIndex,
       weekLabel: formatWeekLabel(w.weekStart, w.weekEnd),
-      goalLabel: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+      goalLabel: goalLabel(w),
+      isRestWeek: w.isRestWeek,
+      sessions,
       emphasisClass: w.isRaceWeek
         ? 'text-[var(--status-warn)]'
         : w.isTaper
@@ -183,12 +200,6 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
         ? 'text-[var(--status-info)]'
         : 'text-[var(--text-2)]',
   }))
-
-  const budget = checkDescentBudget(
-    session.runningDescentHmM,
-    session.steepDescentHmM,
-    descentLimit,
-  )
 
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
@@ -252,34 +263,12 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             </p>
           </div>
           <div className="rounded-lg bg-[var(--surface-3)] px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Rennend / stijl af</p>
-            <p className="mt-1 text-lg font-semibold text-[var(--text)]">
-              {session.runningDescentHmM.toFixed(0)} / {session.steepDescentHmM.toFixed(0)} m
+            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Herhalingen</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--accent-emerald-text)]">
+              {session.allocations.reduce((n, a) => n + a.reps, 0) + (session.warmup?.reps ?? 0)}×
             </p>
           </div>
         </div>
-
-        {budget.overBudget && (
-          <p className="mt-4 rounded-lg border border-[var(--status-warn)]/40 bg-[var(--badge-bg)] px-4 py-3 text-sm text-[var(--status-warn)]">
-            Deze sessie kost je {budget.totalHmM.toFixed(0)} m afdaling, boven je grens van{' '}
-            {budget.limitHmM} m. Op een pendelheuvel kun je die afdaling niet weglaten — verlaag het
-            percentage, of verschuif hoogtemeters naar de gym (zie weekvolume hieronder).
-          </p>
-        )}
-
-        {advanced && (
-          <label className="mt-4 flex w-fit flex-col gap-1 text-sm text-[var(--text-3)]">
-            Max. afdaling per sessie (m)
-            <NumberField
-              min={50}
-              max={2000}
-              step={25}
-              value={descentLimit}
-              onChange={setDescentLimit}
-              className="w-32 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
-            />
-          </label>
-        )}
 
         <div className="mt-5">
           <SessionBreakdown session={session} />
@@ -304,32 +293,18 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
               className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
             />
           </label>
-          {advanced && (
-            <>
-              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
-                Startpercentage
-                <NumberField
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={startPercentInput}
-                  onChange={setStartPercentInput}
-                  className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
-                Trainingen per week
-                <NumberField
-                  min={1}
-                  max={7}
-                  value={sessionsPerWeekInput}
-                  onChange={setSessionsPerWeekInput}
-                  className="w-28 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
-                />
-              </label>
-            </>
-          )}
         </div>
+
+        {advanced && (
+          <PlanSettingsPanel
+            settings={settingsInput}
+            onChange={setSettingsInput}
+            sessionsPerWeek={sessionsPerWeekInput}
+            onSessionsPerWeekChange={setSessionsPerWeekInput}
+            startDate={startDateInput}
+            onStartDateChange={setStartDateInput}
+          />
+        )}
 
         {advanced && sessionsPerWeek > 1 && (
           <div className="mt-4">

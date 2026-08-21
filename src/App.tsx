@@ -19,12 +19,14 @@ import { deleteCustomHill, listCustomHills, saveCustomHill } from './lib/customH
 import type { DerivedHill } from './lib/hillFromGpx'
 import { RacePresetPanel } from './components/RacePresetPanel'
 import { ImageRacePanel } from './components/ImageRacePanel'
+import { ManualRacePanel } from './components/ManualRacePanel'
+import { buildManualRace, DEFAULT_MANUAL_RACE, type ManualRaceInput } from './lib/manualRace'
 import { TrainingPlan } from './components/TrainingPlan'
 import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 import { OnboardingModal } from './components/OnboardingModal'
 
 type BergMode = 'gpx' | 'hill' | 'eigen'
-type RaceMode = 'gpx' | 'preset' | 'image'
+type RaceMode = 'gpx' | 'preset' | 'image' | 'manual'
 type UiMode = 'simple' | 'advanced'
 type Theme = 'light' | 'dark'
 
@@ -51,6 +53,10 @@ function App() {
   const [racePreset, setRacePreset] = useState<RaceArchetype | null>(null)
   const [raceDistanceKm, setRaceDistanceKm] = useState<number>(0)
   const [imageRace, setImageRace] = useState<RouteStats | null>(null)
+  const [manualRace, setManualRace] = useLocalStorageState<ManualRaceInput>(
+    'bergtrainer:manual-race',
+    DEFAULT_MANUAL_RACE,
+  )
   const [raceMode, setRaceMode] = useState<RaceMode>('gpx')
   const [berg, setBerg] = useState<RouteStats | null>(null)
   const [hill, setHill] = useState<TrainingHill | null>(BUILTIN_HILLS[0] ?? null)
@@ -67,6 +73,8 @@ function App() {
   const effectiveRace: RouteStats | null =
     raceMode === 'image'
       ? imageRace
+      : raceMode === 'manual'
+      ? buildManualRace(manualRace)
       : raceMode === 'preset'
       ? racePreset
         ? generateSyntheticRace(racePreset, raceDistanceKm || racePreset.defaultDistanceKm)
@@ -133,7 +141,7 @@ function App() {
 
         <div className="no-print grid gap-6 sm:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setRaceMode('gpx')}
@@ -167,10 +175,27 @@ function App() {
               >
                 Uit afbeelding
               </button>
+              <button
+                type="button"
+                onClick={() => setRaceMode('manual')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  raceMode === 'manual'
+                    ? 'bg-orange-400 text-slate-900'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
+                }`}
+              >
+                Handmatig
+              </button>
             </div>
 
             {raceMode === 'image' ? (
               <ImageRacePanel onRouteReady={setImageRace} />
+            ) : raceMode === 'manual' ? (
+              <ManualRacePanel
+                input={manualRace}
+                onChange={setManualRace}
+                onSave={(r) => setSavedRaces([saveRace(r), ...savedRaces])}
+              />
             ) : raceMode === 'gpx' ? (
               <RoutePanel
                 title="Ultrarace"

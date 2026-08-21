@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { RouteStats } from '../lib/gpx'
-import { buildWeeklyPlan, computeSession } from '../lib/plan'
+import { buildWeeklyPlan, computeSession, DEFAULT_PLAN_SETTINGS, type PlanSettings } from '../lib/plan'
 import {
   buildIcsCalendar,
   downloadTextFile,
@@ -12,9 +12,10 @@ import {
 import { PrintChecklist } from './PrintChecklist'
 import { NumberField } from './NumberField'
 import { WeekdayPicker } from './WeekdayPicker'
-import { WeekAgendaRow, type DayCell } from './WeekAgenda'
+import { WeekAgendaRow, type AgendaSessionLine, type DayCell } from './WeekAgenda'
 import { WeeklyVolumePanel, type VolumeWeekRow } from './WeeklyVolumePanel'
 import { densityHmPerKm } from '../lib/weeklyVolume'
+import { PlanSettingsPanel } from './PlanSettingsPanel'
 
 interface TrainingPlanProps {
   race: RouteStats
@@ -27,19 +28,21 @@ function formatWeekLabel(start: Date, end: Date): string {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
-const DEFAULT_START_PERCENT = 40
 const DEFAULT_SESSIONS_PER_WEEK = 1
 
 export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
   const [targetPercent, setTargetPercent] = useState(100)
   const [sessionsPerWeekInput, setSessionsPerWeekInput] = useState(DEFAULT_SESSIONS_PER_WEEK)
-  const [startPercentInput, setStartPercentInput] = useState(DEFAULT_START_PERCENT)
+  const [settingsInput, setSettingsInput] = useState<PlanSettings>(DEFAULT_PLAN_SETTINGS)
+  const [startDateInput, setStartDateInput] = useState('')
   const [raceDate, setRaceDate] = useState('')
   const [weekGoalMultiplier, setWeekGoalMultiplier] = useState(2.5)
   const raceDensity = densityHmPerKm(race)
   const [longRunDensity, setLongRunDensity] = useState(Math.round(raceDensity) || 26)
+  // Simple mode hides every knob and just runs the defaults.
   const sessionsPerWeek = advanced ? sessionsPerWeekInput : DEFAULT_SESSIONS_PER_WEEK
-  const startPercent = advanced ? startPercentInput : DEFAULT_START_PERCENT
+  const settings = advanced ? settingsInput : DEFAULT_PLAN_SETTINGS
+  const startDate = advanced ? startDateInput : ''
 
   const session = useMemo(
     () => computeSession(race, berg, targetPercent),
@@ -50,8 +53,10 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
     if (!raceDate) return []
     const parsed = new Date(raceDate)
     if (Number.isNaN(parsed.getTime())) return []
-    return buildWeeklyPlan(race, berg, parsed, new Date(), sessionsPerWeek, 110, startPercent)
-  }, [race, berg, raceDate, sessionsPerWeek, startPercent])
+    const start = startDate ? new Date(startDate) : new Date()
+    if (Number.isNaN(start.getTime())) return []
+    return buildWeeklyPlan(race, berg, parsed, start, sessionsPerWeek, settings)
+  }, [race, berg, raceDate, startDate, sessionsPerWeek, settings])
 
   const [customWeekdays, setCustomWeekdays] = useState<number[] | null>(null)
   // A custom day selection only applies while it still matches how many
@@ -68,22 +73,38 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
       weeklyPlan.flatMap((w) =>
         w.repsPerSession.map((reps, i) => ({
           date: sessionDate(w.weekStart, weekdays[i] ?? weekdays[0]),
-          title: `Bergtraining: ${reps}× herhaling`,
-          description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : `${w.targetPercent}% van D+`}. Deze sessie: ${reps}× (${(reps * berg.distanceKm).toFixed(1)} km, ${(reps * berg.gainM).toFixed(0)} m D+). Hele week: ${w.repsPerSession.join(' + ')}×, ${w.totalGainM.toFixed(0)} m D+.`,
+          title: `Bergtraining: ${reps}× ${berg.name}`,
+          description: `Weekdoel: ${w.isRaceWeek ? 'wedstrijdweek' : w.isRestWeek ? `rustweek, ${w.targetPercent}% van D+` : `${w.targetPercent}% van D+`}. Deze sessie: ${reps}× (${(reps * berg.distanceKm).toFixed(1)} km, ${(reps * berg.gainM).toFixed(0)} m D+). Hele week: ${w.repsPerSession.join(' + ')}×, ${w.totalGainM.toFixed(0)} m D+.`,
         })),
       ),
-    [weeklyPlan, weekdays, berg.distanceKm, berg.gainM],
+    [weeklyPlan, weekdays, berg.name, berg.distanceKm, berg.gainM],
   )
+
+  function goalLabel(w: (typeof weeklyPlan)[number]): string {
+    if (w.isRaceWeek) return 'Wedstrijdweek'
+    if (w.isRestWeek) return `Rustweek — ${w.targetPercent}% van D+`
+    return `${w.targetPercent}% van D+`
+  }
+
+  function sessionParts(reps: number): string[] {
+    if (reps <= 0) return []
+    return [`${berg.name} ${reps}×`]
+  }
 
   const printWeeks = weeklyPlan.map((w) => ({
     label: formatWeekLabel(w.weekStart, w.weekEnd),
-    goal: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+    goal: goalLabel(w),
     sessions: w.repsPerSession.map(
-      (reps, i) => `${weekdayName(weekdays[i] ?? weekdays[0])}: ${reps}× herhaling`,
+      (reps, i) =>
+        `${weekdayName(weekdays[i] ?? weekdays[0])}: ${reps}× ${berg.name} (${(reps * berg.gainM).toFixed(0)} m D+)`,
     ),
   }))
 
   const weeklyAgenda = weeklyPlan.map((w) => {
+    const sessions: AgendaSessionLine[] = w.repsPerSession.map((reps, i) => ({
+      dayLabel: weekdayName(weekdays[i] ?? weekdays[0]),
+      parts: sessionParts(reps),
+    }))
     const days: DayCell[] = Array.from({ length: 7 }, (_, i) => {
       const iso = i + 1
       const sessionIdx = weekdays.indexOf(iso)
@@ -94,14 +115,16 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
       return {
         iso,
         label: `${reps}×`,
-        detail: `${reps} herhaling(en) — ${(reps * berg.distanceKm).toFixed(1)} km, ${(reps * berg.gainM).toFixed(0)} m D+`,
+        detail: `${reps}× ${berg.name} — ${(reps * berg.distanceKm).toFixed(1)} km, ${(reps * berg.gainM).toFixed(0)} m D+`,
         isTrainingDay: true,
       }
     })
     return {
       weekIndex: w.weekIndex,
       weekLabel: formatWeekLabel(w.weekStart, w.weekEnd),
-      goalLabel: w.isRaceWeek ? 'Wedstrijdweek' : `${w.targetPercent}% van D+`,
+      goalLabel: goalLabel(w),
+      isRestWeek: w.isRestWeek,
+      sessions,
       emphasisClass: w.isRaceWeek
         ? 'text-[var(--status-warn)]'
         : w.isTaper
@@ -205,32 +228,18 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
               className="rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
             />
           </label>
-          {advanced && (
-            <>
-              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
-                Trainingen per week
-                <NumberField
-                  min={1}
-                  max={7}
-                  value={sessionsPerWeekInput}
-                  onChange={setSessionsPerWeekInput}
-                  className="w-24 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm text-[var(--text-3)]">
-                Startpercentage
-                <NumberField
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={startPercentInput}
-                  onChange={setStartPercentInput}
-                  className="w-24 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
-                />
-              </label>
-            </>
-          )}
         </div>
+
+        {advanced && (
+          <PlanSettingsPanel
+            settings={settingsInput}
+            onChange={setSettingsInput}
+            sessionsPerWeek={sessionsPerWeekInput}
+            onSessionsPerWeekChange={setSessionsPerWeekInput}
+            startDate={startDateInput}
+            onStartDateChange={setStartDateInput}
+          />
+        )}
 
         {advanced && sessionsPerWeek > 1 && (
           <div className="mt-4">

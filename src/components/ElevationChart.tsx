@@ -30,6 +30,12 @@ export function ElevationChart({ profile, color }: ElevationChartProps) {
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-2)" />
         <XAxis
           dataKey="distanceKm"
+          // A numeric axis, so points sit at their real distance. The default
+          // category axis spaces every point equally, which distorts any
+          // profile whose points aren't evenly sampled (a hand-entered race,
+          // or a curve traced off an image).
+          type="number"
+          domain={[0, maxDistanceKm]}
           tickFormatter={(v: number) => `${v.toFixed(decimals)}km`}
           stroke="var(--muted)"
           fontSize={12}

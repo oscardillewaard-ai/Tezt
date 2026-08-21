@@ -19,10 +19,8 @@ export interface WeekVolume {
    */
   longRunKm: number
   /**
-   * The same gap done on a treadmill/stairmaster instead. On a pendel hill
-   * every climbed metre must also be descended, so the gym is the only way
-   * to add climbing without paying the descent cost — useful once the
-   * week's descent budget is spent.
+   * The same gap done on a treadmill/stairmaster instead — a way to add
+   * climbing when the hill or a long run isn't an option that week.
    */
   gymHmM: number
 }
@@ -40,33 +38,5 @@ export function computeWeekVolume(
     gapHmM,
     longRunKm: densityHmPerKm > 0 ? gapHmM / densityHmPerKm : 0,
     gymHmM: gapHmM,
-  }
-}
-
-/**
- * Descent load a pendel session forces on you, and whether it exceeds what
- * you're willing to absorb. On this hill climb and descent are locked 1:1,
- * so the descent is not a choice — the only lever is which flank you use.
- */
-export interface DescentBudget {
-  runningHmM: number
-  steepHmM: number
-  totalHmM: number
-  limitHmM: number
-  overBudget: boolean
-}
-
-export function checkDescentBudget(
-  runningHmM: number,
-  steepHmM: number,
-  limitHmM: number,
-): DescentBudget {
-  const totalHmM = runningHmM + steepHmM
-  return {
-    runningHmM,
-    steepHmM,
-    totalHmM,
-    limitHmM,
-    overBudget: totalHmM > limitHmM,
   }
 }

@@ -28,6 +28,31 @@ export interface WeekTarget {
   targetPercent: number
   isTaper: boolean
   isRaceWeek: boolean
+  isRestWeek: boolean
+}
+
+export interface PlanSettings {
+  /** Highest week, as a percentage of the race's elevation gain. */
+  peakPercent: number
+  /** Where the build starts, as a percentage of the race's elevation gain. */
+  startPercent: number
+  /** Where the taper lands in race week. */
+  taperPercent: number
+  /** How many weeks before race day to taper. -1 picks a sensible number for the plan's length. */
+  taperWeeks: number
+  /** Insert a recovery week every N build weeks. 0 turns them off. */
+  restWeekEvery: number
+  /** A recovery week's load, as a percentage of what that week would otherwise have been. */
+  restWeekPercent: number
+}
+
+export const DEFAULT_PLAN_SETTINGS: PlanSettings = {
+  peakPercent: 110,
+  startPercent: 40,
+  taperPercent: 30,
+  taperWeeks: -1,
+  restWeekEvery: 4,
+  restWeekPercent: 60,
 }
 
 export interface WeekPlan extends WeekTarget {
@@ -57,10 +82,9 @@ function startOfWeek(d: Date): Date {
 export function computeWeeklyTargets(
   raceDate: Date,
   today: Date,
-  peakPercent = 110,
-  startPercent = 40,
-  taperPercent = 30,
+  settings: PlanSettings = DEFAULT_PLAN_SETTINGS,
 ): WeekTarget[] {
+  const { peakPercent, startPercent, taperPercent, restWeekEvery, restWeekPercent } = settings
   const firstWeekStart = startOfWeek(today)
   const raceWeekStart = startOfWeek(raceDate)
   const msPerWeek = 7 * 24 * 60 * 60 * 1000
@@ -69,7 +93,14 @@ export function computeWeeklyTargets(
 
   if (weeksTotal <= 0) return []
 
-  const taperWeeks = weeksTotal >= 5 ? 2 : weeksTotal >= 3 ? 1 : 0
+  const taperWeeks =
+    settings.taperWeeks >= 0
+      ? Math.min(settings.taperWeeks, Math.max(0, weeksTotal - 1))
+      : weeksTotal >= 5
+        ? 2
+        : weeksTotal >= 3
+          ? 1
+          : 0
   const buildWeeks = weeksTotal - taperWeeks
   const peakWeekIndex = Math.max(0, buildWeeks - 1)
 
@@ -94,12 +125,26 @@ export function computeWeeklyTargets(
       targetPercent = startPercent + (peakPercent - startPercent) * progress
     }
 
+    // Recovery weeks cut back the load the ramp would otherwise ask for, so
+    // the build keeps climbing afterwards instead of restarting lower. The
+    // peak week is never turned into one — that's the week the whole plan is
+    // aiming at — and neither is anything from the taper onwards, which is
+    // already a step down.
+    const isRestWeek =
+      restWeekEvery > 0 &&
+      !isTaper &&
+      !isRaceWeek &&
+      i > 0 &&
+      i !== peakWeekIndex &&
+      (i + 1) % restWeekEvery === 0
+    if (isRestWeek) targetPercent = (targetPercent * restWeekPercent) / 100
+
     targetPercent = Math.round(targetPercent)
 
     const weekStart = new Date(firstWeekStart.getTime() + i * msPerWeek)
     const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
 
-    weeks.push({ weekIndex: i, weekStart, weekEnd, targetPercent, isTaper, isRaceWeek })
+    weeks.push({ weekIndex: i, weekStart, weekEnd, targetPercent, isTaper, isRaceWeek, isRestWeek })
   }
 
   return weeks
@@ -111,11 +156,9 @@ export function buildWeeklyPlan(
   raceDate: Date,
   today: Date,
   sessionsPerWeek: number,
-  peakPercent = 110,
-  startPercent = 40,
-  taperPercent = 30,
+  settings: PlanSettings = DEFAULT_PLAN_SETTINGS,
 ): WeekPlan[] {
-  const weeks = computeWeeklyTargets(raceDate, today, peakPercent, startPercent, taperPercent)
+  const weeks = computeWeeklyTargets(raceDate, today, settings)
 
   return weeks.map((w) => {
     const targetGainM = (race.gainM * w.targetPercent) / 100

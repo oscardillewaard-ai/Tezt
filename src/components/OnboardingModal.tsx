@@ -26,8 +26,8 @@ export function OnboardingModal({ onDismiss }: OnboardingModalProps) {
               1
             </span>
             <span className="text-[var(--text-2)]">
-              Kies je <strong>wedstrijd</strong> — upload een GPX, of kies een voorbeeldwedstrijd
-              als je die nog niet hebt.
+              Kies je <strong>wedstrijd</strong> — upload een GPX, kies een voorbeeldwedstrijd,
+              lees een hoogteprofiel uit een plaatje, of tik de cijfers handmatig in.
             </span>
           </li>
           <li className="flex gap-3">
@@ -52,7 +52,7 @@ export function OnboardingModal({ onDismiss }: OnboardingModalProps) {
 
         <p className="mt-4 text-xs text-[var(--faint)]">
           Begin eenvoudig — schakel naar "Uitgebreid" (rechtsboven) voor fijnere controle over
-          start-percentage en trainingen per week.
+          opbouw, taper, rustweken en trainingen per week.
         </p>
 
         <button

@@ -91,9 +91,8 @@ export function WeeklyVolumePanel({
       </div>
 
       <p className="mt-2 text-xs text-[var(--faint)]">
-        Gym-kolom: op een pendelheuvel moet elke geklommen meter ook afgedaald worden. Loopband of
-        stairmaster is de enige manier om klim-hoogtemeters te maken zonder die afdaalkosten — handig
-        als je afdaalbudget voor die week op is.
+        Gym-kolom: dezelfde hoogtemeters op de loopband of stairmaster, voor weken waarin de heuvel
+        of een heuvelachtige long run er niet in zit.
       </p>
     </div>
   )

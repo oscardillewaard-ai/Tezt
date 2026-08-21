@@ -7,18 +7,44 @@ export interface DayCell {
   isTrainingDay: boolean
 }
 
+/**
+ * One training day spelled out: which flanks/pendels, how many reps each.
+ * The seven-day grid only has room for a rep count, so the actual "welke
+ * pendel" answer lives in these lines underneath it.
+ */
+export interface AgendaSessionLine {
+  dayLabel: string
+  parts: string[]
+}
+
 interface WeekAgendaRowProps {
   weekLabel: string
   goalLabel: string
   emphasisClass: string
   days: DayCell[]
+  sessions?: AgendaSessionLine[]
+  isRestWeek?: boolean
 }
 
-export function WeekAgendaRow({ weekLabel, goalLabel, emphasisClass, days }: WeekAgendaRowProps) {
+export function WeekAgendaRow({
+  weekLabel,
+  goalLabel,
+  emphasisClass,
+  days,
+  sessions = [],
+  isRestWeek = false,
+}: WeekAgendaRowProps) {
   return (
     <div className="border-b border-[var(--border-soft)] py-3">
-      <div className={`flex items-baseline justify-between text-sm ${emphasisClass}`}>
-        <span className="font-medium">{weekLabel}</span>
+      <div className={`flex flex-wrap items-baseline justify-between gap-2 text-sm ${emphasisClass}`}>
+        <span className="flex items-baseline gap-2">
+          <span className="font-medium">{weekLabel}</span>
+          {isRestWeek && (
+            <span className="rounded-full bg-[var(--badge-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--status-info)]">
+              Rustweek
+            </span>
+          )}
+        </span>
         <span>{goalLabel}</span>
       </div>
       <div className="mt-2 grid grid-cols-7 gap-1">
@@ -37,6 +63,16 @@ export function WeekAgendaRow({ weekLabel, goalLabel, emphasisClass, days }: Wee
           </div>
         ))}
       </div>
+      {sessions.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-[var(--muted)]">
+          {sessions.map((s) => (
+            <li key={s.dayLabel} className="flex flex-wrap gap-x-2">
+              <span className="font-medium text-[var(--text-3)]">{s.dayLabel}</span>
+              <span>{s.parts.length > 0 ? s.parts.join(' · ') : 'geen herhalingen'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
