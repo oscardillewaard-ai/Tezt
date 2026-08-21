@@ -1,4 +1,10 @@
+import { lazy, Suspense, useState } from 'react'
 import type { TrainingHill } from '../lib/hills'
+import { HillMap, type TracedFlank } from './HillMap'
+
+// three.js roughly doubles the bundle, and most visits never open the 3D
+// view — so it only downloads once someone actually asks for it.
+const Hill3D = lazy(() => import('./Hill3D').then((m) => ({ default: m.Hill3D })))
 
 const modeLabel: Record<string, string> = {
   jog: 'joggend',
@@ -14,6 +20,11 @@ interface HillPanelProps {
 }
 
 export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
+  const [view, setView] = useState<'geen' | 'kaart' | '3d'>('geen')
+  const traced: TracedFlank[] = (selected?.flanks ?? [])
+    .filter((f): f is typeof f & { trace: NonNullable<typeof f.trace> } => !!f.trace?.length)
+    .map((f) => ({ id: f.id, aspect: f.aspect, trace: f.trace }))
+
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
       <h2 className="text-lg font-semibold text-[var(--text)]">Trainingsberg</h2>
@@ -48,6 +59,39 @@ export function HillPanel({ hills, selected, onSelect }: HillPanelProps) {
           <p className="rounded-lg bg-[var(--surface-3)] px-4 py-3 text-sm text-[var(--text-3)]">
             {selected.note}
           </p>
+
+          {traced.length > 0 && (
+            <div>
+              <div className="mb-2 flex gap-1">
+                {(['geen', 'kaart', '3d'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className={`rounded-full px-3 py-1 text-xs ${
+                      view === v
+                        ? 'bg-[var(--surface-2-active)] text-[var(--text)]'
+                        : 'bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--text-2)]'
+                    }`}
+                  >
+                    {v === 'geen' ? 'Geen weergave' : v === 'kaart' ? 'Plattegrond' : '3D'}
+                  </button>
+                ))}
+              </div>
+              {view === 'kaart' && <HillMap flanks={traced} />}
+              {view === '3d' && (
+                <Suspense
+                  fallback={
+                    <p className="rounded-lg bg-[var(--surface-3)] px-4 py-8 text-center text-sm text-[var(--muted)]">
+                      3D-weergave laden…
+                    </p>
+                  }
+                >
+                  <Hill3D flanks={traced} />
+                </Suspense>
+              )}
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] border-collapse text-left text-sm">

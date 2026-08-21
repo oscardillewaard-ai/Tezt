@@ -1,7 +1,12 @@
+import type { LocalPoint } from './hillFromGpx'
+import { LUHRS_TRACES } from './luhrsTraces'
+
 export type DirectionMode = 'jog' | 'run' | 'powerhike' | 'hike'
 
 export interface Flank {
   id: string
+  /** Where this flank runs, in metres relative to the summit, when GPS data for it exists. */
+  trace?: LocalPoint[]
   /** Pendel type label as used on the hill's schema, e.g. "D" or "K". */
   pendelType: string
   name: string
@@ -109,6 +114,12 @@ export const LUHRS_HEUVEL: TrainingHill = {
       role: 'climb',
     },
   ],
+}
+
+// Attach the recorded traces so the built-in hill has a map and 3D view
+// without the user having to upload anything.
+for (const flank of LUHRS_HEUVEL.flanks) {
+  flank.trace = LUHRS_TRACES[flank.id]
 }
 
 export const BUILTIN_HILLS: TrainingHill[] = [LUHRS_HEUVEL]

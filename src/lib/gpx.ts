@@ -189,7 +189,19 @@ function byLocalName(root: Document | Element, localName: string): Element[] {
   return out
 }
 
-export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
+export interface ParsedTrack {
+  name: string
+  points: TrackPoint[]
+  /** Per-point timestamps where the file has them, otherwise null. */
+  times: (Date | null)[]
+}
+
+/**
+ * Parses a GPX into geo-located, elevation-filled track points. Split out
+ * from parseGpx because analysing a hill needs the coordinates and times,
+ * not just the distance/elevation profile a race needs.
+ */
+export function parseTrack(xmlText: string, fallbackName: string): ParsedTrack {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
   const parserError = doc.getElementsByTagName('parsererror')[0]
   if (parserError) {
@@ -216,14 +228,21 @@ export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
   // points (or none at all), and discarding those points used to throw away
   // the whole track. Missing values are interpolated from their neighbours
   // below instead.
-  const raw: { lat: number; lon: number; ele: number | null }[] = []
+  const raw: { lat: number; lon: number; ele: number | null; time: Date | null }[] = []
   for (const pt of source) {
     const lat = parseFloat(pt.getAttribute('lat') ?? '')
     const lon = parseFloat(pt.getAttribute('lon') ?? '')
     if (Number.isNaN(lat) || Number.isNaN(lon)) continue
     const eleText = byLocalName(pt, 'ele')[0]?.textContent
     const parsed = eleText != null ? parseFloat(eleText) : NaN
-    raw.push({ lat, lon, ele: Number.isNaN(parsed) ? null : parsed })
+    const timeText = byLocalName(pt, 'time')[0]?.textContent
+    const time = timeText ? new Date(timeText) : null
+    raw.push({
+      lat,
+      lon,
+      ele: Number.isNaN(parsed) ? null : parsed,
+      time: time && !Number.isNaN(time.getTime()) ? time : null,
+    })
   }
 
   if (raw.length < 2) {
@@ -258,20 +277,28 @@ export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
   }
 
   const points: TrackPoint[] = []
+  const times: (Date | null)[] = []
   let cumulativeDistanceM = 0
 
-  for (const { lat, lon, ele: maybeEle } of raw) {
+  for (const { lat, lon, ele: maybeEle, time } of raw) {
     const ele = maybeEle as number
     const prev = points[points.length - 1]
     if (prev) {
       cumulativeDistanceM += haversineMeters(prev, { lat, lon })
     }
     points.push({ lat, lon, ele, distanceKm: cumulativeDistanceM / 1000 })
+    times.push(time)
   }
 
   if (points.length < 2) {
     throw new Error('Dit GPX-bestand bevat geen bruikbare hoogtedata.')
   }
+
+  return { name, points, times }
+}
+
+export function parseGpx(xmlText: string, fallbackName: string): RouteStats {
+  const { name, points } = parseTrack(xmlText, fallbackName)
 
   // Smooth elevation with a small moving average to reduce GPS/barometer noise
   // before summing gain/loss, otherwise jitter wildly overstates D+.
