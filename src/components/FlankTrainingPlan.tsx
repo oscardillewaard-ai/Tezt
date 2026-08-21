@@ -14,6 +14,8 @@ import { PrintChecklist } from './PrintChecklist'
 import { NumberField } from './NumberField'
 import { WeekdayPicker } from './WeekdayPicker'
 import { WeekAgendaRow, type DayCell } from './WeekAgenda'
+import { WeeklyVolumePanel, type VolumeWeekRow } from './WeeklyVolumePanel'
+import { checkDescentBudget, densityHmPerKm } from '../lib/weeklyVolume'
 
 interface FlankTrainingPlanProps {
   race: RouteStats
@@ -72,6 +74,10 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
   const [raceDate, setRaceDate] = useState('')
   const [startPercentInput, setStartPercentInput] = useState(DEFAULT_START_PERCENT)
   const [sessionsPerWeekInput, setSessionsPerWeekInput] = useState(DEFAULT_SESSIONS_PER_WEEK)
+  const [weekGoalMultiplier, setWeekGoalMultiplier] = useState(2.5)
+  const raceDensity = densityHmPerKm(race)
+  const [longRunDensity, setLongRunDensity] = useState(Math.round(raceDensity) || 26)
+  const [descentLimit, setDescentLimit] = useState(225)
   const startPercent = advanced ? startPercentInput : DEFAULT_START_PERCENT
   const sessionsPerWeek = advanced ? sessionsPerWeekInput : DEFAULT_SESSIONS_PER_WEEK
 
@@ -165,6 +171,23 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
     }
   })
 
+  const volumeWeeks: VolumeWeekRow[] = weeklyPlan.map((w) => ({
+    key: w.weekIndex,
+    label: formatWeekLabel(w.weekStart, w.weekEnd),
+    hillHmM: w.session.totalHmM,
+    emphasisClass: w.isRaceWeek
+      ? 'text-[var(--status-warn)]'
+      : w.isTaper
+        ? 'text-[var(--status-info)]'
+        : 'text-[var(--text-2)]',
+  }))
+
+  const budget = checkDescentBudget(
+    session.runningDescentHmM,
+    session.steepDescentHmM,
+    descentLimit,
+  )
+
   if (race.climbSegments.length === 0 && race.descentSegments.length === 0) {
     return (
       <p className="text-sm text-[var(--status-warn)]">
@@ -234,6 +257,28 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
           </div>
         </div>
 
+        {budget.overBudget && (
+          <p className="mt-4 rounded-lg border border-[var(--status-warn)]/40 bg-[var(--badge-bg)] px-4 py-3 text-sm text-[var(--status-warn)]">
+            Deze sessie kost je {budget.totalHmM.toFixed(0)} m afdaling, boven je grens van{' '}
+            {budget.limitHmM} m. Op een pendelheuvel kun je die afdaling niet weglaten — verlaag het
+            percentage, of verschuif hoogtemeters naar de gym (zie weekvolume hieronder).
+          </p>
+        )}
+
+        {advanced && (
+          <label className="mt-4 flex w-fit flex-col gap-1 text-sm text-[var(--text-3)]">
+            Max. afdaling per sessie (m)
+            <NumberField
+              min={50}
+              max={2000}
+              step={25}
+              value={descentLimit}
+              onChange={setDescentLimit}
+              className="w-32 rounded-md border border-[var(--border-2)] bg-[var(--surface-2)] px-3 py-1.5 text-[var(--text)]"
+            />
+          </label>
+        )}
+
         <div className="mt-5">
           <SessionBreakdown session={session} />
         </div>
@@ -295,6 +340,19 @@ export function FlankTrainingPlan({ race, hill, advanced }: FlankTrainingPlanPro
             {weeklyAgenda.map((w) => (
               <WeekAgendaRow key={w.weekIndex} {...w} />
             ))}
+          </div>
+        )}
+
+        {volumeWeeks.length > 0 && (
+          <div className="mt-8">
+            <WeeklyVolumePanel
+              weeks={volumeWeeks}
+              raceDensityHmPerKm={raceDensity}
+              weekGoalMultiplier={weekGoalMultiplier}
+              onWeekGoalMultiplierChange={setWeekGoalMultiplier}
+              longRunDensity={longRunDensity}
+              onLongRunDensityChange={setLongRunDensity}
+            />
           </div>
         )}
 

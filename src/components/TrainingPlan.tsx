@@ -13,6 +13,8 @@ import { PrintChecklist } from './PrintChecklist'
 import { NumberField } from './NumberField'
 import { WeekdayPicker } from './WeekdayPicker'
 import { WeekAgendaRow, type DayCell } from './WeekAgenda'
+import { WeeklyVolumePanel, type VolumeWeekRow } from './WeeklyVolumePanel'
+import { densityHmPerKm } from '../lib/weeklyVolume'
 
 interface TrainingPlanProps {
   race: RouteStats
@@ -33,6 +35,9 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
   const [sessionsPerWeekInput, setSessionsPerWeekInput] = useState(DEFAULT_SESSIONS_PER_WEEK)
   const [startPercentInput, setStartPercentInput] = useState(DEFAULT_START_PERCENT)
   const [raceDate, setRaceDate] = useState('')
+  const [weekGoalMultiplier, setWeekGoalMultiplier] = useState(2.5)
+  const raceDensity = densityHmPerKm(race)
+  const [longRunDensity, setLongRunDensity] = useState(Math.round(raceDensity) || 26)
   const sessionsPerWeek = advanced ? sessionsPerWeekInput : DEFAULT_SESSIONS_PER_WEEK
   const startPercent = advanced ? startPercentInput : DEFAULT_START_PERCENT
 
@@ -105,6 +110,17 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
       days,
     }
   })
+
+  const volumeWeeks: VolumeWeekRow[] = weeklyPlan.map((w) => ({
+    key: w.weekIndex,
+    label: formatWeekLabel(w.weekStart, w.weekEnd),
+    hillHmM: w.totalGainM,
+    emphasisClass: w.isRaceWeek
+      ? 'text-[var(--status-warn)]'
+      : w.isTaper
+        ? 'text-[var(--status-info)]'
+        : 'text-[var(--text-2)]',
+  }))
 
   if (berg.gainM <= 0) {
     return (
@@ -227,6 +243,19 @@ export function TrainingPlan({ race, berg, advanced }: TrainingPlanProps) {
             {weeklyAgenda.map((w) => (
               <WeekAgendaRow key={w.weekIndex} {...w} />
             ))}
+          </div>
+        )}
+
+        {volumeWeeks.length > 0 && (
+          <div className="mt-8">
+            <WeeklyVolumePanel
+              weeks={volumeWeeks}
+              raceDensityHmPerKm={raceDensity}
+              weekGoalMultiplier={weekGoalMultiplier}
+              onWeekGoalMultiplierChange={setWeekGoalMultiplier}
+              longRunDensity={longRunDensity}
+              onLongRunDensityChange={setLongRunDensity}
+            />
           </div>
         )}
 
