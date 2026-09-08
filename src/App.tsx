@@ -18,6 +18,7 @@ import { HillBuilder } from './components/HillBuilder'
 import { deleteCustomHill, listCustomHills, saveCustomHill } from './lib/customHills'
 import type { DerivedHill } from './lib/hillFromGpx'
 import { RacePresetPanel } from './components/RacePresetPanel'
+import { FamousRacePanel } from './components/FamousRacePanel'
 import { ImageRacePanel } from './components/ImageRacePanel'
 import { ManualRacePanel } from './components/ManualRacePanel'
 import { buildManualRace, DEFAULT_MANUAL_RACE, type ManualRaceInput } from './lib/manualRace'
@@ -26,7 +27,7 @@ import { FlankTrainingPlan } from './components/FlankTrainingPlan'
 import { OnboardingModal } from './components/OnboardingModal'
 
 type BergMode = 'gpx' | 'hill' | 'eigen'
-type RaceMode = 'gpx' | 'preset' | 'image' | 'manual'
+type RaceMode = 'gpx' | 'preset' | 'famous' | 'image' | 'manual'
 type UiMode = 'simple' | 'advanced'
 type Theme = 'light' | 'dark'
 
@@ -166,6 +167,17 @@ function App() {
               </button>
               <button
                 type="button"
+                onClick={() => setRaceMode('famous')}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
+                  raceMode === 'famous'
+                    ? 'bg-orange-400 text-slate-900'
+                    : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--surface-2-hover)]'
+                }`}
+              >
+                Bekende wedstrijd
+              </button>
+              <button
+                type="button"
                 onClick={() => setRaceMode('image')}
                 className={`flex-1 rounded-full px-3 py-1.5 text-sm ${
                   raceMode === 'image'
@@ -190,6 +202,8 @@ function App() {
 
             {raceMode === 'image' ? (
               <ImageRacePanel onRouteReady={setImageRace} />
+            ) : raceMode === 'famous' ? (
+              <FamousRacePanel onGoToUpload={() => setRaceMode('gpx')} />
             ) : raceMode === 'manual' ? (
               <ManualRacePanel
                 input={manualRace}
