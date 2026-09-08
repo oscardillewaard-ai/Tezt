@@ -19,6 +19,51 @@ redistributing anyone's course file.
   races kept out of the core to preserve its distance-category balance
   (~20 short / ~25 50K / ~30 100K / ~25 100M+multi-stage).
 
+## Verification status (2026-09-08)
+
+38 rows were originally marked `verify` — a confirmed URL pattern but the
+exact page was never individually loaded. An attempt was made to actually
+fetch all of them; the result:
+
+- **Outbound web fetching was blocked for this session's network policy**
+  (`EGRESS_BLOCKED`, confirmed against a control domain that definitely
+  exists). This is an environment/session limit, not a per-domain block —
+  none of the 38 rows could be directly loaded and confirmed this way.
+- **Two rows were confirmed dead independently of that block**: a DNS
+  lookup failure (`ENOTFOUND`) is a different, real error from the policy
+  block, so it's a genuine signal rather than noise from the outage.
+  `quebecmegatrail.com` (row 37) and `traildescathares.com` (row 42) no
+  longer resolve at all. Their `gpxSource` fields now say so, with an
+  unconfirmed lead for a possible successor site (`ultratrailcanada.com`,
+  `grandraid-cathares.fr` respectively) — treat those leads as
+  **unverified**, not corrected.
+- **Everything else search-suggested but not fetch-confirmed** (so left
+  as `verify`, unchanged in `races.json`), worth checking directly once
+  web access works:
+  - Sezoenstrail: likely `sezoenstrail.be` (not in manifest at all currently).
+  - MIUT (rows 25/26/50/88): GPX appears to live on per-distance sub-pages
+    (e.g. `miutmadeira.com/miut-advanced/`) rather than one central page.
+  - Squamish 50 (row 36): GPX possibly on the `/50-km/` sub-page, not the homepage.
+  - Aravaipa races (rows 38/65/94): Cocodona and Black Canyon pages reportedly
+    link a CalTopo map rather than a direct GPX button; Javelina Jundred had
+    no GPX evidence at all.
+  - Ultra-Trail Cape Town (row 53): lead is the `/ut100` route sub-page, not the homepage.
+  - Ultra Trail Drenthe / Veluwe (rows 62/73): the manifest's race names may not match
+    the real organisers — leads are "Drenthe Trail" (drenthetrailrun.nl) and
+    "Veluwezoom Trail" (cairnadventures.nl) — **confirm these are the same events**
+    before updating.
+  - Destination Trail races (rows 95/96): official maps appear to be hosted on
+    CalTopo (caltopo.com), not as a direct GPX button on destinationtrailrun.com.
+  - UTMB World Series: at least a *third* GPX-delivery pattern exists beyond the two
+    documented above (`/race/tracks` vs `/races/[CODE]`) — some events show GPX in
+    a "MAP" table on the per-distance race page shortly before the event, and Istria
+    uses yet another path (`/races-runners/runners/gpx-tracks`). Rows 3/4/7/8/21
+    (and their sibling distances) should be re-checked per-event rather than assumed
+    to follow one of the two patterns.
+
+**Next step**: re-run this verification once a session with working web
+egress is available, rather than trusting the leads above.
+
 ## TL;DR
 
 - UTMB World Series events follow two consistent, machine-friendly URL
