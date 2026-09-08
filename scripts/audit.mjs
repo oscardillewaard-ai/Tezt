@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import fs from 'node:fs';
 const SP = new URL('./fixtures/', import.meta.url).pathname;
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
 const results=[];
@@ -132,10 +133,14 @@ await p.getByRole('button',{name:/horloge/i}).click();
 const f2=await dl2;
 ok('horloge-export download', !!f2, f2?await f2.suggestedFilename():'geen');
 
-// sessie terugkijken met echte GPX
+// sessie terugkijken met echte GPX — vereist een opgenomen sessie-track (met tijden),
+// die niet in de repo staat; zonder fixture wordt deze check overgeslagen.
+const SESSION_GPX=process.env.SESSION_GPX||SP+'session.gpx';
 const revBtn=p.getByRole('button',{name:'Sessie-GPX kiezen'});
-if(await revBtn.count()){
-  await p.locator('input[type=file]').last().setInputFiles('/root/.claude/uploads/1562378b-aaa4-5783-bb46-14bd5f7ee08e/3b747020-Zepp20260805154940.gpx');
+if(!fs.existsSync(SESSION_GPX)){
+  results.push('SKIP  sessie beoordeeld — geen sessie-GPX (zet SESSION_GPX=/pad/naar.gpx)');
+} else if(await revBtn.count()){
+  await p.locator('input[type=file]').last().setInputFiles(SESSION_GPX);
   await p.waitForTimeout(1200);
   const rt=await p.locator('body').innerText();
   ok('sessie beoordeeld', /gehaald|net niet|onder doel|ruim over/.test(rt), (rt.match(/\d+% · (gehaald|net niet|onder doel|ruim over)/)||[''])[0]);
@@ -179,6 +184,40 @@ await p.getByRole('button',{name:'Steilte toevoegen'}).click(); await p.waitForT
 ok('steilte-band toe te voegen', await p.locator('label:has-text("Aandeel D+ (%)") input').count()===nBands+1);
 await p.getByLabel('Wedstrijddatum').fill('2027-03-01'); await p.waitForTimeout(700);
 ok('handmatige wedstrijd geeft schema', await p.getByRole('button',{name:/agenda/i}).count()>0);
+
+// 14 bekende wedstrijd: bron-instructies, statuswaarschuwingen, doorsturen naar upload
+await fresh(p);
+await p.getByRole('button',{name:'Bekende wedstrijd'}).click(); await p.waitForTimeout(300);
+const raceSearch=p.getByPlaceholder('Zoek op naam of locatie…');
+ok('bekende-wedstrijd paneel', await raceSearch.count()>0);
+await raceSearch.fill('Hardrock'); await p.waitForTimeout(300);
+await p.getByRole('button',{name:/Hardrock 100/}).first().click(); await p.waitForTimeout(300);
+t=await p.locator('body').innerText();
+ok('gpx-instructies getoond', /Zo kom je aan de GPX/.test(t));
+ok('link naar officiële bron', await p.locator('a[href*="hardrock100.com"]').count()>0);
+// Races without any published course file must say so rather than link nowhere.
+await raceSearch.fill('Barkley'); await p.waitForTimeout(300);
+await p.getByRole('button',{name:/Barkley Marathons/}).first().click(); await p.waitForTimeout(300);
+t=await p.locator('body').innerText();
+ok('geen-gpx race gemarkeerd', /Geen publieke GPX beschikbaar/.test(t));
+// Sources the manifest never actually loaded must be flagged as unchecked.
+await raceSearch.fill('Ultra Pirineu'); await p.waitForTimeout(300);
+await p.getByRole('button',{name:/Ultra Pirineu/}).first().click(); await p.waitForTimeout(300);
+t=await p.locator('body').innerText();
+ok('ongeverifieerde bron gemarkeerd', /niet nagelopen/.test(t));
+// Domains confirmed dead must not be offered as a working link.
+await raceSearch.fill('Quebec'); await p.waitForTimeout(300);
+await p.getByRole('button',{name:/Quebec Mega Trail/}).first().click(); await p.waitForTimeout(300);
+t=await p.locator('body').innerText();
+ok('dode bron gemarkeerd', /Bron bestaat niet meer/.test(t));
+ok('dode bron zonder link', await p.locator('a[href*="quebecmegatrail"]').count()===0);
+await raceSearch.fill('Hardrock'); await p.waitForTimeout(300);
+await p.getByRole('button',{name:/Hardrock 100/}).first().click(); await p.waitForTimeout(300);
+await p.getByRole('button',{name:'Ga naar Eigen GPX-upload'}).click(); await p.waitForTimeout(400);
+t=await p.locator('body').innerText();
+// Assert the eigen-GPX panel itself, not the dropzone: once a route is saved the
+// dropzone hides behind a link, so the drop text is not always on screen.
+ok('doorsturen naar eigen-gpx upload', /De GPX-track van de wedstrijd waar je je op voorbereidt/.test(t));
 
 // 11 mobile
 const mp=await page(390,844);

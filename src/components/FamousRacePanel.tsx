@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react'
-import { extractGpxUrl, FAMOUS_RACE_GROUPS, FAMOUS_RACES, type FamousRace } from '../lib/famousRaces'
+import { FAMOUS_RACE_GROUPS, FAMOUS_RACES, type FamousRace } from '../lib/famousRaces'
+import {
+  deadSourceInfo,
+  extractGpxUrl,
+  gpxSourceStatus,
+  loginRequirement,
+} from '../lib/famousRaceSource'
 
 interface FamousRacePanelProps {
   onGoToUpload: () => void
 }
-
-const NO_PUBLIC_GPX_MARKER = 'NO PUBLIC GPX'
 
 function matchesQuery(race: FamousRace, query: string): boolean {
   if (!query) return true
@@ -30,7 +34,9 @@ export function FamousRacePanel({ onGoToUpload }: FamousRacePanelProps) {
 
   const selected = selectedId ? FAMOUS_RACES.find((r) => r.id === selectedId) ?? null : null
   const gpxUrl = selected ? extractGpxUrl(selected.gpxSource) : null
-  const hasNoPublicGpx = selected?.gpxSource.includes(NO_PUBLIC_GPX_MARKER) ?? false
+  const status = selected ? gpxSourceStatus(selected) : null
+  const loginNeeded = selected ? loginRequirement(selected) : null
+  const deadSource = selected ? deadSourceInfo(selected) : { domain: null, lead: null }
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
@@ -127,14 +133,32 @@ export function FamousRacePanel({ onGoToUpload }: FamousRacePanelProps) {
             (trackdichtheid, hoogtebron, smoothing) — normaal en geen fout in de GPX.
           </p>
 
-          {hasNoPublicGpx ? (
+          {status === 'none' ? (
             <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-[var(--text-2)]">
               <p className="font-medium text-[var(--text)]">Geen publieke GPX beschikbaar</p>
               <p className="mt-1">
-                {selected.gpxSource}. Kies voor deze wedstrijd een{' '}
+                Deze wedstrijd publiceert bewust geen parcoursbestand. Kies een{' '}
                 <span className="font-medium">generiek voorbeeldprofiel</span> of vul de klimmen
                 handmatig in.
               </p>
+              <p className="mt-2 text-xs text-[var(--faint)]">Bron: {selected.gpxSource}</p>
+            </div>
+          ) : status === 'dead' ? (
+            <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-[var(--text-2)]">
+              <p className="font-medium text-[var(--text)]">Bron bestaat niet meer</p>
+              <p className="mt-1">
+                {deadSource.domain
+                  ? `De vermelde website (${deadSource.domain}) bestaat niet meer.`
+                  : 'De vermelde website bestaat niet meer.'}
+                {deadSource.lead
+                  ? ` Mogelijk is de wedstrijd verhuisd naar ${deadSource.lead} — niet bevestigd.`
+                  : ''}
+              </p>
+              <p className="mt-1">
+                Zoek de wedstrijd zelf op bij de organisator en upload de GPX via{' '}
+                <span className="font-medium">"Eigen GPX"</span>.
+              </p>
+              <p className="mt-2 text-xs text-[var(--faint)]">Bron: {selected.gpxSource}</p>
             </div>
           ) : (
             <div className="rounded-lg border border-[var(--border-2)] bg-[var(--surface-3)] px-4 py-3 text-sm">
@@ -158,15 +182,20 @@ export function FamousRacePanel({ onGoToUpload }: FamousRacePanelProps) {
                     <>Zoek de GPX op via: {selected.gpxSource}</>
                   )}
                 </li>
-                {selected.login !== 'No' && selected.login !== '—' && (
-                  <li>Nodig om te downloaden: {selected.login}.</li>
-                )}
+                {loginNeeded && <li>Nodig om te downloaden: {loginNeeded}.</li>}
                 {selected.terms !== '—' && <li>Let op: {selected.terms}.</li>}
                 <li>
                   Kom terug naar Bergtrainer, kies hierboven <span className="font-medium">"Eigen GPX"</span>{' '}
                   en upload het gedownloade bestand.
                 </li>
               </ol>
+              {status === 'unverified' && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  Deze bron is niet nagelopen: de link volgt het gebruikelijke patroon van de
+                  organisator, maar kan verouderd zijn of geen directe GPX bieden. Kom je er niet
+                  uit, zoek de wedstrijd dan zelf op bij de organisator.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={onGoToUpload}
