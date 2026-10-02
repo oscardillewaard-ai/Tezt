@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Drie routes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --surface-2:#F4F6F8; --ink:#172033; --muted:#566074; --line:#D2D8E0;
+  --noten:#2B59C3; --noten-soft:#DDE6FA;
+  --akkoord:#1C7655; --akkoord-soft:#D5EEE4;
+  --impro:#A0347A; --impro-soft:#F5DDEC;
+  --primary:#172033; --on-primary:#FFFFFF;
+  --ok:#1C7655; --on-ok:#FFFFFF; --bad:#B23E2C; --on-bad:#FFFFFF;
+  --key-white:#FFFFFF; --key-black:#1A2030; --key-edge:#B4BDC9;
+  --paper:#FFFFFF; --paper-ink:#141A26;
+  --focus:#2B59C3;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E131C; --surface:#161D2A; --surface-2:#1B2333; --ink:#E6EAF1; --muted:#A1AAB9; --line:#2A3345;
+    --noten:#8AA8FF; --noten-soft:#212E55;
+    --akkoord:#5CC69C; --akkoord-soft:#15372B;
+    --impro:#E58AC3; --impro-soft:#3D1F34;
+    --primary:#E6EAF1; --on-primary:#0E131C;
+    --ok:#5CC69C; --on-ok:#0E131C; --bad:#F08976; --on-bad:#0E131C;
+    --key-white:#F2F4F7; --key-black:#090C12; --key-edge:#3A4458;
+    --paper:#FBFBF9; --paper-ink:#141A26;
+    --focus:#8AA8FF;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E131C; --surface:#161D2A; --surface-2:#1B2333; --ink:#E6EAF1; --muted:#A1AAB9; --line:#2A3345;
+  --noten:#8AA8FF; --noten-soft:#212E55;
+  --akkoord:#5CC69C; --akkoord-soft:#15372B;
+  --impro:#E58AC3; --impro-soft:#3D1F34;
+  --primary:#E6EAF1; --on-primary:#0E131C;
+  --ok:#5CC69C; --on-ok:#0E131C; --bad:#F08976; --on-bad:#0E131C;
+  --key-white:#F2F4F7; --key-black:#090C12; --key-edge:#3A4458;
+  --paper:#FBFBF9; --paper-ink:#141A26;
+  --focus:#8AA8FF;
+  color-scheme:dark;
+}
+html{ background:var(--bg); scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after{ box-sizing:inherit; }
+body{ margin:0; background:var(--bg); color:var(--ink); font-family:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size:17px; line-height:1.5; -webkit-text-size-adjust:100%; -webkit-tap-highlight-color:transparent; }
+button{ font:inherit; color:inherit; }
+:focus-visible{ outline:3px solid var(--focus); outline-offset:2px; }
+.wrap{ max-width:720px; margin:0 auto; padding:8px 16px 112px; }
+.in-session .wrap{ padding-bottom:0; }
+.top{ display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; }
+.brand{ margin:0; font-size:21px; font-weight:700; letter-spacing:-0.01em; display:flex; align-items:center; gap:10px; }
+.mark{ display:inline-flex; gap:3px; align-items:flex-end; height:20px; }
+.mark i{ display:block; width:5px; border-radius:3px; }
+.mark i:nth-child(1){ height:11px; background:var(--noten); }
+.mark i:nth-child(2){ height:20px; background:var(--akkoord); }
+.mark i:nth-child(3){ height:15px; background:var(--impro); }
+.sync{ font-size:13px; color:var(--muted); text-align:right; }
+h2{ font-size:26px; line-height:1.15; margin:18px 0 6px; letter-spacing:-0.01em; }
+h3{ font-size:19px; line-height:1.25; margin:26px 0 8px; }
+p{ margin:8px 0; }
+.muted{ color:var(--muted); }
+.small{ font-size:15px; }
+ul.plain{ padding-left:1.2em; }
+ul.plain li{ margin:6px 0; }
+.r-noten{ --rc:var(--noten); --rs:var(--noten-soft); --kmark:#C9D7FA; --kon:#2B59C3; }
+.r-akkoord{ --rc:var(--akkoord); --rs:var(--akkoord-soft); --kmark:#C0E6D6; --kon:#1C7655; }
+.r-impro{ --rc:var(--impro); --rs:var(--impro-soft); --kmark:#F2CDE3; --kon:#A0347A; }
+.rname{ color:var(--rc); font-weight:700; }
+
+.btn{ appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; border:1.5px solid var(--ink); background:transparent; color:var(--ink); border-radius:10px; min-height:48px; padding:10px 18px; font-weight:700; cursor:pointer; text-align:center; }
+.btn.primary{ background:var(--primary); border-color:var(--primary); color:var(--on-primary); }
+.btn.ghost{ border-color:var(--line); font-weight:400; background:var(--surface); }
+.btn.ghost[aria-pressed="true"]{ border-color:var(--rc, var(--ink)); box-shadow:inset 0 0 0 1.5px var(--rc, var(--ink)); font-weight:700; }
+.btn.wide{ width:100%; }
+.btn.ok{ border-color:var(--ok); background:var(--ok); color:var(--on-ok); }
+.btn.bad{ border-color:var(--bad); color:var(--bad); background:transparent; }
+.btn[data-armed="1"]{ background:var(--bad); border-color:var(--bad); color:var(--on-bad); }
+.link{ appearance:none; background:none; border:0; padding:10px 4px; min-height:44px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.link[data-armed="1"]{ color:var(--bad); font-weight:700; }
+
+.timekeys{ margin:14px 0 8px; user-select:none; -webkit-user-select:none; }
+.timekeys .fall{ height:10px; background:var(--key-black); border-radius:7px 7px 0 0; }
+.timekeys .row{ position:relative; display:grid; grid-template-columns:repeat(6,1fr); height:160px; }
+.tkey{ appearance:none; position:relative; margin:0; border:1px solid var(--key-edge); border-top:0; border-left-width:0; background:var(--key-white); color:var(--paper-ink); border-radius:0 0 9px 9px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:0 0 14px; cursor:pointer; transition:transform .08s ease, background-color .15s ease; }
+.tkey:first-child{ border-left-width:1px; }
+.tkey b{ font-size:25px; line-height:1; }
+.tkey span{ font-size:13px; color:#5B6475; margin-top:3px; }
+.tkey[aria-pressed="true"]{ background:#D9E3F7; transform:translateY(3px); box-shadow:inset 0 -6px 0 #2B59C3; }
+.tkey:active{ transform:translateY(2px); }
+.bkey{ position:absolute; top:0; width:9.4%; height:55%; background:var(--key-black); border-radius:0 0 5px 5px; pointer-events:none; z-index:1; }
+
+.plan{ list-style:none; margin:8px 0 16px; padding:0; }
+.plan li{ display:grid; grid-template-columns:5px 1fr auto; column-gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+.plan li:last-child{ border-bottom:1px solid var(--line); }
+.bar{ align-self:stretch; border-radius:3px; background:var(--rc); }
+.plan .t{ font-weight:700; }
+.plan .s{ font-size:15px; color:var(--muted); }
+.plan .m{ font-size:15px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.next{ margin:22px 0 0; padding:14px 16px; border:1.5px solid var(--line); border-radius:12px; background:var(--surface); }
+
+.blockhead{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-top:4px; }
+.prog{ font-size:15px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.kind{ font-size:14px; font-weight:700; padding:2px 10px; border-radius:999px; background:var(--rs); color:var(--rc); border:1.5px solid transparent; }
+.kind.check{ background:transparent; border-color:var(--rc); }
+.block h2{ margin-top:10px; }
+.help{ display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:0 0 12px; font-size:15px; color:var(--muted); }
+.dots{ display:inline-flex; gap:4px; }
+.dots i{ width:10px; height:10px; border-radius:50%; border:1.5px solid var(--rc); }
+.dots i.f{ background:var(--rc); }
+.paper{ background:var(--paper); color:var(--paper-ink); border:1px solid var(--line); border-radius:10px; padding:4px 2px; overflow:hidden; }
+.paper .hard, .paper .hard *{ fill:#B23E2C; }
+.fb{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; padding:8px; }
+@media (min-width:560px){ .fb{ grid-template-columns:repeat(4,1fr); } }
+.fbb{ border:1px solid #D2D8E0; border-radius:6px; padding:6px 8px; font-size:18px; }
+.fbb small{ display:block; font-size:11px; color:#6A7385; }
+.fbc{ font-weight:700; min-height:1.2em; }
+.kbwrap{ margin:12px 0 4px; }
+.kb{ display:block; width:100%; height:auto; max-height:180px; }
+.kb rect.w{ fill:var(--key-white); stroke:var(--key-edge); stroke-width:1; }
+.kb rect.b{ fill:var(--key-black); }
+.kb g.rh rect.w{ fill:var(--kmark); }
+.kb g.lh rect.w{ fill:#F0DDA6; }
+.kb g.on rect.w{ fill:var(--kon); }
+.kb g.on text{ fill:#FFFFFF; }
+.kb text{ font:700 12px "Atkinson Hyperlegible", system-ui, sans-serif; text-anchor:middle; fill:#141A26; }
+.kb .mc{ fill:#7D8798; }
+.kblegend{ display:flex; flex-wrap:wrap; gap:4px 16px; font-size:14px; color:var(--muted); margin-top:6px; }
+.kblegend span{ display:inline-flex; align-items:center; gap:6px; }
+.sw{ width:14px; height:14px; border-radius:3px; border:1px solid var(--key-edge); display:inline-block; }
+.sw.rh{ background:var(--kmark); }
+.sw.lh{ background:#F0DDA6; }
+.sw.mc{ width:8px; height:8px; border-radius:50%; background:#7D8798; border:0; }
+.note-box{ margin:12px 0; padding:10px 14px; background:var(--surface); border-left:4px solid var(--rc); border-radius:0 10px 10px 0; }
+.steps{ margin:12px 0 4px; padding-left:1.4em; font-size:18px; }
+.steps li{ margin:6px 0; padding-left:2px; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px; }
+.chip{ appearance:none; min-width:46px; min-height:46px; border-radius:9px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer; }
+.chip[aria-pressed="true"]{ border-color:var(--bad); color:var(--bad); box-shadow:inset 0 0 0 1.5px var(--bad); }
+.controls{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:14px 0 4px; }
+.tempo{ display:inline-flex; align-items:center; border:1.5px solid var(--line); border-radius:10px; background:var(--surface); }
+.tempo button{ appearance:none; width:46px; height:46px; border:0; background:none; font-size:22px; cursor:pointer; border-radius:9px; }
+.tempo output{ min-width:76px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums; }
+.status{ min-height:1.5em; margin:6px 0; font-size:15px; color:var(--muted); }
+.chart{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.chart button{ appearance:none; position:relative; min-height:58px; border:1.5px solid var(--key-edge); border-radius:9px; background:var(--paper); color:var(--paper-ink); font-size:22px; font-weight:700; cursor:pointer; word-spacing:8px; }
+.chart button small{ position:absolute; top:3px; left:7px; font-size:11px; font-weight:400; color:#6A7385; word-spacing:0; }
+.chart button.sel{ background:#EEF2FB; }
+.chart button.cur{ border-color:var(--kon); box-shadow:inset 0 0 0 2px var(--kon); }
+.actionbar{ position:sticky; bottom:0; z-index:5; display:flex; align-items:center; gap:10px; margin:18px -16px 0; padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px)); background:var(--bg); border-top:1px solid var(--line); }
+.actionbar .grow{ flex:1; }
+.timer{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; min-width:76px; }
+.timer.up{ color:var(--bad); }
+
+.sum{ display:grid; grid-template-columns:1fr auto; margin:14px 0 12px; border-top:1px solid var(--line); }
+.sum dt, .sum dd{ margin:0; padding:10px 0; border-bottom:1px solid var(--line); }
+.sum dd{ font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
+.btnrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.btnrow .btn{ flex:1 1 180px; }
+
+.songs{ margin:12px 0 0; padding-left:1.5em; }
+.songs > li{ padding:14px 0 16px; border-top:1px solid var(--line); }
+.songs > li::marker{ font-weight:700; color:var(--muted); }
+.songs h3{ margin:0; }
+.rrow{ display:grid; grid-template-columns:5px 1fr auto; column-gap:12px; align-items:center; padding:8px 0; }
+.rrow .btn{ min-height:44px; padding:8px 12px; font-size:15px; }
+
+.metric{ display:flex; align-items:baseline; gap:12px; margin:10px 0; }
+.metric b{ font-size:32px; line-height:1; font-variant-numeric:tabular-nums; min-width:84px; }
+.rbars .row{ display:grid; grid-template-columns:7.4em 1fr auto; gap:10px; align-items:center; margin:10px 0; font-size:15px; }
+.track{ height:10px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line); overflow:hidden; }
+.track i{ display:block; height:100%; background:var(--rc); }
+.days, .dayl{ display:grid; grid-template-columns:repeat(14,1fr); gap:4px; }
+.days span{ aspect-ratio:1; border-radius:4px; background:var(--surface-2); border:1px solid var(--line); }
+.days span.on{ background:var(--ink); border-color:var(--ink); }
+.days span.today{ outline:2px solid var(--focus); outline-offset:1px; }
+.dayl span{ font-size:11px; color:var(--muted); text-align:center; }
+.hist{ list-style:none; margin:0; padding:0; }
+.hist li{ display:grid; grid-template-columns:5px 1fr auto; column-gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:15px; }
+.hist .res{ font-weight:700; }
+.hist .res.ok{ color:var(--ok); }
+.hist .res.no{ color:var(--bad); }
+
+.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--surface); border-top:1px solid var(--line); padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px)); }
+.tabs .in{ max-width:720px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); }
+.tabs button{ appearance:none; position:relative; background:none; border:0; min-height:52px; font-size:15px; color:var(--muted); cursor:pointer; border-radius:10px; }
+.tabs button[aria-current="page"]{ color:var(--ink); font-weight:700; }
+.tabs button[aria-current="page"]::before{ content:""; position:absolute; top:-4px; left:28%; right:28%; height:3px; border-radius:0 0 3px 3px; background:var(--ink); }
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+'use strict';
+
+/* ---------- Inhoud ---------- */
+const ABCJS_URL = 'https://cdn.jsdelivr.net/npm/abcjs@6.7.1/dist/abcjs-basic-min.js';
+const LS_KEY = 'drieroutes.v1';
+const MAX_HIST = 800;
+const CHECK_MIN = 2;
+const INTERVALS = [2, 4, 7, 14, 30, 60];
+const TIME_OPTIONS = [5, 10, 15, 20, 30, 45];
+const TIME_NOTES = [60, 62, 64, 65, 67, 69];
+
+const ROUTES = [
+  { id: 'noten', name: 'Noten' },
+  { id: 'akkoord', name: 'Akkoorden' },
+  { id: 'impro', name: 'Improviseren' }
+];
+const ROUTE = {};
+ROUTES.forEach(r => { ROUTE[r.id] = r; });
+const HELP = ['geen hulp', 'weinig hulp', 'veel hulp'];
+const HELP_WITH = ['zonder hulp', 'met weinig hulp', 'met veel hulp'];
+const PC = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'B♭', 'B'];
+const WHITE = [0, 2, 4, 5, 7, 9, 11];
+const nameOf = m => PC[((m % 12) + 12) % 12];
+const qs = (...ms) => ms.map(m => [m, 1]);
+
+const SONGS = [
+  { id: 'clair', title: 'Au clair de la lune', origin: 'Frans volksliedje, eerste helft',
+    rh: [60, 62, 64], intro: 'Drie noten: C, D en E. Je duim ligt op C.',
+    bars: [
+      { n: qs(60, 60, 60, 62), c: [['C', 0]] },
+      { n: [[64, 2], [62, 2]], c: [['C', 0], ['G', 2]] },
+      { n: qs(60, 64, 62, 62), c: [['C', 0], ['G', 2]] },
+      { n: [[60, 4]], c: [['C', 0]] },
+      { n: qs(60, 60, 60, 62), c: [['C', 0]] },
+      { n: [[64, 2], [62, 2]], c: [['C', 0], ['G', 2]] },
+      { n: qs(60, 64, 62, 62), c: [['C', 0], ['G', 2]] },
+      { n: [[60, 4]], c: [['C', 0]] }
+    ] },
+  { id: 'ode', title: 'Ode an die Freude', origin: 'Beethoven, thema uit de Negende symfonie, ritme vereenvoudigd',
+    rh: [60, 62, 64, 65, 67], intro: 'Vijf noten, van C tot en met G: elke vinger heeft een eigen noot.',
+    bars: [
+      { n: qs(64, 64, 65, 67), c: [['C', 0]] },
+      { n: qs(67, 65, 64, 62), c: [['G', 0]] },
+      { n: qs(60, 60, 62, 64), c: [['C', 0]] },
+      { n: [[64, 1], [62, 1], [62, 2]], c: [['G', 0]] },
+      { n: qs(64, 64, 65, 67), c: [['C', 0]] },
+      { n: qs(67, 65, 64, 62), c: [['G', 0]] },
+      { n: qs(60, 60, 62, 64), c: [['C', 0]] },
+      { n: [[62, 1], [60, 1], [60, 2]], c: [['G', 0], ['C', 2]] }
+    ] },
+  { id: 'kortjakje', title: 'Altijd is Kortjakje ziek', origin: 'Volksliedje op de melodie van Ah! vous dirai-je, maman',
+    rh: [60, 62, 64, 65, 67, 69], intro: 'Zes noten: je pink reikt van G naar A. Nieuw akkoord: F.',
+    bars: [
+      { n: qs(60, 60, 67, 67), c: [['C', 0]] },
+      { n: [[69, 1], [69, 1], [67, 2]], c: [['F', 0], ['C', 2]] },
+      { n: qs(65, 65, 64, 64), c: [['F', 0], ['C', 2]] },
+      { n: [[62, 1], [62, 1], [60, 2]], c: [['G', 0], ['C', 2]] },
+      { n: qs(67, 67, 65, 65), c: [['C', 0], ['F', 2]] },
+      { n: [[64, 1], [64, 1], [62, 2]], c: [['C', 0], ['G', 2]] },
+      { n: qs(67, 67, 65, 65), c: [['C', 0], ['F', 2]] },
+      { n: [[64, 1], [64, 1], [62, 2]], c: [['C', 0], ['G', 2]] },
+      { n: qs(60, 60, 67, 67), c: [['C', 0]] },
+      { n: [[69, 1], [69, 1], [67, 2]], c: [['F', 0], ['C', 2]] },
+      { n: qs(65, 65, 64, 64), c: [['F', 0], ['C', 2]] },
+      { n: [[62, 1], [62, 1], [60, 2]], c: [['G', 0], ['C', 2]] }
+    ] }
+];
+const SONG = {};
+SONGS.forEach(s => { SONG[s.id] = s; });
+
+const CHORD_PCS = { C: [0, 4, 7], F: [5, 9, 0], G: [7, 11, 2] };
+const LH_ROOT = { C: 48, F: 53, G: 55 };
+const LH_FINGER = { C: 'pink op C', F: 'wijsvinger op F', G: 'duim op G' };
+const BACK = { C: [48, 52, 55], F: [53, 57, 60], G: [50, 55, 59] };
+const BASS = { C: 36, F: 41, G: 43 };
+const ABC_PITCH = { 60: 'C', 62: 'D', 64: 'E', 65: 'F', 67: 'G', 69: 'A', 71: 'B', 72: 'c' };
+
+const IMPRO_PROMPTS = [
+  'Speel alleen lange noten, halve en hele. Luister hoe elke noot bij het akkoord klinkt.',
+  'Vraag en antwoord: twee maten die open eindigen, dan twee maten die op C eindigen.',
+  'Neem het ritme van het liedje over, maar kies zelf de noten.',
+  'Speel de melodie, maar verander in elke maat één noot.',
+  'Gebruik hooguit drie verschillende noten. Herhalen mag.',
+  'Begin elke maat op een veilige noot. Daartussen mag alles.'
+];
+
+/* ---------- Hulpjes ---------- */
+const clone = o => (o == null ? o : JSON.parse(JSON.stringify(o)));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function fmt(sec){ sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+function listNL(a){ if (a.length <= 1) return a.join(''); return a.slice(0, -1).join(', ') + ' en ' + a[a.length - 1]; }
+
+function dstr(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function today(){ return dstr(new Date()); }
+function addDays(s, n){ const p = s.split('-').map(Number); return dstr(new Date(p[0], p[1] - 1, p[2] + n)); }
+function dayDiff(a, b){ const x = a.split('-').map(Number), y = b.split('-').map(Number); return Math.round((Date.UTC(y[0], y[1] - 1, y[2]) - Date.UTC(x[0], x[1] - 1, x[2])) / 86400000); }
+function relDay(s){ const n = dayDiff(today(), s); if (n <= 0) return 'vandaag'; if (n === 1) return 'morgen'; if (n === 2) return 'overmorgen'; return 'over ' + n + ' dagen'; }
+const WD = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+const MON = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+function shortDate(s){ const n = dayDiff(s, today()); if (n === 0) return 'vandaag'; if (n === 1) return 'gisteren'; const p = s.split('-').map(Number); return p[2] + ' ' + MON[p[1] - 1]; }
+
+/* ---------- Muziek ---------- */
+function timeline(song){
+  const notes = [], chords = [];
+  let beat = 0;
+  song.bars.forEach((bar, bi) => {
+    let b = beat;
+    bar.n.forEach(([m, d]) => { notes.push({ beat: b, dur: d, midi: m, bar: bi }); b += d; });
+    bar.c.forEach(([sym, off]) => chords.push({ beat: beat + off, sym, bar: bi }));
+    beat += 4;
+  });
+  chords.forEach((c, i) => { c.dur = (i + 1 < chords.length ? chords[i + 1].beat : beat) - c.beat; });
+  return { notes, chords, length: beat };
+}
+function chordsIn(song){ const s = []; song.bars.forEach(b => b.c.forEach(([x]) => { if (!s.includes(x)) s.push(x); })); return s; }
+function safeNotes(song, sym){ return song.rh.filter(m => CHORD_PCS[sym].includes(m % 12)); }
+function abcFor(song, o){
+  const bars = song.bars.map(bar => {
+    const at = {};
+    bar.c.forEach(([s, off]) => { at[off] = s; });
+    let beat = 0;
+    return bar.n.map(([m, d]) => {
+      let pre = '';
+      if (o.chords && at[beat]) pre += '"' + at[beat] + '"';
+      if (o.names) pre += '"_' + nameOf(m) + '"';
+      beat += d;
+      return pre + ABC_PITCH[m] + (d === 1 ? '' : d);
+    }).join(' ');
+  });
+  let body = '';
+  bars.forEach((b, i) => {
+    const last = i === bars.length - 1;
+    body += b + (last ? ' |]' : ' |');
+    if (!last) body += ((i + 1) % o.perLine === 0) ? '\n' : ' ';
+  });
+  return 'X:1\nM:4/4\nL:1/4\n%%barnumbers 1\nK:C\n' + body + '\n';
+}
+
+/* ---------- Toestand ---------- */
+function freshState(){ return { v: 1, epoch: rid(), epochAt: 0, started: [], items: {}, history: [], updatedAt: 0 }; }
+function normalize(s){
+  if (!s || s.v !== 1) return freshState();
+  s.started = Array.isArray(s.started) ? s.started.filter(id => SONG[id]) : [];
+  s.items = s.items && typeof s.items === 'object' ? s.items : {};
+  s.history = Array.isArray(s.history) ? s.history : [];
+  Object.keys(s.items).forEach(k => {
+    const it = s.items[k];
+    if (!it || !SONG[it.song] || !ROUTE[it.route]){ delete s.items[k]; return; }
+    it.level = clamp(Number.isFinite(+it.level) ? +it.level : 2, 0, 2);
+    it.streak = +it.streak || 0; it.fails = +it.fails || 0;
+    it.hard = Array.isArray(it.hard) ? it.hard : [];
+    it.bpm = clamp(+it.bpm || 60, 40, 120);
+  });
+  return s;
+}
+function loadLocal(){ try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function saveLocal(){ try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* geen lokale opslag */ } }
+
+let state = normalize(loadLocal() || freshState());
+
+function mergeStates(a, b){
+  if (!a) return normalize(clone(b));
+  if (!b) return normalize(clone(a));
+  const ea = a.epochAt || 0, eb = b.epochAt || 0;
+  if (ea !== eb) return normalize(clone(ea > eb ? a : b));
+  const out = { v: 1, epoch: a.epoch, epochAt: ea, started: [], items: {}, history: [], updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0) };
+  const st = new Set([].concat(a.started || [], b.started || []));
+  out.started = SONGS.map(s => s.id).filter(id => st.has(id));
+  const ids = new Set([].concat(Object.keys(a.items || {}), Object.keys(b.items || {})));
+  ids.forEach(id => {
+    const x = (a.items || {})[id], y = (b.items || {})[id];
+    out.items[id] = clone(!x ? y : !y ? x : ((x.t || 0) >= (y.t || 0) ? x : y));
+  });
+  const h = new Map();
+  [].concat(a.history || [], b.history || []).forEach(e => { if (e && e.id) h.set(e.id, e); });
+  out.history = clone(Array.from(h.values()).sort((p, q) => p.ts - q.ts).slice(-MAX_HIST));
+  return normalize(out);
+}
+
+/* ---------- Opslag in je account (db), anders lokaal ---------- */
+const cloud = { status: 'init', ref: null, writing: false, pending: false, retried: false };
+function syncText(){ return cloud.status === 'synced' ? 'Bewaard in je account' : cloud.status === 'init' ? 'Opslag laden…' : 'Bewaard op dit apparaat'; }
+function renderSync(){ const el = document.getElementById('sync'); if (el) el.textContent = syncText(); }
+async function writeCloud(){
+  if (!cloud.ref) return;
+  if (cloud.writing){ cloud.pending = true; return; }
+  cloud.writing = true;
+  try {
+    await cloud.ref.set(clone(state));
+    cloud.status = 'synced';
+  } catch (e) {
+    const code = e && e.code;
+    if (code === 'unavailable' && !cloud.retried){
+      cloud.retried = true;
+      setTimeout(() => { cloud.retried = false; writeCloud(); }, 700 + Math.random() * 900);
+    } else if (code !== 'unavailable' && code !== 'resource_exhausted'){
+      cloud.ref = null; cloud.status = 'local';
+    }
+  } finally {
+    cloud.writing = false; renderSync();
+    if (cloud.pending){ cloud.pending = false; writeCloud(); }
+  }
+}
+function persist(){
+  state.updatedAt = Date.now();
+  if (state.history.length > MAX_HIST) state.history = state.history.slice(-MAX_HIST);
+  saveLocal();
+  writeCloud();
+}
+async function initCloud(){
+  const C = window.claude;
+  if (!C || typeof C.use !== 'function'){ cloud.status = 'local'; renderSync(); return; }
+  try {
+    const both = await Promise.all([C.use('db'), C.use('user')]);
+    const db = both[0], user = both[1];
+    const uid = user ? await user.id() : null;
+    if (!db || !uid){ cloud.status = 'local'; renderSync(); return; }
+    const ref = db.collection('data/users/' + uid).doc('state');
+    const snap = await ref.get();
+    const remote = snap.exists ? snap.data() : null;
+    const localNewer = (state.updatedAt || 0) > ((remote && remote.updatedAt) || 0);
+    state = mergeStates(state, remote);
+    saveLocal();
+    cloud.ref = ref; cloud.status = 'synced';
+    if (localNewer) await writeCloud();
+    if (!isBusy()) render(); else renderSync();
+    ref.onSnapshot(s => {
+      if (!s.exists) return;
+      const r = s.data();
+      if ((r.updatedAt || 0) === (state.updatedAt || 0) && (r.epochAt || 0) === (state.epochAt || 0)) return;
+      state = mergeStates(state, r);
+      saveLocal();
+      if (!isBusy()) render(); else renderSync();
+    }, () => { cloud.status = 'local'; cloud.ref = null; renderSync(); });
+  } catch (e) {
+    cloud.status = 'local'; cloud.ref = null; renderSync();
+  }
+}
+
+/* ---------- Oefenlogica ---------- */
+function itemId(songId, routeId){ return songId + ':' + routeId; }
+function startSong(songId){
+  if (!SONG[songId]) return;
+  if (!state.started.includes(songId)) state.started.push(songId);
+  state.started = SONGS.map(s => s.id).filter(id => state.started.includes(id));
+  ROUTES.forEach(r => {
+    const id = itemId(songId, r.id);
+    if (!state.items[id]) state.items[id] = { id, song: songId, route: r.id, level: 2, streak: 0, fails: 0, nextCheck: null, lastPractice: null, lastCheck: null, hard: [], bpm: 60, t: 0 };
+  });
+}
+function songItems(){
+  const out = [];
+  state.started.forEach(sid => ROUTES.forEach(r => { const it = state.items[itemId(sid, r.id)]; if (it) out.push(it); }));
+  return out;
+}
+function checkLevel(it){ return Math.max(0, it.level - 1); }
+function isDue(it, t){ return !!it.nextCheck && it.nextCheck <= t && it.lastCheck !== t; }
+function needsWork(it){ return it.level > 0 || it.fails > 0 || !it.lastPractice; }
+function log(e){ state.history.push(Object.assign({ id: rid(), ts: Date.now(), d: today() }, e)); }
+
+function recordPractice(id, min){
+  const it = state.items[id], t = today();
+  it.lastPractice = t;
+  if (!it.nextCheck || (it.nextCheck <= t && it.lastCheck !== t)) it.nextCheck = addDays(t, 1);
+  it.t = Date.now();
+  log({ k: 'practice', item: id, min, lvl: it.level });
+}
+function recordCheck(id, ok){
+  const it = state.items[id], t = today(), cl = checkLevel(it);
+  if (ok){
+    it.fails = 0;
+    if (it.level > 0) it.level = cl;
+    if (cl === 0) it.streak += 1;
+    it.nextCheck = it.level > 0 ? addDays(t, 1) : addDays(t, INTERVALS[Math.min(it.streak, INTERVALS.length) - 1]);
+  } else {
+    it.fails += 1; it.streak = 0;
+    if (it.fails >= 2 && it.level < 2){ it.level += 1; it.fails = 0; }
+    it.nextCheck = addDays(t, 1);
+  }
+  it.lastCheck = t; it.t = Date.now();
+  log({ k: 'check', item: id, lvl: cl, ok: !!ok });
+}
+
+function routeRobin(list){
+  const g = {};
+  ROUTES.forEach(r => { g[r.id] = []; });
+  list.forEach(x => g[x.route].push(x));
+  const out = [];
+  let more = true;
+  while (more){
+    more = false;
+    ROUTES.forEach(r => { const x = g[r.id].shift(); if (x){ out.push(x); more = true; } });
+  }
+  return out;
+}
+function byPractice(a, b){ const x = a.lastPractice || '9999', y = b.lastPractice || '9999'; return x < y ? -1 : x > y ? 1 : 0; }
+function blockLen(minutes){ return minutes <= 10 ? 3 : 4; }
+function buildPlan(minutes, exclude){
+  exclude = exclude || new Set();
+  const t = today(), items = songItems(), bl = blockLen(minutes);
+  const blocks = [];
+  let used = 0;
+  const due = items.filter(it => isDue(it, t)).sort((a, b) => (a.nextCheck < b.nextCheck ? -1 : a.nextCheck > b.nextCheck ? 1 : 0));
+  routeRobin(due).forEach(it => { if (used + CHECK_MIN <= minutes){ blocks.push({ kind: 'check', id: it.id, min: CHECK_MIN }); used += CHECK_MIN; } });
+  const planned = new Set(blocks.map(b => b.id));
+  const skippedDue = new Set(due.filter(it => !planned.has(it.id)).map(it => it.id));
+  const work = items.filter(it => !skippedDue.has(it.id) && needsWork(it))
+    .sort((a, b) => ((b.fails > 0) - (a.fails > 0)) || byPractice(a, b));
+  const order = routeRobin(work.filter(it => !exclude.has(it.id))).concat(routeRobin(work.filter(it => exclude.has(it.id))));
+  const fill = (list, maint) => {
+    for (const it of list){
+      const rem = minutes - used;
+      if (rem < 2) break;
+      const m = rem >= bl ? bl : rem;
+      blocks.push({ kind: 'practice', id: it.id, min: m, maint: !!maint });
+      used += m;
+    }
+  };
+  fill(order, false);
+  for (let round = 1; round < 3 && order.length >= 2 && minutes - used >= 2; round++) fill(order, false);
+  if (minutes - used >= 2){
+    const maint = items.filter(it => !skippedDue.has(it.id) && !needsWork(it) && !planned.has(it.id))
+      .sort((a, b) => ((a.nextCheck || '') < (b.nextCheck || '') ? -1 : 1));
+    fill(routeRobin(maint), true);
+  }
+  return { blocks, used, minutes };
+}
+function nextSongReady(){
+  const last = state.started[state.started.length - 1];
+  if (!last) return null;
+  const nxt = SONGS[SONGS.findIndex(s => s.id === last) + 1];
+  if (!nxt || state.started.includes(nxt.id)) return null;
+  return ROUTES.every(r => { const it = state.items[itemId(last, r.id)]; return it && it.level <= 1; }) ? nxt : null;
+}
+function recommendedSong(){ return SONGS.find(s => !state.started.includes(s.id)) || null; }
+
+/* ---------- Geluid ---------- */
+let AC = null, master = null;
+function audio(){
+  if (!AC){
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* niet ondersteund */ }
+    try { AC = new Ctor(); } catch (e) { return null; }
+    master = AC.createGain(); master.gain.value = 0.9; master.connect(AC.destination);
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+function tone(m, t, dur, vol, bus){
+  if (!AC) return;
+  const g = AC.createGain(), o1 = AC.createOscillator(), o2 = AC.createOscillator(), g2 = AC.createGain();
+  o1.type = 'triangle'; o1.frequency.value = hz(m);
+  o2.type = 'sine'; o2.frequency.value = hz(m) * 2; g2.gain.value = 0.18;
+  const end = t + Math.max(0.25, dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.4), t + Math.min(0.3, dur));
+  g.gain.exponentialRampToValueAtTime(0.0001, end);
+  o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(bus || master);
+  o1.start(t); o2.start(t); o1.stop(end + 0.02); o2.stop(end + 0.02);
+}
+function click(t, accent, bus){
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'square'; o.frequency.value = accent ? 1760 : 1180;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(accent ? 0.16 : 0.09, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+  o.connect(g); g.connect(bus || master); o.start(t); o.stop(t + 0.06);
+}
+function keyNote(m){ const c = audio(); if (c) tone(m, c.currentTime + 0.01, 0.35, 0.16, master); }
+function chime(){ if (!AC || AC.state !== 'running') return; const t = AC.currentTime + 0.02; tone(72, t, 0.4, 0.12, master); tone(79, t + 0.16, 0.6, 0.1, master); }
+
+const T = { playing: false, timer: null, bpm: 60, start: 0, next: 0, len: 4, o: null, bus: null, timeouts: [] };
+function tStart(o){
+  tStop();
+  const c = audio();
+  if (!c) return false;
+  T.o = o; T.bpm = o.bpm || 60; T.len = o.tl ? o.tl.length : (o.len || 4);
+  T.bus = c.createGain(); T.bus.connect(master);
+  T.start = c.currentTime + 0.12; T.next = 0; T.playing = true;
+  T.timer = setInterval(tTick, 25);
+  tTick();
+  return true;
+}
+function beatTime(b){ return T.start + b * 60 / T.bpm; }
+function tTick(){ if (!T.playing || !AC) return; const horizon = AC.currentTime + 0.2; while (T.playing && beatTime(T.next) < horizon){ tBeat(T.next); T.next++; } }
+function later(t, fn){ T.timeouts.push(setTimeout(fn, Math.max(0, (t - AC.currentTime) * 1000))); }
+function tBeat(b){
+  const o = T.o, t = beatTime(b), spb = 60 / T.bpm, ci = o.countIn || 0, bus = T.bus;
+  if (b < ci){ click(t, b === 0, bus); later(t, () => { if (o.onCount) o.onCount(ci - b); }); return; }
+  let sb = b - ci;
+  if (!o.loop && sb >= T.len){
+    T.playing = false; clearInterval(T.timer);
+    later(t, () => { tStop(); if (o.onEnd) o.onEnd(); });
+    return;
+  }
+  if (o.loop) sb = sb % T.len;
+  if (o.click) click(t, sb % 4 === 0, bus);
+  const tl = o.tl;
+  if (!tl) return;
+  if (o.melody) tl.notes.forEach(n => {
+    if (n.beat !== sb) return;
+    const d = n.dur * spb * 0.92;
+    tone(n.midi, t, d, 0.22, bus);
+    later(t, () => { if (o.onNote) o.onNote(n, true); });
+    later(t + d, () => { if (o.onNote) o.onNote(n, false); });
+  });
+  if (o.roots) tl.chords.forEach(ch => { if (ch.beat === sb) tone(LH_ROOT[ch.sym], t, ch.dur * spb * 0.95, 0.15, bus); });
+  if (o.backing) tl.chords.forEach(ch => {
+    if (ch.beat !== sb) return;
+    const d = ch.dur * spb * 0.97;
+    BACK[ch.sym].forEach(m => tone(m, t, d, 0.075, bus));
+    tone(BASS[ch.sym], t, d, 0.12, bus);
+    later(t, () => { if (o.onChord) o.onChord(ch); });
+  });
+}
+function tStop(){
+  T.playing = false; clearInterval(T.timer); T.timer = null;
+  T.timeouts.forEach(clearTimeout); T.timeouts = [];
+  if (T.bus && AC){
+    const bus = T.bus;
+    try { bus.gain.setTargetAtTime(0.0001, AC.currentTime, 0.02); } catch (e) { /* al gestopt */ }
+    setTimeout(() => { try { bus.disconnect(); } catch (e) { /* al los */ } }, 250);
+  }
+  T.bus = null;
+}
+
+/* ---------- Scherm aan houden tijdens een sessie ---------- */
+let wake = null;
+async function requestWake(){ try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } }
+function releaseWake(){ try { if (wake) wake.release(); } catch (e) { /* niets */ } wake = null; }
+
+/* ---------- Weergave ---------- */
+const app = document.getElementById('app');
+const ui = { tab: 'vandaag', minutes: null, metro: false, selBar: 0 };
+let session = null, mode = null, timerInt = null, lvlNow = 0, scorePer = 0;
+const MARK = '<span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>';
+
+function isBusy(){ return !!session && !session.done; }
+function cur(){
+  if (!isBusy()) return null;
+  const b = session.blocks[session.i], it = state.items[b.id];
+  if (!it) return null;
+  const isCheck = b.kind === 'check';
+  return { b, it, song: SONG[it.song], isCheck, lvl: isCheck ? checkLevel(it) : it.level };
+}
+
+function render(){
+  tStop(); mode = null; clearInterval(timerInt); timerInt = null;
+  if (isBusy() && !cur()){ session = null; }
+  const busy = isBusy();
+  document.body.classList.toggle('in-session', !!session);
+  let main;
+  if (session && session.done) main = summaryHTML();
+  else if (busy) main = blockHTML();
+  else main = (VIEWS[ui.tab] || vandaagHTML)();
+  app.innerHTML = '<div class="wrap">' + headerHTML() + '<main id="main">' + main + '</main></div>' + (session ? '' : navHTML());
+  if (busy) afterBlock();
+}
+function headerHTML(){
+  const right = isBusy() ? '<button class="link" data-act="stop">Sessie stoppen</button>' : '<span class="sync" id="sync">' + syncText() + '</span>';
+  return '<header class="top"><p class="brand">' + MARK + 'Drie routes</p>' + right + '</header>';
+}
+function navHTML(){
+  const tabs = [['vandaag', 'Vandaag'], ['liedjes', 'Liedjes'], ['voortgang', 'Voortgang'], ['uitleg', 'Uitleg']];
+  return '<nav class="tabs" aria-label="Hoofdmenu"><div class="in">' + tabs.map(x => '<button data-act="tab" data-tab="' + x[0] + '"' + (ui.tab === x[0] ? ' aria-current="page"' : '') + '>' + x[1] + '</button>').join('') + '</div></nav>';
+}
+
+/* Vandaag */
+function vandaagHTML(){
+  if (!state.started.length) return onboardingHTML();
+  const t = today(), dueN = songItems().filter(it => isDue(it, t)).length;
+  let h = '<h2>Hoeveel tijd heb je?</h2><p class="muted small">Tik op het aantal minuten. De planning past zich daaraan aan.</p>';
+  h += timeKeysHTML();
+  h += '<p class="small muted">' + (dueN ? dueN + (dueN === 1 ? ' toets staat' : ' toetsen staan') + ' vandaag klaar.' : 'Vandaag staan er geen toetsen klaar.') + '</p>';
+  if (ui.minutes) h += planHTML(buildPlan(ui.minutes));
+  const nxt = nextSongReady();
+  if (nxt) h += '<div class="next"><p><b>Klaar voor het volgende liedje.</b> De drie routes van ' + esc(SONG[state.started[state.started.length - 1]].title) + ' gaan al met minder hulp.</p><button class="btn" data-act="startsong" data-song="' + nxt.id + '">Start ' + esc(nxt.title) + '</button></div>';
+  return h;
+}
+function timeKeysHTML(){
+  let h = '<div class="timekeys"><div class="fall"></div><div class="row" role="group" aria-label="Minuten">';
+  TIME_OPTIONS.forEach((m, i) => { h += '<button class="tkey" data-act="min" data-min="' + m + '" data-note="' + TIME_NOTES[i] + '" aria-pressed="' + (ui.minutes === m) + '" aria-label="' + m + ' minuten"><b>' + m + '</b><span>min</span></button>'; });
+  [1, 2, 4, 5].forEach(b => { h += '<span class="bkey" style="left:' + (b * 100 / 6 - 4.7).toFixed(2) + '%"></span>'; });
+  return h + '</div></div>';
+}
+function blockLine(b){
+  const it = state.items[b.id], r = ROUTE[it.route];
+  const lvl = b.kind === 'check' ? checkLevel(it) : it.level;
+  const what = (b.kind === 'check' ? 'toets ' : b.maint ? 'onderhoud ' : 'oefenen ') + HELP_WITH[lvl];
+  return '<li class="r-' + it.route + '"><span class="bar"></span><span><span class="t">' + esc(SONG[it.song].title) + '</span><br><span class="s"><span class="rname">' + r.name + '</span>: ' + what + '</span></span><span class="m">' + b.min + ' min</span></li>';
+}
+function planHTML(plan){
+  if (!plan.blocks.length) return '<p class="next">Er staat nu niets open. Start een nieuw liedje bij Liedjes, of oefen daar vrij.</p>';
+  let h = '<h3>Plan voor ' + plan.used + ' minuten</h3><ol class="plan">' + plan.blocks.map(blockLine).join('') + '</ol>';
+  if (plan.minutes - plan.used >= 3) h += '<p class="small muted">Meer staat er nu niet open. De rest van je tijd kun je vrij oefenen.</p>';
+  return h + '<button class="btn primary wide" data-act="start">Start de sessie</button>';
+}
+function onboardingHTML(){
+  return '<h2>Eén liedje, drie routes</h2>' +
+    '<p>Je leert elk liedje op drie manieren: als <span class="rname r-noten">noten</span>, met <span class="rname r-akkoord">akkoorden</span> en door te <span class="rname r-impro">improviseren</span>. Elke sessie begint met korte toetsen van wat je eerder oefende. Daarna oefen je in korte blokken die van route wisselen.</p>' +
+    '<p>Zet je telefoon, tablet of laptop op de muziekstandaard en begin bij het eerste liedje.</p>' +
+    '<button class="btn primary wide" data-act="startsong" data-song="clair">Begin met Au clair de la lune</button>' +
+    '<p class="small muted">Hoe de aanpak werkt en waar hij op rust, staat onder Uitleg.</p>';
+}
+
+/* Oefenblok */
+function dotsHTML(l){ return '<span class="dots" aria-hidden="true"><i class="' + (l >= 1 ? 'f' : '') + '"></i><i class="' + (l >= 2 ? 'f' : '') + '"></i></span>'; }
+function blockHTML(){
+  const c = cur();
+  const kind = c.isCheck ? 'Toets' : c.b.extra ? 'Extra oefenblok' : c.b.maint ? 'Onderhoud' : 'Oefenen';
+  let h = '<section class="block r-' + c.it.route + '">';
+  h += '<div class="blockhead"><span class="prog">' + (session.free ? 'Vrij oefenen' : 'Blok ' + (session.i + 1) + ' van ' + session.blocks.length) + '</span><span class="kind' + (c.isCheck ? ' check' : '') + '">' + kind + '</span></div>';
+  h += '<h2>' + esc(c.song.title) + '</h2>';
+  h += '<div class="help"><span class="rname">' + ROUTE[c.it.route].name + '</span>' + dotsHTML(c.lvl) + '<span>' + cap(HELP[c.lvl]) + '</span></div>';
+  h += c.it.route === 'impro' ? improHTML(c) : scoreHTML(c);
+  return h + '</section>' + actionHTML(c);
+}
+function lhText(song){ return 'Linkerhand een octaaf lager: ' + listNL(chordsIn(song).sort((a, b) => LH_ROOT[a] - LH_ROOT[b]).map(s => LH_FINGER[s])) + '.'; }
+function scoreHTML(c){
+  let h = '';
+  if (c.it.route === 'akkoord' && !c.isCheck && c.lvl >= 1) h += '<p class="note-box">Rechts speel je de melodie. Links speel je de grondtoon van het akkoord, de letter boven de noten, op het moment dat het akkoord wisselt. Die houd je vast.</p>';
+  h += '<div class="paper"><div id="score" role="img" aria-label="Bladmuziek van ' + esc(c.song.title) + '"></div></div>';
+  if (c.lvl === 2) h += '<div class="kbwrap" id="kb"></div>';
+  if (c.it.route === 'akkoord' && c.lvl >= 1) h += '<p class="small">' + lhText(c.song) + '</p>';
+  h += controlsHTML(c);
+  h += c.isCheck ? checkTextHTML(c) : stepsHTML(c);
+  return h;
+}
+function stepsHTML(c){
+  const hard = c.it.hard.slice().sort((a, b) => a - b);
+  let h = '';
+  if (hard.length) h += '<p class="note-box">Vorige keer lastig: ' + listNL(hard.map(n => 'maat ' + n)) + '. Begin daar.</p>';
+  if (c.it.fails >= 2 && c.it.level === 2) h += '<p class="note-box">De toets ging een paar keer mis. Maak het kleiner: oefen alleen de lastigste maat, langzamer dan je denkt dat nodig is.</p>';
+  h += '<ol class="steps"><li>Speel het één keer helemaal door, in een rustig tempo.</li><li>Tik hieronder de maat aan waar het misging.</li><li>Oefen alleen die maat, langzaam, tot hij een paar keer achter elkaar goed gaat.</li><li>Speel daarna het hele liedje nog één keer.</li></ol>';
+  return h + chipsHTML(c);
+}
+function chipsHTML(c){
+  let h = '<div class="chips" role="group" aria-label="Lastige maten">';
+  for (let i = 1; i <= c.song.bars.length; i++) h += '<button class="chip" data-act="hard" data-bar="' + i + '" aria-pressed="' + c.it.hard.includes(i) + '" aria-label="Maat ' + i + '">' + i + '</button>';
+  return h + '</div>';
+}
+function checkTextHTML(c){
+  if (session.failedOpen){
+    if (c.it.route === 'impro') return '<p class="note-box">Genoteerd. Bij improviseren hoef je geen maat aan te wijzen.</p>';
+    return '<p class="note-box">Waar ging het mis? Tik de maat aan, of ga meteen verder.</p>' + chipsHTML(c);
+  }
+  const crit = c.it.route === 'impro'
+    ? 'Speel één keer de hele akkoordreeks mee met de begeleiding. Gehaald betekent: je bent niet gestopt en je eindigt op C.'
+    : 'Eén poging, zonder eerst te oefenen. Gehaald betekent: van begin tot eind, zonder stoppen of opnieuw beginnen, met hooguit één verkeerde noot.';
+  return '<p class="note-box">' + crit + '</p>';
+}
+function controlsHTML(c){
+  let h = '<div class="controls"><div class="tempo" role="group" aria-label="Tempo"><button data-act="tempo" data-d="-4" aria-label="Langzamer">−</button><output id="bpm">' + c.it.bpm + ' bpm</output><button data-act="tempo" data-d="4" aria-label="Sneller">+</button></div>';
+  h += '<button class="btn ghost" id="metroBtn" data-act="metro" aria-pressed="' + ui.metro + '">Metronoom</button>';
+  if (c.it.route !== 'impro' && c.lvl === 2 && !c.isCheck) h += '<button class="btn ghost" id="listenBtn" data-act="listen" aria-pressed="false">Luister</button>';
+  if (c.it.route === 'impro') h += '<button class="btn ghost" id="backBtn" data-act="backing" aria-pressed="false">Begeleiding</button>';
+  return h + '</div><p class="status" id="status" aria-live="polite"></p>';
+}
+function improHTML(c){
+  let h = '<div class="chart" id="chart">';
+  c.song.bars.forEach((bar, i) => {
+    const syms = bar.c.map(x => x[0]);
+    h += '<button data-act="selbar" data-bar="' + i + '"' + (c.lvl === 2 && i === ui.selBar ? ' class="sel"' : '') + ' aria-label="Maat ' + (i + 1) + ': ' + syms.join(' dan ') + '"><small>' + (i + 1) + '</small>' + syms.join(' ') + '</button>';
+  });
+  h += '</div>';
+  if (c.lvl === 2) h += '<div class="kbwrap" id="kb"></div><p class="small muted" id="safeTxt"></p>';
+  if (c.lvl === 1) h += '<p class="note-box">Veilige noten: ' + chordsIn(c.song).map(s => 'bij <b>' + s + '</b> ' + listNL(safeNotes(c.song, s).map(nameOf))).join('; ') + '.</p>';
+  h += controlsHTML(c);
+  if (c.isCheck) h += checkTextHTML(c);
+  else h += '<p class="note-box"><b>Opdracht.</b> ' + improPrompt(c.it) + '</p><p class="small muted">Zet de begeleiding aan en speel met je rechterhand mee. Stoppen en opnieuw beginnen mag hier gewoon. ' + esc(c.song.intro) + '</p>';
+  return h;
+}
+function improPrompt(it){ const n = state.history.filter(e => e.k === 'practice' && e.item === it.id).length; return IMPRO_PROMPTS[n % IMPRO_PROMPTS.length]; }
+function actionHTML(c){
+  if (c.isCheck && !session.failedOpen) return '<div class="actionbar"><button class="btn bad grow" data-act="checkbad">Niet gehaald</button><button class="btn ok grow" data-act="checkok">Gehaald</button></div>';
+  if (c.isCheck) return '<div class="actionbar"><span class="grow small muted">' + esc(session.failNote || '') + '</span><button class="btn primary" data-act="next">Verder</button></div>';
+  const last = session.i === session.blocks.length - 1;
+  return '<div class="actionbar"><span class="timer" id="timer">' + fmt(c.b.min * 60) + '</span><span class="grow"></span><button class="btn primary" data-act="done">' + (session.free ? 'Klaar' : last ? 'Klaar, naar overzicht' : 'Klaar, volgend blok') + '</button></div>';
+}
+function afterBlock(){
+  const c = cur();
+  if (!c) return;
+  lvlNow = c.lvl;
+  if (c.it.route !== 'impro') renderScore(c);
+  if (c.lvl === 2) renderKb(c);
+  if (!c.isCheck) startTimer(c.b);
+}
+function renderScore(c){
+  const el = document.getElementById('score');
+  if (!el) return;
+  const per = (el.clientWidth || 340) < 520 ? 2 : 4;
+  scorePer = per;
+  const opts = { names: c.it.route === 'noten' ? c.lvl >= 1 : c.lvl === 2, chords: c.it.route === 'akkoord', perLine: per };
+  if (window.ABCJS && typeof window.ABCJS.renderAbc === 'function'){
+    try {
+      window.ABCJS.renderAbc(el, abcFor(c.song, opts), { responsive: 'resize', add_classes: true, staffwidth: per === 2 ? 330 : 660, paddingtop: 6, paddingbottom: 2, paddingleft: 4, paddingright: 4 });
+      markHard();
+      return;
+    } catch (e) { /* val terug op tekst */ }
+  }
+  el.innerHTML = fallbackScore(c.song, opts);
+}
+function fallbackScore(song, o){
+  return '<div class="fb">' + song.bars.map((bar, i) => '<div class="fbb"><small>maat ' + (i + 1) + '</small><div class="fbc">' + (o.chords ? bar.c.map(x => x[0]).join(' ') : '') + '</div><div>' + bar.n.map(x => nameOf(x[0]) + (x[1] > 1 ? ' ' + '–'.repeat(x[1] - 1) : '')).join(' ') + '</div></div>').join('') + '</div><p class="small" style="margin:0 8px 6px;color:#566074">De bladmuziek laadt niet. Dit zijn de noten als tekst.</p>';
+}
+function markHard(){
+  const el = document.getElementById('score'), c = cur();
+  if (!el || !c) return;
+  el.querySelectorAll('.hard').forEach(n => n.classList.remove('hard'));
+  c.it.hard.forEach(n => el.querySelectorAll('.abcjs-note.abcjs-mm' + (n - 1)).forEach(x => x.classList.add('hard')));
+}
+function renderKb(c, sym){
+  const el = document.getElementById('kb');
+  if (!el || !c) return;
+  const marks = new Map();
+  let lo = 60, hi = 72, legend;
+  if (c.it.route === 'noten'){
+    c.song.rh.forEach(m => marks.set(m, { cls: 'rh', label: nameOf(m) }));
+    legend = ['rh'];
+  } else if (c.it.route === 'akkoord'){
+    lo = 48; hi = 69;
+    c.song.rh.forEach(m => marks.set(m, { cls: 'rh', label: nameOf(m) }));
+    chordsIn(c.song).forEach(s => marks.set(LH_ROOT[s], { cls: 'lh', label: s }));
+    legend = ['rh', 'lh'];
+  } else {
+    lo = 48; hi = 69;
+    sym = sym || c.song.bars[ui.selBar || 0].c[0][0];
+    const safe = safeNotes(c.song, sym);
+    safe.forEach(m => marks.set(m, { cls: 'rh', label: nameOf(m) }));
+    marks.set(LH_ROOT[sym], { cls: 'lh', label: sym });
+    legend = ['safe', 'root'];
+    const st = document.getElementById('safeTxt');
+    if (st) st.textContent = 'Bij ' + sym + ' klinken ' + listNL(safe.map(nameOf)) + ' veilig. De begeleiding speelt de grondtoon.';
+  }
+  el.innerHTML = keyboardSVG(marks, lo, hi) + legendHTML(legend);
+}
+function legendHTML(keys){
+  const L = { rh: ['rh', 'Rechterhand'], lh: ['lh', 'Linkerhand'], safe: ['rh', 'Veilige noten'], root: ['lh', 'Grondtoon'] };
+  return '<div class="kblegend">' + keys.map(k => '<span><i class="sw ' + L[k][0] + '"></i>' + L[k][1] + '</span>').join('') + '<span><i class="sw mc"></i>Midden-C</span></div>';
+}
+function keyboardSVG(marks, lo, hi){
+  const W = 28, H = 104, BW = 17, BH = 64, whites = [], labels = [];
+  for (let m = lo; m <= hi; m++) if (WHITE.includes(m % 12)) whites.push(m);
+  marks.forEach(v => labels.push(v.label));
+  let s = '<svg class="kb" viewBox="0 0 ' + (whites.length * W + 1) + ' ' + (H + 1) + '" role="img" aria-label="Toetsenbord, gemarkeerd: ' + esc(listNL(labels)) + '">';
+  whites.forEach((m, i) => {
+    const mk = marks.get(m), x = i * W + 0.5;
+    s += '<g class="k ' + (mk ? mk.cls : '') + '" data-m="' + m + '"><rect class="w" x="' + x + '" y="0.5" width="' + W + '" height="' + H + '" rx="3"/>';
+    if (m === 60) s += '<circle class="mc" cx="' + (x + W / 2) + '" cy="' + (H - 30) + '" r="2.6"/>';
+    if (mk && mk.label) s += '<text x="' + (x + W / 2) + '" y="' + (H - 10) + '">' + mk.label + '</text>';
+    s += '</g>';
+  });
+  for (let m = lo; m <= hi; m++){
+    if (WHITE.includes(m % 12)) continue;
+    const i = whites.indexOf(m - 1);
+    if (i < 0) continue;
+    const mk = marks.get(m);
+    s += '<g class="k ' + (mk ? mk.cls : '') + '" data-m="' + m + '"><rect class="b" x="' + ((i + 1) * W + 0.5 - BW / 2) + '" y="0.5" width="' + BW + '" height="' + BH + '" rx="2"/></g>';
+  }
+  return s + '</svg>';
+}
+function keyOn(m, on){ const g = document.querySelector('#kb g[data-m="' + m + '"]'); if (g) g.classList.toggle('on', on); }
+function clearKeys(){
+  document.querySelectorAll('#kb g.on').forEach(g => g.classList.remove('on'));
+  document.querySelectorAll('#chart .cur').forEach(x => x.classList.remove('cur'));
+}
+function setStatus(t){ const el = document.getElementById('status'); if (el) el.textContent = t; }
+function startTimer(b){
+  clearInterval(timerInt);
+  const el = document.getElementById('timer');
+  if (!el) return;
+  let chimed = false;
+  const tick = () => {
+    const left = Math.round(b.min * 60 - (Date.now() - session.blockStart) / 1000);
+    if (left >= 0){ el.textContent = fmt(left); el.classList.remove('up'); }
+    else { el.textContent = '+' + fmt(-left); el.classList.add('up'); }
+    if (left <= 0 && !chimed){ chimed = true; chime(); setStatus('Tijd om te wisselen. Rond af en tik op Klaar.'); }
+  };
+  tick();
+  timerInt = setInterval(tick, 500);
+}
+
+/* Afspelen */
+function updateButtons(){
+  const l = document.getElementById('listenBtn');
+  if (l){ l.setAttribute('aria-pressed', mode === 'listen'); l.textContent = mode === 'listen' ? 'Stop' : 'Luister'; }
+  const bk = document.getElementById('backBtn');
+  if (bk){ bk.setAttribute('aria-pressed', mode === 'backing'); bk.textContent = mode === 'backing' ? 'Stop begeleiding' : 'Begeleiding'; }
+  const mt = document.getElementById('metroBtn');
+  if (mt) mt.setAttribute('aria-pressed', ui.metro);
+}
+function startMode(m){
+  const c = cur();
+  if (!c) return;
+  const tl = timeline(c.song), bpm = c.it.bpm;
+  const onCount = n => setStatus('Aftellen: ' + n);
+  const end = () => { mode = null; clearKeys(); setStatus(''); if (ui.metro) startMode('metro'); else updateButtons(); };
+  let ok = false;
+  if (m === 'metro') ok = tStart({ bpm, len: 4, loop: true, click: true });
+  else if (m === 'listen') ok = tStart({ bpm, tl, melody: true, roots: c.it.route === 'akkoord', click: ui.metro, countIn: 4, onCount, onEnd: end,
+    onNote: (n, on) => { keyOn(n.midi, on); if (on) setStatus('Maat ' + (n.bar + 1)); } });
+  else if (m === 'backing') ok = tStart({ bpm, tl, backing: true, loop: true, click: ui.metro, countIn: 4, onCount,
+    onChord: ch => {
+      setStatus('Maat ' + (ch.bar + 1) + ': ' + ch.sym);
+      document.querySelectorAll('#chart button').forEach((x, i) => x.classList.toggle('cur', i === ch.bar));
+      if (lvlNow === 2) renderKb(cur(), ch.sym);
+    } });
+  mode = ok ? m : null;
+  if (!ok) setStatus('Geluid werkt niet in deze browser.');
+  else if (m === 'metro') setStatus('Metronoom op ' + bpm + ' bpm.');
+  updateButtons();
+}
+function stopAudio(){ tStop(); mode = null; clearKeys(); setStatus(''); updateButtons(); }
+
+/* Samenvatting */
+function summaryHTML(){
+  const r = session.results, checks = r.filter(x => x.kind === 'check'), okN = checks.filter(x => x.ok).length, prac = r.filter(x => x.kind === 'practice');
+  const mins = r.reduce((s, x) => s + (x.min || 0), 0);
+  const tm = addDays(today(), 1), dueTm = songItems().filter(it => it.nextCheck && it.nextCheck <= tm).length;
+  return '<h2>Sessie klaar</h2><dl class="sum">' +
+    '<dt>Toetsen</dt><dd>' + (checks.length ? okN + ' van ' + checks.length + ' gehaald' : 'geen') + '</dd>' +
+    '<dt>Oefenblokken</dt><dd>' + prac.length + '</dd>' +
+    '<dt>Tijd, ongeveer</dt><dd>' + mins + ' min</dd>' +
+    '<dt>Morgen klaar</dt><dd>' + dueTm + (dueTm === 1 ? ' toets' : ' toetsen') + '</dd></dl>' +
+    '<p class="small muted" id="moreMsg">De toetsen van morgen laten zien wat er van vandaag is blijven hangen.</p>' +
+    '<div class="btnrow"><button class="btn" data-act="more">Nog 5 minuten</button><button class="btn primary" data-act="finish">Terug naar vandaag</button></div>';
+}
+
+/* Liedjes */
+function statusLine(it){
+  let s = cap(HELP[it.level]);
+  s += it.nextCheck ? ', volgende toets ' + relDay(it.nextCheck) : ', nog niet geoefend';
+  if (it.streak) s += ', ' + it.streak + '× op rij zonder hulp gehaald';
+  return s;
+}
+function liedjesHTML(){
+  const rec = recommendedSong();
+  let h = '<h2>Liedjes</h2><p class="muted small">Van makkelijk naar moeilijker. Start een nieuw liedje als de drie routes van het vorige met minder hulp gaan.</p><ol class="songs">';
+  SONGS.forEach(s => {
+    const on = state.started.includes(s.id);
+    h += '<li><h3>' + esc(s.title) + '</h3><p class="small muted">' + esc(s.origin) + '</p><p class="small">' + esc(s.intro) + ' Akkoorden: ' + listNL(chordsIn(s)) + '.</p>';
+    if (on) ROUTES.forEach(r => {
+      const it = state.items[itemId(s.id, r.id)];
+      if (!it) return;
+      h += '<div class="rrow r-' + r.id + '"><span class="bar"></span><span><span class="rname">' + r.name + '</span><br><span class="small muted">' + statusLine(it) + '</span></span><button class="btn ghost" data-act="free" data-id="' + it.id + '">Vrij oefenen</button></div>';
+    });
+    else h += '<button class="btn' + (rec && rec.id === s.id ? ' primary' : '') + '" data-act="startsong" data-song="' + s.id + '">Start dit liedje</button>';
+    h += '</li>';
+  });
+  return h + '</ol>';
+}
+
+/* Voortgang */
+function voortgangHTML(){
+  const t = today(), f30 = addDays(t, -29), f7 = addDays(t, -6), ev = state.history;
+  const routeOf = e => String(e.item).split(':')[1];
+  let h = '<h2>Voortgang</h2><p class="muted small">De maatstaf is wat je een dag of langer later nog kunt, niet hoe het tijdens het oefenen voelt.</p>';
+  if (!ev.length) return h + '<p>Nog geen gegevens. Na je eerste sessie en de toets van de dag erna zie je hier wat er blijft hangen.</p>';
+  const checks = ev.filter(e => e.k === 'check' && e.d >= f30);
+  const zero = checks.filter(e => e.lvl === 0), zeroOk = zero.filter(e => e.ok).length, allOk = checks.filter(e => e.ok).length;
+  const min7 = ev.filter(e => e.d >= f7).reduce((s, e) => s + (e.k === 'check' ? CHECK_MIN : (e.min || 0)), 0);
+  h += '<div class="metric"><b>' + (zero.length ? zeroOk + '/' + zero.length : '–') + '</b><span>toetsen zonder hulp gehaald, laatste 30 dagen</span></div>';
+  h += '<div class="metric"><b>' + (checks.length ? allOk + '/' + checks.length : '–') + '</b><span>alle toetsen gehaald, laatste 30 dagen</span></div>';
+  h += '<div class="metric"><b>' + min7 + '</b><span>minuten geoefend en getoetst, laatste 7 dagen</span></div>';
+  h += '<h3>Toetsen per route, laatste 30 dagen</h3><div class="rbars">' + ROUTES.map(r => {
+    const c = checks.filter(e => routeOf(e) === r.id), ok = c.filter(e => e.ok).length, pct = c.length ? Math.round(ok / c.length * 100) : 0;
+    return '<div class="row r-' + r.id + '"><span class="rname">' + r.name + '</span><span class="track"><i style="width:' + pct + '%"></i></span><span class="small">' + (c.length ? ok + ' van ' + c.length : 'nog geen') + '</span></div>';
+  }).join('') + '</div>';
+  const days = [];
+  for (let i = 13; i >= 0; i--) days.push(addDays(t, -i));
+  const active = new Set(ev.map(e => e.d));
+  h += '<h3>Laatste 14 dagen</h3><div class="days" role="img" aria-label="Geoefend op ' + days.filter(d => active.has(d)).length + ' van de 14 dagen">' + days.map(d => '<span class="' + (active.has(d) ? 'on' : '') + (d === t ? ' today' : '') + '"></span>').join('') + '</div>';
+  h += '<div class="dayl" aria-hidden="true">' + days.map(d => { const p = d.split('-').map(Number); return '<span>' + WD[new Date(p[0], p[1] - 1, p[2]).getDay()] + '</span>'; }).join('') + '</div>';
+  const recent = ev.filter(e => e.k === 'check').slice(-8).reverse();
+  if (recent.length) h += '<h3>Laatste toetsen</h3><ul class="hist">' + recent.map(e => {
+    const it = state.items[e.item], r = routeOf(e);
+    return '<li class="r-' + r + '"><span class="bar"></span><span>' + (it ? esc(SONG[it.song].title) : '') + '<br><span class="muted"><span class="rname">' + (ROUTE[r] ? ROUTE[r].name : '') + '</span>, ' + HELP[e.lvl] + ', ' + shortDate(e.d) + '</span></span><span class="res ' + (e.ok ? 'ok' : 'no') + '">' + (e.ok ? 'gehaald' : 'niet gehaald') + '</span></li>';
+  }).join('') + '</ul>';
+  h += '<h3>Opnieuw beginnen</h3><p class="small muted">Dit wist alle voortgang, ook op je andere apparaten als die aan je account gekoppeld zijn.</p><button class="btn bad" data-act="reset">Alles wissen</button>';
+  return h;
+}
+
+/* Uitleg */
+function uitlegHTML(){
+  return '<h2>Uitleg</h2>' +
+    '<h3>De aanpak</h3>' +
+    '<p><b>Eén liedje, drie routes.</b> Elk liedje oefen je als <span class="rname r-noten">noten</span> (melodie van bladmuziek), met <span class="rname r-akkoord">akkoorden</span> (melodie rechts, grondtonen links) en als <span class="rname r-impro">improvisatie</span> over dezelfde akkoorden.</p>' +
+    '<p><b>Kort en door elkaar.</b> Je kiest per sessie hoeveel tijd je hebt. De blokken wisselen van route, zodat je niet lang op één ding blijft hangen.</p>' +
+    '<p><b>Eerst toetsen, dan oefenen.</b> Een toets is één koude poging aan het begin van de sessie. Gehaald betekent: van begin tot eind, zonder stoppen of opnieuw beginnen, met hooguit één verkeerde noot.</p>' +
+    '<p><b>Hulp bouwt af.</b> Er zijn drie niveaus: veel, weinig en geen hulp. Een toets heeft één niveau minder hulp dan je oefenblokken, tot er geen hulp meer over is. Haal je hem, dan zakt je hulp mee. Gaat hij twee keer achter elkaar mis, dan komt er weer wat hulp bij.</p>' +
+    '<p><b>Steeds verder uit elkaar.</b> Haal je een toets zonder hulp, dan komt de volgende pas na 2 dagen, daarna na 4, 7, 14, 30 en 60 dagen.</p>' +
+    '<h3>De hulpniveaus</h3><ul class="plain">' +
+    '<li><span class="rname r-noten">Noten</span>: veel hulp is notennamen, toetsenbord en luisteren. Weinig hulp is alleen notennamen. Geen hulp is alleen de noten.</li>' +
+    '<li><span class="rname r-akkoord">Akkoorden</span>: veel hulp is notennamen, toetsenbord en luisteren. Weinig hulp is een uitleg waar je linkerhand ligt. Geen hulp is alleen de akkoordsymbolen.</li>' +
+    '<li><span class="rname r-impro">Improviseren</span>: veel hulp is een toetsenbord met veilige noten per akkoord. Weinig hulp is een lijst met veilige noten. Geen hulp is alleen de akkoorden.</li></ul>' +
+    '<h3>Waar dit op rust</h3><p>Nagekeken in samenvattingen van de studies:</p><ul class="plain">' +
+    '<li>Duke, Simmons en Cash (2009): bij 17 gevorderde pianostudenten voorspelden oefentijd en aantal herhalingen niet hoe goed ze de dag erna speelden. Gericht de lastige plek herstellen wel. Het gaat om samenhang bij één korte passage, niet om bewezen oorzaak.</li>' +
+    '<li>Abushanab en Bishara (2013): 25 deelnemers met pianotraining. Oefenen in vaste volgorde ging eerst sneller, maar twee dagen later speelden ze de gemengd geoefende melodieën sneller. Zelf verwachtten ze het omgekeerde.</li>' +
+    '<li>McPherson, driejarige studie bij scholieren met een instrument: het padmodel wijst erop dat spelen op gehoor en improviseren de algehele speelvaardigheid kunnen bevorderen.</li>' +
+    '<li>Een preprint uit 2026 over pianoleren in VR: hulp die zich aanpast aan het niveau gaf betere retentie dan hulp die steeds zichtbaar bleef.</li></ul>' +
+    '<p>Eigen keuzes, niet direct onderzocht:</p><ul class="plain">' +
+    '<li>Dat dit voor een volwassen beginner net zo werkt. De onderzochte groepen waren anders.</li>' +
+    '<li>De intervallen, de blokken van 3 tot 4 minuten, de toetsmaatstaf en de improvisatie-opdrachten.</li></ul>' +
+    '<p>Daarom houdt de tool bij hoe vaak je de toetsen haalt. Dat is je eigen meetlat, onder Voortgang.</p>' +
+    '<h3>Wat de tool niet doet</h3><ul class="plain">' +
+    '<li>Hij hoort je niet. Jij beoordeelt de toets, met de maatstaf hierboven.</li>' +
+    '<li>Hij ziet je handen niet. Film jezelf af en toe om houding en spanning te bekijken.</li>' +
+    '<li>Hoor je op een iPhone niets, zet dan de stille modus uit.</li></ul>' +
+    '<h3>Muziek</h3><p class="small">De melodieën zijn volksliedjes en een thema van Beethoven, allemaal publiek domein. Bij de Ode is het ritme vereenvoudigd. De bladmuziek wordt getekend met abcjs.</p>';
+}
+const VIEWS = { vandaag: vandaagHTML, liedjes: liedjesHTML, voortgang: voortgangHTML, uitleg: uitlegHTML };
+
+/* ---------- Acties ---------- */
+function arm(el, label){
+  if (el.dataset.armed === '1') return true;
+  const old = el.textContent;
+  el.dataset.armed = '1'; el.textContent = label;
+  setTimeout(() => { if (el.isConnected){ el.dataset.armed = ''; el.textContent = old; } }, 4000);
+  return false;
+}
+function beginSession(blocks, minutes, free){
+  session = { blocks: blocks.slice(), i: 0, minutes, free, results: [], done: false, failedOpen: false, extraAdded: false, blockStart: Date.now() };
+  ui.metro = false; ui.selBar = 0;
+  requestWake();
+  render(); window.scrollTo(0, 0);
+}
+function elapsedMin(){ return clamp(Math.round((Date.now() - session.blockStart) / 60000), 1, 60); }
+function completePractice(){
+  const c = cur();
+  if (!c) return;
+  const m = elapsedMin();
+  recordPractice(c.b.id, m);
+  session.results.push({ kind: 'practice', id: c.b.id, min: m });
+  persist(); advance();
+}
+function completeCheck(ok){
+  const c = cur();
+  if (!c) return;
+  recordCheck(c.b.id, ok);
+  session.results.push({ kind: 'check', id: c.b.id, ok, min: CHECK_MIN });
+  persist();
+  if (ok) advance();
+  else {
+    const laterPractice = session.blocks.slice(session.i + 1).some(b => b.id === c.b.id && b.kind === 'practice');
+    session.extraAdded = (!session.free && !laterPractice) ? insertExtra(c.b.id) : false;
+    session.failNote = laterPractice ? 'Straks oefen je dit nog in deze sessie.' : session.extraAdded ? 'Er komt straks een extra oefenblok voor.' : 'Morgen komt dit opnieuw als toets.';
+    session.failedOpen = true; render();
+  }
+}
+function insertExtra(id){
+  if (session.blocks.slice(session.i + 1).some(b => b.id === id && b.kind === 'practice')) return false;
+  session.blocks.splice(Math.min(session.blocks.length, session.i + 2), 0, { kind: 'practice', id, min: blockLen(session.minutes), extra: true });
+  return true;
+}
+function advance(){
+  tStop(); mode = null;
+  session.failedOpen = false; session.extraAdded = false; ui.metro = false; ui.selBar = 0;
+  session.i++; session.blockStart = Date.now();
+  if (session.i >= session.blocks.length){
+    releaseWake();
+    if (session.free){ session = null; ui.tab = 'liedjes'; }
+    else session.done = true;
+  }
+  render(); window.scrollTo(0, 0);
+}
+function stopSession(){
+  releaseWake();
+  if (session && session.results.length && !session.free) session.done = true;
+  else session = null;
+  render(); window.scrollTo(0, 0);
+}
+function moreTime(){
+  const plan = buildPlan(5, new Set(session.results.map(r => r.id)));
+  if (!plan.blocks.length){ const p = document.getElementById('moreMsg'); if (p) p.textContent = 'Er staat voor vandaag niets meer open.'; return; }
+  const start = session.blocks.length;
+  session.blocks = session.blocks.concat(plan.blocks);
+  session.i = start; session.done = false; session.minutes = 5; session.blockStart = Date.now();
+  requestWake(); render(); window.scrollTo(0, 0);
+}
+function toggleHard(el){
+  const c = cur();
+  if (!c) return;
+  const n = +el.dataset.bar, set = new Set(c.it.hard);
+  if (set.has(n)) set.delete(n); else set.add(n);
+  c.it.hard = Array.from(set).sort((a, b) => a - b); c.it.t = Date.now();
+  el.setAttribute('aria-pressed', set.has(n));
+  markHard(); persist();
+}
+function changeTempo(d){
+  const c = cur();
+  if (!c) return;
+  c.it.bpm = clamp(c.it.bpm + d, 40, 120); c.it.t = Date.now();
+  const o = document.getElementById('bpm');
+  if (o) o.textContent = c.it.bpm + ' bpm';
+  persist();
+  if (mode) startMode(mode);
+}
+function resetAll(){
+  state = freshState(); state.epochAt = Date.now();
+  session = null; ui.minutes = null; ui.tab = 'vandaag';
+  persist(); render(); window.scrollTo(0, 0);
+}
+const actions = {
+  tab(el){ ui.tab = el.dataset.tab; render(); window.scrollTo(0, 0); },
+  min(el){ ui.minutes = +el.dataset.min; keyNote(+el.dataset.note); render(); },
+  start(){ if (!ui.minutes) return; const plan = buildPlan(ui.minutes); if (plan.blocks.length) beginSession(plan.blocks, ui.minutes, false); },
+  startsong(el){ startSong(el.dataset.song); persist(); ui.tab = 'vandaag'; render(); window.scrollTo(0, 0); },
+  free(el){ beginSession([{ kind: 'practice', id: el.dataset.id, min: 4 }], 4, true); },
+  done(){ completePractice(); },
+  checkok(){ completeCheck(true); },
+  checkbad(){ completeCheck(false); },
+  next(){ advance(); },
+  stop(el){ if (arm(el, 'Tik nogmaals om te stoppen')) stopSession(); },
+  hard(el){ toggleHard(el); },
+  tempo(el){ changeTempo(+el.dataset.d); },
+  metro(){
+    ui.metro = !ui.metro;
+    if (mode === 'listen' || mode === 'backing') startMode(mode);
+    else if (ui.metro) startMode('metro');
+    else stopAudio();
+  },
+  listen(){ if (mode === 'listen') stopAudio(); else startMode('listen'); },
+  backing(){ if (mode === 'backing'){ stopAudio(); if (ui.metro) startMode('metro'); } else startMode('backing'); },
+  selbar(el){
+    const c = cur();
+    if (!c) return;
+    ui.selBar = +el.dataset.bar;
+    document.querySelectorAll('#chart button').forEach((x, i) => x.classList.toggle('sel', c.lvl === 2 && i === ui.selBar));
+    if (c.lvl === 2 && mode !== 'backing') renderKb(c, c.song.bars[ui.selBar].c[0][0]);
+  },
+  more(){ moreTime(); },
+  finish(){ session = null; releaseWake(); render(); window.scrollTo(0, 0); },
+  reset(el){ if (arm(el, 'Tik nogmaals om alles te wissen')) resetAll(); }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || !app.contains(el)) return;
+  const fn = actions[el.dataset.act];
+  if (fn) fn(el, e);
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isBusy()) requestWake(); });
+let rsz = null;
+window.addEventListener('resize', () => {
+  clearTimeout(rsz);
+  rsz = setTimeout(() => {
+    const c = cur(), el = document.getElementById('score');
+    if (!c || !el || c.it.route === 'impro') return;
+    if (((el.clientWidth || 340) < 520 ? 2 : 4) !== scorePer) renderScore(c);
+  }, 200);
+});
+function loadAbc(){
+  const s = document.createElement('script');
+  s.src = ABCJS_URL; s.async = true;
+  s.onload = () => { const c = cur(); if (c && c.it.route !== 'impro') renderScore(c); };
+  document.head.appendChild(s);
+}
+
+/* ---------- Start ---------- */
+loadAbc();
+render();
+initCloud();
+})();
+</script>
+</body>
+</html>
