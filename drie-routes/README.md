@@ -1,7 +1,5 @@
-# Drie routes
+# Drie routes is verhuisd
 
-Een piano-oefentool in één HTML-bestand. Je leert elk liedje op drie manieren: als noten, met akkoorden en door te improviseren. Elke sessie begint met korte toetsen van wat je eerder oefende, daarna oefen je in korte blokken die van route wisselen. Met een digitale piano via MIDI volgt de app je spel en doet hij bij toetsen een voorstel.
+Drie routes heeft nu een eigen repository: [oscardillewaard-ai/drie-routes](https://github.com/oscardillewaard-ai/drie-routes). Daar staan de app, de tests en de overdracht in `CLAUDE.md`, en daarvandaan wordt hij gepubliceerd op [oscardillewaard-ai.github.io/drie-routes](https://oscardillewaard-ai.github.io/drie-routes/).
 
-- **Gebruiken**: open [`drie-routes.html`](drie-routes.html) in Chrome of Edge, of de [artifact in Claude](https://claude.ai/artifact/ULwy5f2NdfqVe9XTosjwHh) (met opslag in je account).
-- **Testen**: `npm install` en `npm test` in deze map.
-- **Achtergrond, keuzes en open vragen**: [`CLAUDE.md`](CLAUDE.md).
+Werk dus niet meer in deze map; hij bestaat alleen nog als verwijzing.
