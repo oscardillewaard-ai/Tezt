@@ -3,6 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1'
+const APP_VERSION = '4' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -166,11 +167,19 @@ const view = document.getElementById('view')
 const title = document.getElementById('title')
 const fab = document.getElementById('fab')
 const sheet = document.getElementById('sheet')
+const topActions = document.getElementById('top-actions')
+
+// Topbalk-knoppen (Week/Maand) vallen buiten #view en hebben een eigen klik-afhandeling.
+topActions.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]')
+  if (el && actions[el.dataset.action]) actions[el.dataset.action](el)
+})
 
 function render() {
   const active = ui.active && state.sessions.find((s) => s.id === ui.active)
   document.body.classList.toggle('in-workout', !!active)
   if (active) {
+    topActions.innerHTML = ''
     view.innerHTML = renderWorkout(active)
     return
   }
@@ -178,7 +187,9 @@ function render() {
   document.querySelectorAll('.tabbar button').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === ui.tab)
   })
-  fab.hidden = ui.tab !== 'week' && ui.tab !== 'schemas'
+  // De agenda heeft per dag een +; de zwevende knop alleen bij schema's.
+  fab.hidden = ui.tab !== 'schemas'
+  topActions.innerHTML = ui.tab === 'week' ? calToggle() : ''
   const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore }
   view.innerHTML = renderers[ui.tab]()
 }
@@ -193,6 +204,8 @@ function calToggle() {
     </div>`
 }
 
+const DAYS_SHORT = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
+
 function renderWeek() {
   if (ui.calMode === 'maand') return renderMonth()
   const ws = ui.weekStart
@@ -204,48 +217,37 @@ function renderWeek() {
   const isCurrent = toKey(ws) === toKey(startOfWeek(new Date()))
   title.textContent = 'Sportagenda'
 
-  const perType = {}
-  for (const s of done) perType[s.typeId] = (perType[s.typeId] || 0) + 1
-  const chips = Object.entries(perType)
-    .map(([id, n]) => {
-      const t = typeById(id)
-      return `<span class="chip">${esc(t.emoji)} ${esc(t.name)} × ${n}</span>`
-    })
-    .join('')
-
-  let html = `
-    ${calToggle()}
-    <div class="weeknav">
-      <button class="iconbtn" data-action="prev-week" aria-label="Vorige week">‹</button>
-      <div class="label">
-        <strong>Week ${isoWeek(ws)}</strong>
-        <span class="muted">${shortDate(ws)} – ${shortDate(we)} ${we.getFullYear()}</span>
-        ${isCurrent ? '' : '<br><button class="linkbtn" data-action="this-week">Naar deze week</button>'}
-      </div>
-      <button class="iconbtn" data-action="next-week" aria-label="Volgende week">›</button>
-    </div>
-    <section class="card">
-      <h2>Weekoverzicht</h2>
-      <div><strong>${done.length}</strong> van <strong>${list.length}</strong> trainingen gedaan · ${fmtMinutes(doneMin)}</div>
-      <div class="progress"><div style="width:${pct}%"></div></div>
-      ${chips ? `<div class="chips">${chips}</div>` : '<div class="muted">Nog niets afgevinkt deze week.</div>'}
-    </section>`
-
   const tKey = todayKey()
+  let days = ''
   for (let i = 0; i < 7; i++) {
     const d = addDays(ws, i)
     const k = toKey(d)
     const daySessions = sortSessions(list.filter((s) => s.date === k))
-    html += `
-      <section class="day ${k === tKey ? 'today' : ''}">
-        <div class="day-head">
-          <span><span class="name">${DAYS[i]}</span> <span class="muted">${shortDate(d)}${k === tKey ? ' · vandaag' : ''}</span></span>
-          <button class="day-add" data-action="add" data-date="${k}" aria-label="Training toevoegen op ${DAYS[i]}">+</button>
+    days += `
+      <div class="wday ${k === tKey ? 'today' : ''}">
+        <div class="wday-label"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}</strong></div>
+        <div class="wday-items">
+          ${daySessions.length ? daySessions.map(sessionRow).join('') : '<span class="rest">rust</span>'}
         </div>
-        ${daySessions.length ? daySessions.map(sessionRow).join('') : '<div class="empty">Rustdag</div>'}
-      </section>`
+        <button class="day-add" data-action="add" data-date="${k}" aria-label="Training toevoegen op ${DAYS[i]}">+</button>
+      </div>`
   }
-  return html
+
+  return `
+    <div class="weeknav compact">
+      <button class="iconbtn" data-action="prev-week" aria-label="Vorige week">‹</button>
+      <div class="label">
+        <strong>Week ${isoWeek(ws)}</strong>
+        <span class="muted">${shortDate(ws)} – ${shortDate(we)}</span>
+        ${isCurrent ? '' : '<button class="linkbtn" data-action="this-week">Vandaag</button>'}
+      </div>
+      <button class="iconbtn" data-action="next-week" aria-label="Volgende week">›</button>
+    </div>
+    <div class="wsummary">
+      <span><strong>${done.length}/${list.length}</strong> gedaan · ${fmtMinutes(doneMin)}</span>
+      <div class="progress"><div style="width:${pct}%"></div></div>
+    </div>
+    <div class="wdays">${days}</div>`
 }
 
 const MONTHS_FULL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
@@ -281,8 +283,7 @@ function renderMonth() {
   }
 
   return `
-    ${calToggle()}
-    <div class="weeknav">
+    <div class="weeknav compact">
       <button class="iconbtn" data-action="prev-month" aria-label="Vorige maand">‹</button>
       <div class="label">
         <strong>${MONTHS_FULL[m.getMonth()]} ${m.getFullYear()}</strong>
@@ -310,8 +311,8 @@ function sessionRow(s) {
     <div class="session ${s.done ? 'done' : ''}">
       <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? '✓' : ''}</button>
       <button class="s-body" data-action="edit" data-id="${s.id}">
-        <div class="s-title">${esc(t.emoji)} ${esc(t.name)}</div>
-        ${meta ? `<div class="s-meta">${meta}</div>` : ''}
+        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}</span>
+        ${meta ? `<span class="s-meta">${meta}</span>` : ''}
       </button>
     </div>`
 }
@@ -454,6 +455,12 @@ function renderMore() {
         <button class="btn" data-action="import">Importeren</button>
       </div>
       <input type="file" id="import-file" accept="application/json,.json" hidden />
+    </section>
+    <section class="card">
+      <h2>App bijwerken</h2>
+      <p class="muted">Updates worden automatisch binnengehaald als je de app opent. Lukt dat niet, tik dan hieronder. Je gegevens blijven bewaard.</p>
+      <button class="btn block" data-action="force-update">Nu bijwerken</button>
+      <p class="muted">Versie ${APP_VERSION}</p>
     </section>
     <section class="card">
       <h2>Installeren op iPhone</h2>
@@ -1072,6 +1079,17 @@ const actions = {
     render()
   },
   export: exportData,
+  'force-update': async () => {
+    // Alleen de app-cache wissen (niet localStorage) en vers ophalen.
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration()
+      await reg?.update()
+      for (const k of await caches.keys()) await caches.delete(k)
+    } catch {
+      // Geen cache-API: gewoon herladen.
+    }
+    location.reload()
+  },
   import: () => document.getElementById('import-file').click(),
   reset: () => {
     if (!confirm('Alle trainingen, schema\'s en activiteiten wissen? Dit kan niet ongedaan worden gemaakt.')) return
@@ -1181,6 +1199,41 @@ async function requestPersistence() {
 }
 requestPersistence()
 
+// ---------- Updates ----------
+
+// Een nieuwe service worker neemt het over -> pagina herladen zodat de nieuwe
+// versie meteen zichtbaar is. Niet tijdens een lopende rusttimer of open sheet;
+// dan wachten tot die klaar is. Gegevens staan in localStorage en blijven staan.
+let reloadPending = false
+function reloadWhenIdle() {
+  if (ui.restEnd || sheet.open) {
+    reloadPending = true
+    return
+  }
+  location.reload()
+}
+setInterval(() => {
+  if (reloadPending && !ui.restEnd && !sheet.open) location.reload()
+}, 1000)
+
+async function checkForUpdate() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    await reg?.update()
+  } catch {
+    // Offline: gewoon de huidige versie blijven gebruiken.
+  }
+}
+
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {})
+  const hadController = !!navigator.serviceWorker.controller
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // Bij de allereerste installatie is er niets te verversen.
+    if (hadController) reloadWhenIdle()
+  })
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {})
+  // iOS houdt de app vaak "open" op de achtergrond; check bij terugkomen.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate()
+  })
 }

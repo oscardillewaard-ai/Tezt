@@ -63,6 +63,13 @@ button {
   padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
 }
 
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .topbar h1 {
   margin: 0;
   font-size: 1.15rem;
@@ -885,4 +892,153 @@ body.in-workout main {
 .cal-mark.done {
   border-color: var(--done);
   background: var(--done-soft);
+}
+
+/* Compacte week: hele week zonder scrollen */
+.topbar .segmented {
+  margin: 0;
+  width: 150px;
+  background: rgb(255 255 255 / 0.15);
+}
+
+.topbar .segmented button {
+  padding: 4px 0;
+  font-size: 0.85rem;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.topbar .segmented button.on {
+  background: var(--bar-text);
+  color: var(--bar);
+}
+
+.weeknav.compact {
+  margin-bottom: 8px;
+}
+
+.weeknav.compact .iconbtn {
+  height: 38px;
+  min-width: 40px;
+}
+
+.weeknav.compact .label strong {
+  display: inline;
+  margin-right: 6px;
+}
+
+.weeknav.compact .linkbtn {
+  margin-left: 6px;
+  padding: 0;
+}
+
+.wsummary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.wsummary span {
+  white-space: nowrap;
+}
+
+.wsummary .progress {
+  flex: 1;
+  height: 6px;
+  margin: 0;
+}
+
+.wdays {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.wday {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 4px 0 4px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wday:last-child {
+  border-bottom: 0;
+}
+
+.wday-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.wday-label span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.wday-label strong {
+  font-size: 1.05rem;
+}
+
+.wday.today .wday-label strong,
+.wday.today .wday-label span {
+  color: var(--accent);
+}
+
+.wday.today {
+  background: var(--accent-soft);
+}
+
+.wday-items {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wday .rest {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.wday .day-add {
+  width: 40px;
+  height: 40px;
+}
+
+.wday .session {
+  margin: 0;
+  padding: 4px 8px 4px 4px;
+  gap: 8px;
+  border-radius: 10px;
+}
+
+.wday .session .check {
+  width: 26px;
+  height: 26px;
+  font-size: 0.85rem;
+}
+
+.wday .s-body {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.wday .s-title {
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.wday .s-meta {
+  flex: 1;
+  min-width: 0;
 }

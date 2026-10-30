@@ -1,6 +1,6 @@
-// Offline support: serve the app shell from cache, refresh it in the
-// background so a new deploy shows up on the next launch.
-const CACHE = 'sportagenda-v3'
+// Network-first: haal altijd de nieuwste versie op als er internet is, val
+// terug op de cache als je offline bent (bijv. in de gym zonder bereik).
+const CACHE = 'sportagenda-v4'
 const SHELL = [
   './',
   'index.html',
@@ -13,7 +13,9 @@ const SHELL = [
 ]
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)))
+  event.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))),
+  )
   self.skipWaiting()
 })
 
@@ -29,15 +31,18 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
   event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(event.request, { ignoreSearch: true })
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res.ok) cache.put(event.request, res.clone())
-          return res
-        })
-        .catch(() => cached)
-      return cached || network
-    }),
+    (async () => {
+      const cache = await caches.open(CACHE)
+      try {
+        // no-cache: altijd bij de server navragen of er iets nieuws is (GitHub
+        // Pages laat de browser anders tot 10 minuten een oude kopie gebruiken).
+        const res = await fetch(event.request, { cache: 'no-cache' })
+        if (res.ok) cache.put(event.request, res.clone())
+        return res
+      } catch {
+        const cached = await cache.match(event.request, { ignoreSearch: true })
+        return cached || Response.error()
+      }
+    })(),
   )
 })
