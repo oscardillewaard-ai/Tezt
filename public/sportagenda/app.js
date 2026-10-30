@@ -155,6 +155,7 @@ function sortSessions(list) {
 const ui = {
   tab: 'week',
   weekStart: startOfWeek(new Date()),
+  persisted: null, // null = onbekend / niet ondersteund
 }
 
 const view = document.getElementById('view')
@@ -369,6 +370,13 @@ function renderMore() {
     <section class="card">
       <h2>Back-up</h2>
       <p class="muted">Je gegevens staan alleen op dit toestel. Maak af en toe een back-up, of gebruik dit om over te zetten naar een ander toestel.</p>
+      ${
+        ui.persisted === true
+          ? '<p class="muted">✅ Opslag is als blijvend gemarkeerd.</p>'
+          : ui.persisted === false
+            ? '<p class="muted">⚠️ Opslag is niet als blijvend gemarkeerd. Installeer de app op je beginscherm en maak regelmatig een back-up.</p>'
+            : ''
+      }
       <div class="actions">
         <button class="btn" data-action="export">Exporteren</button>
         <button class="btn" data-action="import">Importeren</button>
@@ -731,6 +739,18 @@ document.addEventListener('visibilitychange', () => {
 })
 
 render()
+
+// Vraag de browser de opslag niet op te ruimen bij ruimtegebrek.
+async function requestPersistence() {
+  if (!navigator.storage?.persist) return
+  try {
+    ui.persisted = (await navigator.storage.persisted()) || (await navigator.storage.persist())
+    if (ui.tab === 'meer') render()
+  } catch {
+    // Niet ondersteund of geweigerd: status blijft onbekend.
+  }
+}
+requestPersistence()
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {})

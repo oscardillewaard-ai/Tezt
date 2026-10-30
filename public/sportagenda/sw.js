@@ -1,6 +1,6 @@
 // Offline support: serve the app shell from cache, refresh it in the
 // background so a new deploy shows up on the next launch.
-const CACHE = 'sportagenda-v1'
+const CACHE = 'sportagenda-v2'
 const SHELL = [
   './',
   'index.html',
