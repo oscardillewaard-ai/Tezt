@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '12' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '13' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -210,8 +210,8 @@ function renderWelcome() {
   return `
     <div class="welcome-screen">
       <img class="welcome-logo" src="icons/icon-192.png" alt="" />
-      <h1>Tarapp</h1>
-      <p class="tagline">Plan je trainingen. Vink af wat je gedaan hebt.</p>
+      <h1>Hoi Tara! 💛</h1>
+      <p class="tagline">Welkom in Tarapp, jouw eigen sportagenda.<br />${esc(dailyCompliment())}</p>
       <ul class="welcome-list">
         <li><span>📅</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
         <li><span>🏋️</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
@@ -247,6 +247,57 @@ function render() {
   topActions.innerHTML = ui.tab === 'week' ? calToggle() : ''
   const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore }
   view.innerHTML = renderers[ui.tab]()
+}
+
+// ---------- Complimentjes voor Tara ----------
+
+const COMPLIMENTS = [
+  'Tara, jij bent de beste.',
+  'Tara, jij bent de liefste.',
+  'Tara, jij bent de leukste.',
+  'Tara, jij bent de meest inspirerende persoon die er is.',
+  'Tara, jij maakt iedereen om je heen blijer.',
+  'Tara, jouw doorzettingsvermogen is ongelooflijk.',
+  'Tara, jij bent sterker dan je denkt.',
+  'Tara, jij straalt gewoon.',
+  'Tara, jij bent een topper.',
+  'Tara, de wereld is mooier met jou erin.',
+  'Tara, jij bent grappig, slim én sterk.',
+  'Tara, jij laat zien hoe het moet.',
+  'Tara, jij bent een voorbeeld voor iedereen.',
+  'Tara, jouw lach is de beste.',
+  'Tara, jij kunt alles aan.',
+  'Tara, jij bent goud waard.',
+  'Tara, niemand doet het zoals jij.',
+  'Tara, jij bent zo lief voor iedereen.',
+  'Tara, jij bent de allerleukste.',
+  'Tara, met jou is alles leuker.',
+  'Tara, jij bent gewoon geweldig.',
+  'Tara, jij inspireert iedereen om je heen.',
+  'Tara, jij bent een kanjer.',
+  'Tara, jij bent uniek en dat is prachtig.',
+]
+
+const CHEERS = [
+  'Goed bezig, Tara! Jij bent echt de beste. 💛',
+  'Weer een gedaan! Tara, je bent een topper. 💪',
+  'Yes Tara! Zo inspirerend. ✨',
+  'Kijk jou eens gaan, Tara! De leukste én de sterkste. 🔥',
+  'Tara, wat ben je goed bezig. Echt de liefste. 💛',
+  'Afgevinkt! Niemand doet het zoals jij, Tara. 🌟',
+  'Tara, jij bent onstopbaar. 💪',
+  'Trots op je, Tara! 💛',
+]
+
+// Elke dag hetzelfde complimentje, de volgende dag een ander.
+function dailyCompliment() {
+  const d = new Date()
+  const dayNr = Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000)
+  return COMPLIMENTS[dayNr % COMPLIMENTS.length]
+}
+
+function cheer() {
+  showToast(CHEERS[Math.floor(Math.random() * CHEERS.length)])
 }
 
 // ---------- Week ----------
@@ -298,6 +349,7 @@ function renderWeek() {
       </div>
       <button class="iconbtn" data-action="next-week" aria-label="Volgende week">›</button>
     </div>
+    <div class="compliment">💛 ${esc(dailyCompliment())}</div>
     <div class="wsummary">
       <span><strong>${done.length}/${list.length}</strong> gedaan · ${fmtMinutes(doneMin)}</span>
       <div class="progress"><div style="width:${pct}%"></div></div>
@@ -1167,6 +1219,7 @@ const workoutActions = {
   },
   'wo-finish': () => {
     const s = state.sessions.find((x) => x.id === ui.active)
+    const justFinished = !s.log.endedAt
     if (!s.log.endedAt) {
       const anyDone = s.log.exercises.some((e) => e.sets.some((x) => x.done))
       if (!anyDone && !confirm('Je hebt nog geen sets afgevinkt. Toch afronden?')) return
@@ -1178,6 +1231,7 @@ const workoutActions = {
     ui.restEnd = null
     ui.active = null
     render()
+    if (justFinished) cheer()
   },
   'wo-discard': () => {
     const s = state.sessions.find((x) => x.id === ui.active)
@@ -1705,6 +1759,7 @@ const actions = {
     save()
     render()
     if (s.done && tracksShin(s.typeId)) openShinSheet(s)
+    if (s.done) cheer()
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'delete-type': (el) => {
