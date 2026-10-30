@@ -2,8 +2,8 @@
 
 // ---------- Opslag ----------
 
-const KEY = 'sportagenda.v1'
-const APP_VERSION = '7' // ophogen bij elke release, samen met CACHE in sw.js
+const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
+const APP_VERSION = '8' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -201,7 +201,35 @@ topActions.addEventListener('click', (e) => {
   if (el && actions[el.dataset.action]) actions[el.dataset.action](el)
 })
 
+const isStandalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches
+
+function renderWelcome() {
+  const install = isStandalone()
+    ? ''
+    : `<div class="welcome-install">📲 Tip: tik in Safari op het deel-icoon en kies <strong>Zet op beginscherm</strong>. Dan werkt Tarapp als echte app, ook offline.</div>`
+  return `
+    <div class="welcome-screen">
+      <img class="welcome-logo" src="icons/icon-192.png" alt="" />
+      <h1>Tarapp</h1>
+      <p class="tagline">Plan je trainingen. Vink af wat je gedaan hebt.</p>
+      <ul class="welcome-list">
+        <li><span>📅</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
+        <li><span>🏋️</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
+        <li><span>📊</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
+        <li><span>🔒</span><div><strong>Alleen op jouw telefoon</strong>Geen account, niets naar een server. Maak af en toe een back-up via Meer.</div></li>
+      </ul>
+      ${install}
+      <button class="btn primary block" data-action="welcome-done">Aan de slag</button>
+    </div>`
+}
+
 function render() {
+  const welcome = !state.settings?.welcomed
+  document.body.classList.toggle('welcome', welcome)
+  if (welcome) {
+    view.innerHTML = renderWelcome()
+    return
+  }
   const active = ui.active && state.sessions.find((s) => s.id === ui.active)
   document.body.classList.toggle('in-workout', !!active)
   if (active) {
@@ -242,7 +270,7 @@ function renderWeek() {
   const doneMin = done.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
   const pct = list.length ? Math.round((done.length / list.length) * 100) : 0
   const isCurrent = toKey(ws) === toKey(startOfWeek(new Date()))
-  title.textContent = 'Sportagenda'
+  title.textContent = 'Tarapp'
 
   const tKey = todayKey()
   let days = ''
@@ -280,7 +308,7 @@ function renderWeek() {
 const MONTHS_FULL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
 
 function renderMonth() {
-  title.textContent = 'Sportagenda'
+  title.textContent = 'Tarapp'
   const m = ui.month
   const first = toKey(m)
   const last = toKey(new Date(m.getFullYear(), m.getMonth() + 1, 0))
@@ -517,6 +545,8 @@ function renderMore() {
       <h2>App bijwerken</h2>
       <p class="muted">Updates worden automatisch binnengehaald als je de app opent. Lukt dat niet, tik dan hieronder. Je gegevens blijven bewaard.</p>
       <button class="btn block" data-action="force-update">Nu bijwerken</button>
+      <p></p>
+      <button class="btn block" data-action="show-welcome">Welkomstscherm tonen</button>
       <p class="muted">Versie ${APP_VERSION}</p>
     </section>
     <section class="card">
@@ -526,7 +556,7 @@ function renderMore() {
         <li>Tik op het deel-icoon (vierkant met pijl omhoog).</li>
         <li>Kies <strong>Zet op beginscherm</strong> en tik op <strong>Voeg toe</strong>.</li>
       </ol>
-      <p class="muted">Daarna start de app vanaf je beginscherm, zonder browserbalk, en werkt ook offline.</p>
+      <p class="muted">Daarna start Tarapp vanaf je beginscherm, zonder browserbalk, en werkt ook offline.</p>
     </section>
     <section class="card">
       <button class="btn danger block" data-action="reset">Alles wissen</button>
@@ -1424,6 +1454,20 @@ const actions = {
     render()
   },
   export: exportData,
+  'welcome-done': () => {
+    state.settings ||= {}
+    state.settings.welcomed = true
+    save()
+    render()
+    window.scrollTo(0, 0)
+  },
+  'show-welcome': () => {
+    state.settings ||= {}
+    state.settings.welcomed = false
+    save()
+    render()
+    window.scrollTo(0, 0)
+  },
   'force-update': async () => {
     // Alleen de app-cache wissen (niet localStorage) en vers ophalen.
     try {
@@ -1481,18 +1525,18 @@ view.addEventListener('change', async (e) => {
     render()
     alert('Back-up teruggezet.')
   } catch {
-    alert('Dit bestand is geen geldige Sportagenda-back-up.')
+    alert('Dit bestand is geen geldige Tarapp-back-up.')
   }
 })
 
 async function exportData() {
   const json = JSON.stringify(state, null, 2)
-  const name = `sportagenda-backup-${todayKey()}.json`
+  const name = `tarapp-backup-${todayKey()}.json`
   const file = new File([json], name, { type: 'application/json' })
   // Op iPhone werkt het deelmenu beter dan een download ("Bewaar in Bestanden").
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Sportagenda back-up' })
+      await navigator.share({ files: [file], title: 'Tarapp back-up' })
       return
     } catch (err) {
       if (err.name === 'AbortError') return

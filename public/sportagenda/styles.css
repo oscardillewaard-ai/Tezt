@@ -1,29 +1,32 @@
 :root {
-  --bg: #f1f5f9;
+  --bg: #f5f5f4;
   --card: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --line: #e2e8f0;
-  --accent: #f97316;
-  --accent-soft: #ffedd5;
+  --text: #1c1917;
+  --muted: #78716c;
+  --line: #e7e5e4;
+  --accent: #facc15; /* Tarapp-geel: vlakken en knoppen */
+  --accent-ink: #1c1917; /* tekst op geel */
+  --accent-text: #a16207; /* gele tekst op lichte achtergrond (leesbaar) */
+  --accent-soft: #fef9c3;
   --done: #16a34a;
   --done-soft: #dcfce7;
   --danger: #dc2626;
-  --bar: #0f172a;
-  --bar-text: #f8fafc;
+  --bar: #1c1917;
+  --bar-text: #fafaf9;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #020617;
-    --card: #0f172a;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --line: #1e293b;
-    --accent-soft: #431407;
+    --bg: #0c0a09;
+    --card: #1c1917;
+    --text: #f5f5f4;
+    --muted: #a8a29e;
+    --line: #292524;
+    --accent-soft: #3f2d05;
+    --accent-text: #facc15;
     --done-soft: #052e16;
-    --bar: #0f172a;
+    --bar: #0c0a09;
   }
 }
 
@@ -114,7 +117,7 @@ main {
 }
 
 .tabbar button.active {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -133,7 +136,7 @@ main {
   border-radius: 50%;
   border: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 2rem;
   line-height: 1;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
@@ -192,7 +195,7 @@ main {
 .linkbtn {
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   padding: 4px 0;
 }
@@ -245,7 +248,7 @@ main {
 }
 
 .day.today .day-head .name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .day-add {
@@ -364,7 +367,7 @@ main {
 }
 
 .bar.current {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -429,7 +432,7 @@ table.types td:not(:first-child) {
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .btn.danger {
@@ -667,7 +670,7 @@ dialog h2 {
 .ss-label {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 2px;
 }
 
@@ -676,7 +679,7 @@ dialog h2 {
   background: none;
   padding: 0;
   font-size: 0.72rem;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   text-align: left;
 }
@@ -952,11 +955,11 @@ body.in-workout main {
 }
 
 .cal-day.today {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .cal-day.today .cal-num {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -1078,7 +1081,7 @@ body.in-workout main {
 
 .wday.today .wday-label strong,
 .wday.today .wday-label span {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .wday.today {
@@ -1222,7 +1225,7 @@ body.in-workout main {
   flex: none;
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 0.75rem;
 }
 
@@ -1252,4 +1255,159 @@ body.in-workout main {
   background: var(--bar-text);
   border-color: var(--bar-text);
   color: var(--bar);
+}
+
+/* Tarapp-huisstijl */
+.topbar h1 {
+  color: var(--accent);
+  letter-spacing: 0.01em;
+}
+
+.topbar .segmented button.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hold-bar {
+  color: var(--accent-ink);
+}
+
+.hold-bar.lead {
+  color: #fff;
+}
+
+.hold-bar .btn:not(.primary) {
+  color: inherit;
+  border-color: currentColor;
+}
+
+.hold-bar .btn.primary {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: var(--accent);
+}
+
+/* Welkomstscherm */
+body.welcome .topbar,
+body.welcome .tabbar,
+body.welcome .fab {
+  display: none;
+}
+
+body.welcome {
+  background: var(--bar);
+}
+
+body.welcome main {
+  padding: 0;
+  max-width: none;
+}
+
+.welcome-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  background: var(--bar);
+  color: var(--bar-text);
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.welcome-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  box-shadow: 0 10px 30px rgb(250 204 21 / 0.25);
+  animation: welcome-pop 0.5s ease-out both;
+}
+
+.welcome-screen h1 {
+  margin: 18px 0 4px;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.welcome-screen .tagline {
+  margin: 0 0 28px;
+  color: #d6d3d1;
+}
+
+.welcome-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  text-align: left;
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+.welcome-list li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: start;
+  animation: welcome-in 0.4s ease-out both;
+}
+
+.welcome-list li:nth-child(2) { animation-delay: 0.08s; }
+.welcome-list li:nth-child(3) { animation-delay: 0.16s; }
+.welcome-list li:nth-child(4) { animation-delay: 0.24s; }
+
+.welcome-list li > span {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgb(250 204 21 / 0.14);
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+}
+
+.welcome-list strong {
+  display: block;
+  color: var(--bar-text);
+}
+
+.welcome-list div {
+  color: #a8a29e;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.welcome-install {
+  width: 100%;
+  border: 1px dashed rgb(250 204 21 / 0.5);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: #d6d3d1;
+  margin-bottom: 16px;
+}
+
+.welcome-screen .btn.primary {
+  margin-top: auto;
+  padding: 16px;
+  font-size: 1.1rem;
+  border-radius: 14px;
+}
+
+@keyframes welcome-pop {
+  from { transform: scale(0.8); opacity: 0; }
+}
+
+@keyframes welcome-in {
+  from { transform: translateY(8px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-logo,
+  .welcome-list li {
+    animation: none;
+  }
 }

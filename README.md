@@ -77,16 +77,20 @@ npm run build
 De PWA-service-worker wordt alleen in de productiebuild gegenereerd; test hem
 lokaal met `npm run build && npx vite preview`.
 
-## Sportagenda (losse app)
+## Tarapp (losse app)
 
-In `public/sportagenda/` staat een tweede, losstaande PWA zonder build-stap
-(plain HTML/CSS/JS): een sportagenda om trainingen te plannen (gym, klimmen,
-boulderen, wandelen, … en eigen activiteiten), af te vinken, een
-weekoverzicht te bekijken en gymschema's met oefeningen bij te houden.
-Gegevens staan in `localStorage`; via "Meer" kun je een JSON-back-up
-exporteren/importeren.
+In `public/sportagenda/` staat Tarapp, een tweede, losstaande PWA zonder
+build-stap (plain HTML/CSS/JS): een sportagenda om trainingen te plannen
+(gym, klimmen, boulderen, wandelen, … en eigen activiteiten), af te vinken,
+week- en maandoverzichten te bekijken en gymtrainingen per set te loggen
+(supersets, rusttimer, aftelklok voor oefeningen op tijd). Bij hardlopen
+houdt hij een scheenpijnscore bij. Gegevens staan in `localStorage` (sleutel
+`sportagenda.v1`); via "Meer" kun je een JSON-back-up exporteren/importeren.
 
 Na deploy staat hij op `https://<user>.github.io/Tezt/sportagenda/`. Open dat
-in Safari op de iPhone → deel-icoon → "Zet op beginscherm".
+in Safari op de iPhone → deel-icoon → "Zet op beginscherm". De map en de
+opslagsleutel heten nog `sportagenda`, zodat bestaande installaties en
+gegevens blijven werken. Bij een release `APP_VERSION` in `app.js` en `CACHE`
+in `sw.js` ophogen; geïnstalleerde apps halen de update dan zelf op.
 
 Iconen opnieuw genereren: `node scripts/gen-sportagenda-icons.mjs`.

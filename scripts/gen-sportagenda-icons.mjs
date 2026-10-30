@@ -1,4 +1,4 @@
-// Renders the Sportagenda icon SVG to the PNG sizes iOS and the manifest need.
+// Renders the Tarapp icon SVG to the PNG sizes iOS and the manifest need.
 // Run: node scripts/gen-sportagenda-icons.mjs
 import sharp from 'sharp'
 import { fileURLToPath } from 'node:url'
