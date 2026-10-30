@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1'
-const APP_VERSION = '6' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '7' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -184,6 +184,7 @@ const ui = {
   persisted: null, // null = onbekend / niet ondersteund
   active: null, // id van de training die nu open staat in de workout-weergave
   restEnd: null, // tijdstip (ms) waarop de lopende rusttimer afloopt
+  hold: null, // lopende aftelklok voor een set op tijd: { ex, set, target, startAt, name }
   calMode: 'week', // 'week' | 'maand'
   month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 }
@@ -206,6 +207,7 @@ function render() {
   if (active) {
     topActions.innerHTML = ''
     view.innerHTML = renderWorkout(active)
+    renderHoldBar()
     return
   }
   ui.active = null
@@ -680,10 +682,10 @@ function unlockAudio() {
     // Geen geluid beschikbaar; de timer werkt ook zonder.
   }
 }
-function beep() {
-  navigator.vibrate?.([200, 100, 200])
+function beep(freqs = [880, 880, 1320]) {
+  navigator.vibrate?.(freqs.length > 1 ? [200, 100, 200] : 100)
   if (!audio) return
-  for (const [i, freq] of [880, 880, 1320].entries()) {
+  for (const [i, freq] of freqs.entries()) {
     const osc = audio.createOscillator()
     const gain = audio.createGain()
     const t0 = audio.currentTime + i * 0.25
@@ -694,6 +696,67 @@ function beep() {
     osc.start(t0)
     osc.stop(t0 + 0.2)
   }
+}
+
+// Aftelklok voor een set op tijd: eerst 3 s om in positie te komen.
+const HOLD_LEAD_IN = 3
+let wakeLock = null
+async function keepScreenOn(on) {
+  try {
+    if (on && !wakeLock) wakeLock = await navigator.wakeLock?.request('screen')
+    if (!on && wakeLock) {
+      await wakeLock.release()
+      wakeLock = null
+    }
+  } catch {
+    // Niet ondersteund: scherm kan op slot gaan, de klok loopt op tijdstempels door.
+  }
+}
+
+function holdState() {
+  const h = ui.hold
+  const sinceStart = (Date.now() - h.startAt) / 1000
+  if (sinceStart < 0) return { phase: 'lead', left: Math.ceil(-sinceStart) }
+  return { phase: 'hold', elapsed: Math.floor(sinceStart), left: Math.max(0, Math.ceil(h.target - sinceStart)) }
+}
+
+function renderHoldBar() {
+  const bar = document.getElementById('hold-bar')
+  if (!bar) return
+  bar.hidden = !ui.hold
+  if (!ui.hold) return
+  const st = holdState()
+  bar.classList.toggle('lead', st.phase === 'lead')
+  bar.querySelector('span').textContent = st.phase === 'lead' ? `${ui.hold.name} · klaar maken` : ui.hold.name
+  bar.querySelector('strong').textContent = st.phase === 'lead' ? String(st.left) : fmtClock(st.left * 1000)
+}
+
+// Lopende aftelklok bijhouden (aangeroepen vanuit de klok-interval).
+let lastLeadBeep = null
+function tickHold() {
+  if (!ui.hold) return
+  const st = holdState()
+  if (st.phase === 'lead' && st.left !== lastLeadBeep) {
+    lastLeadBeep = st.left
+    beep([660])
+  }
+  if (st.phase === 'hold' && lastLeadBeep !== 0) {
+    lastLeadBeep = 0
+    beep([1320])
+  }
+  if (st.phase === 'hold' && st.left <= 0) finishHold(ui.hold.target)
+  renderHoldBar()
+}
+
+function finishHold(seconds) {
+  const { ex, set } = ui.hold
+  ui.hold = null
+  lastLeadBeep = null
+  keepScreenOn(false)
+  const s = activeLog().exercises[ex].sets[set]
+  s.reps = String(seconds)
+  beep()
+  completeSet(ex, set)
 }
 
 function renderRestBar() {
@@ -837,7 +900,7 @@ function renderWorkout(s) {
           return `
           <div class="set-row ${st.done ? 'done' : ''}" data-ex="${i}" data-set="${j}">
             <button type="button" class="set-no" data-action="wo-set-note" aria-label="Opmerking bij set ${j + 1}">${j + 1}</button>
-            <span class="muted">${prev[j] ? esc(fmtSet(prev[j], ex.unit)) : '–'}</span>
+            <span class="muted prev-cell">${isSec && !st.done ? `<button type="button" class="mini play" data-action="wo-hold" aria-label="Aftellen voor set ${j + 1}">▶</button>` : ''}${prev[j] ? esc(fmtSet(prev[j], ex.unit)) : isSec && !st.done ? '' : '–'}</span>
             <input data-field="kg" inputmode="decimal" enterkeyhint="next" value="${esc(st.kg)}" placeholder="${esc(phKg)}" aria-label="Set ${j + 1} gewicht in kg" />
             <input data-field="reps" inputmode="numeric" enterkeyhint="done" value="${esc(st.reps)}" placeholder="${esc(phReps)}" aria-label="Set ${j + 1} ${isSec ? 'seconden' : 'herhalingen'}" />
             <button type="button" class="check" data-action="wo-set" aria-label="Set ${j + 1} afvinken">${st.done ? '✓' : ''}</button>
@@ -890,6 +953,12 @@ function renderWorkout(s) {
     <button class="btn block" data-action="wo-add-ex">+ Oefening toevoegen</button>
     <p></p>
     <button class="btn danger block" data-action="wo-discard">${log.endedAt ? 'Log wissen' : 'Training annuleren'}</button>
+    <div class="rest-bar hold-bar" id="hold-bar" hidden>
+      <span></span>
+      <strong></strong>
+      <button type="button" class="btn" data-action="wo-hold-cancel" aria-label="Aftellen annuleren">✕</button>
+      <button type="button" class="btn primary" data-action="wo-hold-stop">Stop</button>
+    </div>
     <div class="rest-bar" id="rest-bar" hidden>
       <span>Rust</span>
       <strong></strong>
@@ -909,7 +978,30 @@ setInterval(() => {
     beep()
   }
   renderRestBar()
+  tickHold()
 }, 250)
+
+// Set afvinken en daarna rust starten, of in een superset doorgaan naar de
+// volgende oefening (rust pas na de laatste oefening van de ronde).
+function completeSet(i, j) {
+  const exs = activeLog().exercises
+  exs[i].sets[j].done = true
+  const { end } = supersetBounds(exs, i)
+  const nextInSuperset = i < end ? i + 1 : null
+  if (nextInSuperset === null && restSeconds() > 0) {
+    unlockAudio()
+    ui.restEnd = Date.now() + restSeconds() * 1000
+  }
+  save()
+  render()
+  renderRestBar()
+  if (nextInSuperset !== null) {
+    const k = Math.min(j, exs[nextInSuperset].sets.length - 1)
+    view
+      .querySelector(`.set-row[data-ex="${nextInSuperset}"][data-set="${k}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+}
 
 function activeLog() {
   return state.sessions.find((s) => s.id === ui.active)?.log
@@ -918,6 +1010,7 @@ function activeLog() {
 const workoutActions = {
   'wo-back': () => {
     ui.restEnd = null
+    if (ui.hold) workoutActions['wo-hold-cancel']()
     ui.active = null
     render()
   },
@@ -930,25 +1023,42 @@ const workoutActions = {
         if (!input.value && input.placeholder) set[input.dataset.field] = input.placeholder
       }
     }
-    set.done = !set.done
-    const exs = activeLog().exercises
+    if (set.done) {
+      set.done = false
+      save()
+      render()
+      return
+    }
+    completeSet(Number(row.dataset.ex), Number(row.dataset.set))
+  },
+  'wo-hold': (el) => {
+    const row = el.closest('.set-row')
     const i = Number(row.dataset.ex)
-    const { end } = supersetBounds(exs, i)
-    // In een superset pas rusten na de laatste oefening van de ronde;
-    // anders meteen door naar dezelfde set van de volgende oefening.
-    const nextInSuperset = set.done && i < end ? i + 1 : null
-    if (set.done && nextInSuperset === null && restSeconds() > 0) {
-      unlockAudio()
-      ui.restEnd = Date.now() + restSeconds() * 1000
-    }
-    save()
-    render()
+    const ex = activeLog().exercises[i]
+    const input = row.querySelector('[data-field="reps"]')
+    const target = parseInt(input.value || input.placeholder) || 30
+    const kg = row.querySelector('[data-field="kg"]')
+    if (!kg.value && kg.placeholder) ex.sets[row.dataset.set].kg = kg.placeholder
+    unlockAudio()
+    keepScreenOn(true)
+    ui.restEnd = null
+    lastLeadBeep = null
+    ui.hold = { ex: i, set: Number(row.dataset.set), target, startAt: Date.now() + HOLD_LEAD_IN * 1000, name: ex.name }
     renderRestBar()
-    if (nextInSuperset !== null) {
-      const sets = exs[nextInSuperset].sets
-      const j = Math.min(Number(row.dataset.set), sets.length - 1)
-      view.querySelector(`.set-row[data-ex="${nextInSuperset}"][data-set="${j}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    }
+    renderHoldBar()
+  },
+  'wo-hold-stop': () => {
+    if (!ui.hold) return
+    const st = holdState()
+    // Tijdens het klaarmaken stoppen = annuleren; anders de volgehouden tijd bewaren.
+    if (st.phase === 'lead') return workoutActions['wo-hold-cancel']()
+    finishHold(st.elapsed)
+  },
+  'wo-hold-cancel': () => {
+    ui.hold = null
+    lastLeadBeep = null
+    keepScreenOn(false)
+    renderHoldBar()
   },
   'wo-move': (el) => {
     const exs = activeLog().exercises
@@ -1441,14 +1551,14 @@ requestPersistence()
 // dan wachten tot die klaar is. Gegevens staan in localStorage en blijven staan.
 let reloadPending = false
 function reloadWhenIdle() {
-  if (ui.restEnd || sheet.open) {
+  if (ui.restEnd || ui.hold || sheet.open) {
     reloadPending = true
     return
   }
   location.reload()
 }
 setInterval(() => {
-  if (reloadPending && !ui.restEnd && !sheet.open) location.reload()
+  if (reloadPending && !ui.restEnd && !ui.hold && !sheet.open) location.reload()
 }, 1000)
 
 async function checkForUpdate() {

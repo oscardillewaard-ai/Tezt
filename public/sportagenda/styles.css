@@ -1207,3 +1207,49 @@ body.in-workout main {
   flex: 1;
   min-width: 0;
 }
+
+/* Aftelklok voor sets op tijd */
+.prev-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mini.play {
+  flex: none;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.hold-bar {
+  z-index: 8;
+  background: var(--accent);
+}
+
+.hold-bar.lead {
+  background: #475569;
+}
+
+.hold-bar span {
+  font-weight: 600;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hold-bar strong {
+  font-size: 2rem;
+  text-align: center;
+}
+
+.hold-bar .btn.primary {
+  background: var(--bar-text);
+  border-color: var(--bar-text);
+  color: var(--bar);
+}
