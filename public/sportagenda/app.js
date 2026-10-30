@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1'
-const APP_VERSION = '4' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '5' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -135,6 +135,9 @@ const esc = (s) =>
 
 const typeById = (id) => state.types.find((t) => t.id === id) || { id, name: 'Onbekend', emoji: '❔' }
 const templateById = (id) => state.templates.find((t) => t.id === id)
+// Bij hardlopen houden we scheenpijn bij (0 = geen, 10 = ergst denkbaar).
+const tracksShin = (typeId) => typeId === 'hardlopen'
+const shinClass = (v) => (v <= 2 ? 'low' : v <= 5 ? 'mid' : 'high')
 
 function fmtMinutes(min) {
   if (!min) return '0 min'
@@ -303,6 +306,9 @@ function sessionRow(s) {
   const t = typeById(s.typeId)
   const tpl = s.templateId && templateById(s.templateId)
   const inProgress = s.log && !s.log.endedAt ? '▶ bezig' : ''
+  const shin = Number.isInteger(s.shin)
+    ? ` <span class="shin-badge ${shinClass(s.shin)}" title="Scheenpijn ${s.shin}/10">🦵${s.shin}</span>`
+    : ''
   const meta = [inProgress, s.time, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl ? tpl.name : '', s.note]
     .filter(Boolean)
     .map(esc)
@@ -311,7 +317,7 @@ function sessionRow(s) {
     <div class="session ${s.done ? 'done' : ''}">
       <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? '✓' : ''}</button>
       <button class="s-body" data-action="edit" data-id="${s.id}">
-        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}</span>
+        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}${shin}</span>
         ${meta ? `<span class="s-meta">${meta}</span>` : ''}
       </button>
     </div>`
@@ -386,9 +392,36 @@ function renderOverview() {
       <div class="muted">Grijs = gepland, groen = gedaan</div>
       <div class="bars">${bars}</div>
     </section>
+    ${renderShinTrend()}
     <section class="card">
       <h2>Per activiteit (${MONTHS[now.getMonth()]})</h2>
       ${rows ? `<table class="types">${rows}</table>` : '<div class="muted">Deze maand nog niets afgevinkt.</div>'}
+    </section>`
+}
+
+function renderShinTrend() {
+  const runs = state.sessions
+    .filter((s) => tracksShin(s.typeId) && Number.isInteger(s.shin))
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+    .slice(-10)
+  if (!runs.length) return ''
+  const bars = runs
+    .map((s) => {
+      const d = fromKey(s.date)
+      return `
+      <div class="bar">
+        <span>${s.shin}</span>
+        <div class="col shin ${shinClass(s.shin)}" style="height:${Math.max(4, s.shin * 10)}%"></div>
+        <span>${d.getDate()}/${d.getMonth() + 1}</span>
+      </div>`
+    })
+    .join('')
+  const avg = runs.reduce((n, s) => n + s.shin, 0) / runs.length
+  return `
+    <section class="card">
+      <h2>Scheenpijn bij hardlopen</h2>
+      <div class="muted">Laatste ${runs.length} run${runs.length === 1 ? '' : 's'} · gemiddeld ${avg.toFixed(1).replace('.', ',')}/10</div>
+      <div class="bars" style="grid-template-columns: repeat(${runs.length}, 1fr)">${bars}</div>
     </section>`
 }
 
@@ -548,6 +581,12 @@ function openSessionSheet(session, date) {
             </label>`
           : ''
       }
+      <label class="field" id="shin-field" ${tracksShin(s.typeId) ? '' : 'hidden'}>Scheenpijn (0–10)
+        <select name="shin">
+          <option value="">Niet ingevuld</option>
+          ${Array.from({ length: 11 }, (_, i) => `<option value="${i}" ${s.shin === i ? 'selected' : ''}>${i}${i === 0 ? ' – geen pijn' : i === 10 ? ' – ergst denkbaar' : ''}</option>`).join('')}
+        </select>
+      </label>
       <label class="field">Notitie<textarea name="note" rows="2" placeholder="Bijv. route, hal, met wie">${esc(s.note)}</textarea></label>
       <div class="actions">
         ${isNew ? '' : '<button type="button" class="btn danger" id="del-session">Verwijderen</button>'}
@@ -563,6 +602,7 @@ function openSessionSheet(session, date) {
         duration: fd.get('duration') ? Number(fd.get('duration')) : '',
         templateId: fd.get('templateId') || '',
         note: (fd.get('note') || '').trim(),
+        shin: tracksShin(fd.get('typeId')) && fd.get('shin') !== '' && fd.get('shin') !== null ? Number(fd.get('shin')) : undefined,
       }
       if (isNew) {
         const count = Number(fd.get('repeat')) || 1
@@ -581,6 +621,9 @@ function openSessionSheet(session, date) {
   )
 
   sheet.querySelector('#cancel').onclick = closeSheet
+  sheet.querySelector('.type-grid').addEventListener('change', (e) => {
+    sheet.querySelector('#shin-field').hidden = !tracksShin(e.target.value)
+  })
   const del = sheet.querySelector('#del-session')
   if (del) del.onclick = () => deleteSession(session)
 }
@@ -934,6 +977,34 @@ function openWorkoutSheet(s) {
   sheet.querySelector('#cancel').onclick = closeSheet
 }
 
+function openShinSheet(s) {
+  const buttons = Array.from(
+    { length: 11 },
+    (_, i) => `<button type="button" class="shin-btn ${shinClass(i)} ${s.shin === i ? 'on' : ''}" data-shin="${i}">${i}</button>`,
+  ).join('')
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>🏃 Scheenpijn na deze run?</h2>
+      <p class="muted">0 = geen pijn · 10 = ergst denkbare pijn</p>
+      <div class="shin-grid">${buttons}</div>
+      <div class="actions">
+        <button type="button" class="btn" id="cancel">Overslaan</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  sheet.querySelector('#cancel').onclick = closeSheet
+  sheet.querySelectorAll('[data-shin]').forEach((btn) => {
+    btn.onclick = () => {
+      s.shin = Number(btn.dataset.shin)
+      save()
+      closeSheet()
+      render()
+    }
+  })
+}
+
 function deleteSession(session) {
   let ids = [session.id]
   if (session.seriesId) {
@@ -1066,6 +1137,7 @@ const actions = {
     s.done = !s.done
     save()
     render()
+    if (s.done && tracksShin(s.typeId)) openShinSheet(s)
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'delete-type': (el) => {

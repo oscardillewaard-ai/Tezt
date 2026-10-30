@@ -1042,3 +1042,70 @@ body.in-workout main {
   flex: 1;
   min-width: 0;
 }
+
+/* Scheenpijn */
+.shin-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.shin-btn {
+  height: 48px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.shin-btn.low,
+.bar .col.shin.low {
+  background: #16a34a;
+}
+
+.shin-btn.mid,
+.bar .col.shin.mid {
+  background: #f59e0b;
+}
+
+.shin-btn.high,
+.bar .col.shin.high {
+  background: #dc2626;
+}
+
+.shin-btn.on {
+  border-color: var(--text);
+}
+
+.bar .col.shin {
+  border-radius: 6px 6px 0 0;
+}
+
+.field[hidden] {
+  display: none;
+}
+
+.shin-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  vertical-align: 1px;
+}
+
+.shin-badge.low {
+  background: #16a34a;
+}
+
+.shin-badge.mid {
+  background: #f59e0b;
+}
+
+.shin-badge.high {
+  background: #dc2626;
+}
