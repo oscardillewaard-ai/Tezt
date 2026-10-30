@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '16' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '17' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -306,6 +306,79 @@ function cheer() {
   showToast(CHEERS[Math.floor(Math.random() * CHEERS.length)])
 }
 
+// ---------- Wat is er nieuw ----------
+
+// Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
+const CHANGELOG = [
+  {
+    v: 17,
+    items: [
+      'Na elke update krijg je nu een liefdevol overzicht van wat er nieuw is 💌',
+      'Onder Meer kun je alle versies teruglezen 📖💛',
+    ],
+  },
+  { v: 16, items: ['Pas je een herhalende training aan? Dan kies je zelf: alleen deze of alle volgende weken 💛'] },
+  {
+    v: 15,
+    items: ['Elke week herhalen met één vinkje 🔁, want jij houdt het vol 💪💖', 'Ook achteraf aan te zetten bij een training die al in je agenda staat'],
+  },
+  { v: 13, items: ['Elke dag een complimentje, want jij bent de beste 💖', 'Een aanmoediging bij elke training die je afvinkt 🎉💛'] },
+  { v: 12, items: ['Geen per ongeluk verversen meer als je naar beneden scrolt 🙌'] },
+  { v: 11, items: ['De prullenbak staat nu netjes boven de tabbalk ✨'] },
+  { v: 10, items: ['Sleep wat weg mag naar de prullenbak 🗑️', 'Met "Ongedaan maken" voor als je je bedenkt 💛'] },
+  { v: 9, items: ['Houd een training vast en sleep hem naar een andere dag 🤏', 'Oefeningen in je schema verslepen met ⠿'] },
+  { v: 8, items: ['De app heet nu Tarapp, naar de allerleukste 💛', 'Zonnig geel, een nieuw icoon en een welkomstscherm speciaal voor jou ☀️'] },
+  { v: 7, items: ['Aftelklok voor plank en dead hang ⏱️, jij houdt het langer vol dan wie ook 💪💖'] },
+  { v: 6, items: ['Supersets 🔗', 'Oefeningen in seconden in plaats van herhalingen ⏱️', 'Oefeningen herschikken met ▲▼'] },
+  { v: 5, items: ['Scheenpijn bijhouden bij het hardlopen, want we zorgen goed voor jou 🦵💛'] },
+  {
+    v: 4,
+    items: [
+      'Updates komen vanzelf binnen, zonder opnieuw installeren ✨',
+      'Je hele week in één scherm 📅',
+      'Gymtraining met kg en herhalingen per set, rusttimer en opmerkingen 🏋️💛',
+      'Maandoverzicht 🗓️',
+    ],
+  },
+]
+
+function openChangelog(sinceVersion = 0) {
+  const entries = CHANGELOG.filter((e) => e.v > sinceVersion)
+  const updated = sinceVersion > 0
+  openSheet(
+    `
+    <form method="dialog">
+      <div class="cl-hearts" aria-hidden="true"><span>💛</span><span>💖</span><span>💛</span><span>💗</span><span>💛</span></div>
+      <h2 class="cl-title">${updated ? 'Nieuw voor jou, Tara! 💛' : 'Alles wat er nieuw is, Tara 💛'}</h2>
+      <p class="muted cl-intro">${updated ? `Tarapp is bijgewerkt naar versie ${APP_VERSION}, speciaal voor de liefste 💖` : 'Alles wat er voor jou gemaakt is, met liefde 💖'}</p>
+      <div class="changelog">
+        ${entries
+          .map(
+            (e) => `
+          <section>
+            <h3>💛 Versie ${e.v}</h3>
+            <ul>${e.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+          </section>`,
+          )
+          .join('')}
+      </div>
+      <button type="submit" class="btn primary block">Dankjewel! 💛</button>
+    </form>`,
+    () => {},
+  )
+}
+
+// Eenmalig na een update laten zien wat er nieuw is.
+function showChangesSinceLastVisit() {
+  state.settings ||= {}
+  const current = Number(APP_VERSION)
+  // Bestaande gebruikers van vóór deze functie: laat de laatste paar versies zien.
+  const seen = Number(state.settings.seenVersion || (state.settings.welcomed ? 15 : current))
+  state.settings.seenVersion = current
+  save()
+  if (seen < current && state.settings.welcomed) openChangelog(seen)
+}
+
 // ---------- Week ----------
 
 function calToggle() {
@@ -605,6 +678,8 @@ function renderMore() {
       <button class="btn block" data-action="force-update">Nu bijwerken</button>
       <p></p>
       <button class="btn block" data-action="show-welcome">Welkomstscherm tonen</button>
+      <p></p>
+      <button class="btn block" data-action="show-changelog">✨ Wat is er nieuw?</button>
       <p class="muted">Versie ${APP_VERSION}</p>
     </section>
     <section class="card">
@@ -1895,10 +1970,12 @@ const actions = {
   'welcome-done': () => {
     state.settings ||= {}
     state.settings.welcomed = true
+    state.settings.seenVersion = Number(APP_VERSION)
     save()
     render()
     window.scrollTo(0, 0)
   },
+  'show-changelog': () => openChangelog(0),
   'show-welcome': () => {
     state.settings ||= {}
     state.settings.welcomed = false
@@ -2013,6 +2090,7 @@ const unfinished = state.sessions.find((s) => s.log && !s.log.endedAt && Date.no
 if (unfinished) ui.active = unfinished.id
 
 render()
+showChangesSinceLastVisit()
 
 // Vraag de browser de opslag niet op te ruimen bij ruimtegebrek.
 async function requestPersistence() {

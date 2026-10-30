@@ -91,6 +91,7 @@ Na deploy staat hij op `https://<user>.github.io/Tezt/sportagenda/`. Open dat
 in Safari op de iPhone → deel-icoon → "Zet op beginscherm". De map en de
 opslagsleutel heten nog `sportagenda`, zodat bestaande installaties en
 gegevens blijven werken. Bij een release `APP_VERSION` in `app.js` en `CACHE`
-in `sw.js` ophogen; geïnstalleerde apps halen de update dan zelf op.
+in `sw.js` ophogen en bovenaan `CHANGELOG` in `app.js` een regel toevoegen;
+geïnstalleerde apps halen de update dan zelf op en tonen eenmalig wat er nieuw is.
 
 Iconen opnieuw genereren: `node scripts/gen-sportagenda-icons.mjs`.
