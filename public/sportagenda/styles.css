@@ -610,3 +610,279 @@ ol.steps {
   margin: 0;
   line-height: 1.6;
 }
+
+/* Actieve training */
+body.in-workout .tabbar,
+body.in-workout .fab {
+  display: none;
+}
+
+body.in-workout main {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
+}
+
+.wo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.wo-head .label {
+  flex: 1;
+  text-align: center;
+}
+
+.wo-head .label strong {
+  display: block;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.wo-ex-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wo-ex-head h3 {
+  margin: 0;
+}
+
+.wo-ex .del {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  width: 36px;
+  height: 36px;
+}
+
+.set-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 72px 64px 36px;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+  border-radius: 8px;
+}
+
+.set-row.set-head {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.set-row .set-no {
+  border: 0;
+  background: var(--bg);
+  border-radius: 8px;
+  height: 34px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.set-note {
+  font-size: 0.8rem;
+  padding: 0 0 4px 34px;
+}
+
+.set-note.prev {
+  color: var(--muted);
+}
+
+.ex-note {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 16px;
+}
+
+.hint {
+  margin: 0 0 8px;
+}
+
+.rest-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rest-setting span {
+  flex: 1;
+}
+
+.rest-setting strong {
+  min-width: 44px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px);
+  background: var(--bar);
+  color: var(--bar-text);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.2);
+}
+
+.rest-bar[hidden] {
+  display: none;
+}
+
+.rest-bar strong {
+  flex: 1;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rest-bar .btn {
+  padding: 8px 10px;
+}
+
+.rest-bar .btn:not(.primary) {
+  background: transparent;
+  color: var(--bar-text);
+  border-color: rgb(255 255 255 / 0.3);
+}
+
+.set-row input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.set-row .check {
+  width: 34px;
+  height: 34px;
+}
+
+.set-row.done {
+  background: var(--done-soft);
+}
+
+.set-row.done input {
+  background: transparent;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.set-row.done .check {
+  background: var(--done);
+  border-color: var(--done);
+}
+
+.wo-set-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.muted-link {
+  color: var(--muted);
+}
+
+/* Week/maand-schakelaar en maandkalender */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.segmented button {
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 7px 0;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.segmented button.on {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.cal-day {
+  min-height: 64px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cal-day.out {
+  opacity: 0.4;
+}
+
+.cal-day.today {
+  border-color: var(--accent);
+}
+
+.cal-day.today .cal-num {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.cal-num {
+  font-size: 0.85rem;
+}
+
+.cal-marks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.cal-mark {
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+}
+
+.cal-mark.done {
+  border-color: var(--done);
+  background: var(--done-soft);
+}

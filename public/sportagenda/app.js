@@ -156,6 +156,10 @@ const ui = {
   tab: 'week',
   weekStart: startOfWeek(new Date()),
   persisted: null, // null = onbekend / niet ondersteund
+  active: null, // id van de training die nu open staat in de workout-weergave
+  restEnd: null, // tijdstip (ms) waarop de lopende rusttimer afloopt
+  calMode: 'week', // 'week' | 'maand'
+  month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 }
 
 const view = document.getElementById('view')
@@ -164,6 +168,13 @@ const fab = document.getElementById('fab')
 const sheet = document.getElementById('sheet')
 
 function render() {
+  const active = ui.active && state.sessions.find((s) => s.id === ui.active)
+  document.body.classList.toggle('in-workout', !!active)
+  if (active) {
+    view.innerHTML = renderWorkout(active)
+    return
+  }
+  ui.active = null
   document.querySelectorAll('.tabbar button').forEach((b) => {
     b.classList.toggle('active', b.dataset.tab === ui.tab)
   })
@@ -174,7 +185,16 @@ function render() {
 
 // ---------- Week ----------
 
+function calToggle() {
+  return `
+    <div class="segmented">
+      <button class="${ui.calMode === 'week' ? 'on' : ''}" data-action="cal-mode" data-mode="week">Week</button>
+      <button class="${ui.calMode === 'maand' ? 'on' : ''}" data-action="cal-mode" data-mode="maand">Maand</button>
+    </div>`
+}
+
 function renderWeek() {
+  if (ui.calMode === 'maand') return renderMonth()
   const ws = ui.weekStart
   const we = addDays(ws, 6)
   const list = sessionsBetween(toKey(ws), toKey(we))
@@ -194,6 +214,7 @@ function renderWeek() {
     .join('')
 
   let html = `
+    ${calToggle()}
     <div class="weeknav">
       <button class="iconbtn" data-action="prev-week" aria-label="Vorige week">‹</button>
       <div class="label">
@@ -227,10 +248,61 @@ function renderWeek() {
   return html
 }
 
+const MONTHS_FULL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+
+function renderMonth() {
+  title.textContent = 'Sportagenda'
+  const m = ui.month
+  const first = toKey(m)
+  const last = toKey(new Date(m.getFullYear(), m.getMonth() + 1, 0))
+  const list = sessionsBetween(first, last)
+  const done = list.filter((s) => s.done)
+  const doneMin = done.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
+  const now = new Date()
+  const isCurrent = m.getFullYear() === now.getFullYear() && m.getMonth() === now.getMonth()
+  const tKey = todayKey()
+
+  let cells = DAYS.map((d) => `<div class="cal-dow">${d.slice(0, 2)}</div>`).join('')
+  // Altijd vanaf de maandag van de week waarin de 1e valt, tot en met de zondag van de laatste week.
+  const start = startOfWeek(m)
+  const end = addDays(startOfWeek(fromKey(last)), 6)
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const k = toKey(d)
+    const inMonth = d.getMonth() === m.getMonth()
+    const day = sortSessions(state.sessions.filter((s) => s.date === k))
+    const marks = day
+      .map((s) => `<span class="cal-mark ${s.done ? 'done' : ''}">${esc(typeById(s.typeId).emoji)}</span>`)
+      .join('')
+    cells += `
+      <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
+        <span class="cal-num">${d.getDate()}</span>
+        <span class="cal-marks">${marks}</span>
+      </button>`
+  }
+
+  return `
+    ${calToggle()}
+    <div class="weeknav">
+      <button class="iconbtn" data-action="prev-month" aria-label="Vorige maand">‹</button>
+      <div class="label">
+        <strong>${MONTHS_FULL[m.getMonth()]} ${m.getFullYear()}</strong>
+        ${isCurrent ? '' : '<button class="linkbtn" data-action="this-month">Naar deze maand</button>'}
+      </div>
+      <button class="iconbtn" data-action="next-month" aria-label="Volgende maand">›</button>
+    </div>
+    <section class="card">
+      <div><strong>${done.length}</strong> van <strong>${list.length}</strong> trainingen gedaan · ${fmtMinutes(doneMin)}</div>
+      <div class="progress"><div style="width:${list.length ? Math.round((done.length / list.length) * 100) : 0}%"></div></div>
+    </section>
+    <div class="cal">${cells}</div>
+    <p class="muted">Groen omrand = gedaan. Tik op een dag om die week te openen.</p>`
+}
+
 function sessionRow(s) {
   const t = typeById(s.typeId)
   const tpl = s.templateId && templateById(s.templateId)
-  const meta = [s.time, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl ? tpl.name : '', s.note]
+  const inProgress = s.log && !s.log.endedAt ? '▶ bezig' : ''
+  const meta = [inProgress, s.time, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl ? tpl.name : '', s.note]
     .filter(Boolean)
     .map(esc)
     .join(' · ')
@@ -442,30 +514,10 @@ function openSessionSheet(session, date) {
   const tplOptions = state.templates
     .map((t) => `<option value="${t.id}" ${t.id === s.templateId ? 'selected' : ''}>${esc(t.name)}</option>`)
     .join('')
-  const tpl = !isNew && s.templateId && templateById(s.templateId)
-  const exDone = s.exDone || {}
-  const checklist = tpl
-    ? `
-      <div class="field">Oefeningen afvinken</div>
-      <div id="ex-list">
-        ${tpl.exercises
-          .map(
-            (e) => `
-          <div class="ex ${exDone[e.id] ? 'done' : ''}">
-            <button type="button" class="check" data-ex="${e.id}">${exDone[e.id] ? '✓' : ''}</button>
-            <span class="grow">${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${esc(e.reps)}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}</span></span>
-          </div>`,
-          )
-          .join('')}
-      </div>
-      <p></p>`
-    : ''
-
   openSheet(
     `
     <form method="dialog">
-      <h2>${isNew ? 'Training plannen' : 'Training'}</h2>
-      ${checklist}
+      <h2>${isNew ? 'Training plannen' : 'Training bewerken'}</h2>
       <div class="type-grid">${typeOptions}</div>
       <div class="row">
         <label class="field">Datum<input type="date" name="date" value="${s.date}" required /></label>
@@ -510,11 +562,10 @@ function openSessionSheet(session, date) {
         const seriesId = count > 1 ? uid() : undefined
         const base = fromKey(data.date)
         for (let i = 0; i < count; i++) {
-          state.sessions.push({ id: uid(), ...data, date: toKey(addDays(base, 7 * i)), done: false, exDone: {}, seriesId })
+          state.sessions.push({ id: uid(), ...data, date: toKey(addDays(base, 7 * i)), done: false, seriesId })
         }
         ui.weekStart = startOfWeek(base)
       } else {
-        if (data.templateId !== session.templateId) session.exDone = {}
         Object.assign(session, data)
       }
       save()
@@ -525,20 +576,355 @@ function openSessionSheet(session, date) {
   sheet.querySelector('#cancel').onclick = closeSheet
   const del = sheet.querySelector('#del-session')
   if (del) del.onclick = () => deleteSession(session)
-  sheet.querySelectorAll('[data-ex]').forEach((btn) => {
-    btn.onclick = () => {
-      session.exDone ||= {}
-      const id = btn.dataset.ex
-      session.exDone[id] = !session.exDone[id]
-      btn.textContent = session.exDone[id] ? '✓' : ''
-      btn.closest('.ex').classList.toggle('done', session.exDone[id])
-      // Alle oefeningen gedaan = training gedaan.
-      const all = tpl.exercises.every((e) => session.exDone[e.id])
-      if (all) session.done = true
-      save()
-      render()
+}
+
+// ---------- Actieve training ----------
+
+const isWorkoutSession = (s) => !!(s.templateId || s.typeId === 'gym' || s.log)
+const parseNum = (v) => parseFloat(String(v).replace(',', '.'))
+
+// De oefening met dezelfde naam uit de meest recente afgeronde training.
+function previousExercise(name, sessionId) {
+  const n = name.trim().toLowerCase()
+  const past = state.sessions
+    .filter((s) => s.id !== sessionId && s.log?.endedAt)
+    .sort((a, b) => b.log.endedAt - a.log.endedAt)
+  for (const s of past) {
+    const ex = s.log.exercises.find((e) => e.name.trim().toLowerCase() === n)
+    if (ex && ex.sets.some((x) => x.done)) return { ...ex, sets: ex.sets.filter((x) => x.done) }
+  }
+  return null
+}
+
+const restSeconds = () => state.settings?.rest ?? 90
+
+// iOS staat geluid pas toe na een tik; maak de AudioContext aan bij het afvinken.
+let audio
+function unlockAudio() {
+  try {
+    audio ||= new (window.AudioContext || window.webkitAudioContext)()
+    if (audio.state === 'suspended') audio.resume()
+  } catch {
+    // Geen geluid beschikbaar; de timer werkt ook zonder.
+  }
+}
+function beep() {
+  navigator.vibrate?.([200, 100, 200])
+  if (!audio) return
+  for (const [i, freq] of [880, 880, 1320].entries()) {
+    const osc = audio.createOscillator()
+    const gain = audio.createGain()
+    const t0 = audio.currentTime + i * 0.25
+    osc.frequency.value = freq
+    gain.gain.setValueAtTime(0.3, t0)
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.2)
+    osc.connect(gain).connect(audio.destination)
+    osc.start(t0)
+    osc.stop(t0 + 0.2)
+  }
+}
+
+function renderRestBar() {
+  const bar = document.getElementById('rest-bar')
+  if (!bar) return
+  const left = ui.restEnd ? Math.ceil((ui.restEnd - Date.now()) / 1000) : 0
+  bar.hidden = left <= 0
+  if (left > 0) bar.querySelector('strong').textContent = fmtClock(left * 1000)
+}
+
+function newLogExercise(name, target) {
+  const count = Math.max(1, Math.min(20, parseInt(target?.sets) || 3))
+  return {
+    id: uid(),
+    name,
+    note: '',
+    target: target || null,
+    sets: Array.from({ length: count }, () => ({ kg: '', reps: '', note: '', done: false })),
+  }
+}
+
+function startWorkout(session) {
+  if (!session.log) {
+    const tpl = session.templateId && templateById(session.templateId)
+    session.log = {
+      startedAt: Date.now(),
+      endedAt: null,
+      exercises: tpl
+        ? tpl.exercises.map((e) => newLogExercise(e.name, { sets: e.sets, reps: e.reps, weight: e.weight }))
+        : [],
     }
-  })
+  } else if (session.log.endedAt) {
+    // Afgeronde training bekijken/aanpassen: de klok blijft staan.
+  }
+  save()
+  closeSheet()
+  ui.active = session.id
+  render()
+  window.scrollTo(0, 0)
+}
+
+function fmtClock(ms) {
+  const sec = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  return h ? `${h}:${pad(m)}:${pad(sec % 60)}` : `${m}:${pad(sec % 60)}`
+}
+
+function workoutElapsed(log) {
+  return (log.endedAt || Date.now()) - log.startedAt
+}
+
+function renderWorkout(s) {
+  const log = s.log
+  const tpl = s.templateId && templateById(s.templateId)
+  const t = typeById(s.typeId)
+  title.textContent = tpl ? tpl.name : `${t.emoji} ${t.name}`
+  const doneSets = log.exercises.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0)
+  const allSets = log.exercises.reduce((n, e) => n + e.sets.length, 0)
+
+  const exercises = log.exercises
+    .map((ex, i) => {
+      const prevEx = previousExercise(ex.name, s.id)
+      const prev = prevEx ? prevEx.sets : []
+      const tg = ex.target
+      const targetReps = tg && /^\d+$/.test(String(tg.reps).trim()) ? String(tg.reps).trim() : ''
+      const target = tg ? `Doel: ${esc(tg.sets)} × ${esc(tg.reps)}${tg.weight ? ' · ' + esc(tg.weight) + ' kg' : ''}` : ''
+      const rows = ex.sets
+        .map((st, j) => {
+          const p = prev[j] || prev[prev.length - 1]
+          const phKg = p?.kg || tg?.weight || ''
+          const phReps = p?.reps || targetReps
+          return `
+          <div class="set-row ${st.done ? 'done' : ''}" data-ex="${i}" data-set="${j}">
+            <button type="button" class="set-no" data-action="wo-set-note" aria-label="Opmerking bij set ${j + 1}">${j + 1}</button>
+            <span class="muted">${prev[j] ? `${esc(prev[j].kg || '–')} × ${esc(prev[j].reps || '–')}` : '–'}</span>
+            <input data-field="kg" inputmode="decimal" enterkeyhint="next" value="${esc(st.kg)}" placeholder="${esc(phKg)}" aria-label="Set ${j + 1} gewicht in kg" />
+            <input data-field="reps" inputmode="numeric" enterkeyhint="done" value="${esc(st.reps)}" placeholder="${esc(phReps)}" aria-label="Set ${j + 1} herhalingen" />
+            <button type="button" class="check" data-action="wo-set" aria-label="Set ${j + 1} afvinken">${st.done ? '✓' : ''}</button>
+          </div>
+          ${st.note ? `<div class="set-note">💬 ${esc(st.note)}</div>` : ''}
+          ${prev[j]?.note ? `<div class="set-note prev">Vorige keer: ${esc(prev[j].note)}</div>` : ''}`
+        })
+        .join('')
+      return `
+        <section class="card wo-ex">
+          <div class="wo-ex-head">
+            <h3>${esc(ex.name)}</h3>
+            <button type="button" class="del" data-action="wo-del-ex" data-ex="${i}" aria-label="${esc(ex.name)} verwijderen">✕</button>
+          </div>
+          ${target ? `<div class="muted">${target}</div>` : ''}
+          ${prevEx?.note ? `<div class="muted">Vorige keer: ${esc(prevEx.note)}</div>` : ''}
+          <input class="ex-note" data-field="note" data-ex="${i}" value="${esc(ex.note)}" placeholder="Opmerking (bijv. rode band, smalle grip)" aria-label="Opmerking bij ${esc(ex.name)}" />
+          <div class="set-row set-head"><span>Set</span><span>Vorige</span><span>kg</span><span>Herh.</span><span></span></div>
+          ${rows}
+          <div class="wo-set-actions">
+            <button type="button" class="linkbtn" data-action="wo-add-set" data-ex="${i}">+ Set</button>
+            ${ex.sets.length > 1 ? `<button type="button" class="linkbtn muted-link" data-action="wo-del-set" data-ex="${i}">− Set</button>` : ''}
+          </div>
+        </section>`
+    })
+    .join('')
+
+  return `
+    <div class="wo-head">
+      <button class="iconbtn" data-action="wo-back" aria-label="Terug naar agenda">‹</button>
+      <div class="label">
+        <strong id="wo-timer">${fmtClock(workoutElapsed(log))}</strong>
+        <span class="muted">${doneSets}/${allSets} sets${log.endedAt ? ' · afgerond' : ''}</span>
+      </div>
+      <button class="btn primary" data-action="wo-finish">${log.endedAt ? 'Opslaan' : 'Afronden'}</button>
+    </div>
+    <div class="rest-setting">
+      <span>⏱ Rust na elke set</span>
+      <button type="button" class="iconbtn" data-action="wo-rest" data-delta="-15" aria-label="15 seconden korter">−</button>
+      <strong>${fmtClock(restSeconds() * 1000)}</strong>
+      <button type="button" class="iconbtn" data-action="wo-rest" data-delta="15" aria-label="15 seconden langer">+</button>
+    </div>
+    ${exercises ? '<p class="muted hint">Tik op een setnummer voor een opmerking bij die set.</p>' + exercises : '<p class="muted">Nog geen oefeningen. Voeg er hieronder een toe.</p>'}
+    <button class="btn block" data-action="wo-add-ex">+ Oefening toevoegen</button>
+    <p></p>
+    <button class="btn danger block" data-action="wo-discard">${log.endedAt ? 'Log wissen' : 'Training annuleren'}</button>
+    <div class="rest-bar" id="rest-bar" hidden>
+      <span>Rust</span>
+      <strong></strong>
+      <button type="button" class="btn" data-action="wo-rest-adjust" data-delta="-15">−15</button>
+      <button type="button" class="btn" data-action="wo-rest-adjust" data-delta="15">+15</button>
+      <button type="button" class="btn primary" data-action="wo-rest-skip">Klaar</button>
+    </div>`
+}
+
+// Lopende klok in de workout-weergave.
+setInterval(() => {
+  const el = document.getElementById('wo-timer')
+  const s = ui.active && state.sessions.find((x) => x.id === ui.active)
+  if (el && s?.log && !s.log.endedAt) el.textContent = fmtClock(workoutElapsed(s.log))
+  if (ui.restEnd && Date.now() >= ui.restEnd) {
+    ui.restEnd = null
+    beep()
+  }
+  renderRestBar()
+}, 250)
+
+function activeLog() {
+  return state.sessions.find((s) => s.id === ui.active)?.log
+}
+
+const workoutActions = {
+  'wo-back': () => {
+    ui.restEnd = null
+    ui.active = null
+    render()
+  },
+  'wo-set': (el) => {
+    const row = el.closest('.set-row')
+    const set = activeLog().exercises[row.dataset.ex].sets[row.dataset.set]
+    if (!set.done) {
+      // Leeg veld = de voorgestelde waarde (vorige keer / doel) overnemen.
+      for (const input of row.querySelectorAll('input')) {
+        if (!input.value && input.placeholder) set[input.dataset.field] = input.placeholder
+      }
+    }
+    set.done = !set.done
+    if (set.done && restSeconds() > 0) {
+      unlockAudio()
+      ui.restEnd = Date.now() + restSeconds() * 1000
+    }
+    save()
+    render()
+    renderRestBar()
+  },
+  'wo-set-note': (el) => {
+    const row = el.closest('.set-row')
+    const set = activeLog().exercises[row.dataset.ex].sets[row.dataset.set]
+    const note = prompt(`Opmerking bij set ${Number(row.dataset.set) + 1}`, set.note || '')
+    if (note === null) return
+    set.note = note.trim()
+    save()
+    render()
+    renderRestBar()
+  },
+  'wo-rest': (el) => {
+    state.settings ||= {}
+    state.settings.rest = Math.max(0, Math.min(600, restSeconds() + Number(el.dataset.delta)))
+    save()
+    render()
+    renderRestBar()
+  },
+  'wo-rest-adjust': (el) => {
+    if (!ui.restEnd) return
+    ui.restEnd += Number(el.dataset.delta) * 1000
+    if (ui.restEnd <= Date.now()) ui.restEnd = null
+    renderRestBar()
+  },
+  'wo-rest-skip': () => {
+    ui.restEnd = null
+    renderRestBar()
+  },
+  'wo-add-set': (el) => {
+    const ex = activeLog().exercises[el.dataset.ex]
+    const last = ex.sets[ex.sets.length - 1]
+    ex.sets.push({ kg: last?.kg || '', reps: last?.reps || '', note: '', done: false })
+    save()
+    render()
+  },
+  'wo-del-set': (el) => {
+    activeLog().exercises[el.dataset.ex].sets.pop()
+    save()
+    render()
+  },
+  'wo-add-ex': () => {
+    const name = prompt('Naam van de oefening')?.trim()
+    if (!name) return
+    activeLog().exercises.push(newLogExercise(name, null))
+    save()
+    render()
+    window.scrollTo(0, document.body.scrollHeight)
+  },
+  'wo-del-ex': (el) => {
+    const log = activeLog()
+    if (!confirm(`"${log.exercises[el.dataset.ex].name}" uit deze training halen?`)) return
+    log.exercises.splice(el.dataset.ex, 1)
+    save()
+    render()
+  },
+  'wo-finish': () => {
+    const s = state.sessions.find((x) => x.id === ui.active)
+    if (!s.log.endedAt) {
+      const anyDone = s.log.exercises.some((e) => e.sets.some((x) => x.done))
+      if (!anyDone && !confirm('Je hebt nog geen sets afgevinkt. Toch afronden?')) return
+      s.log.endedAt = Date.now()
+      s.duration = Math.max(1, Math.round(workoutElapsed(s.log) / 60000))
+      s.done = true
+    }
+    save()
+    ui.restEnd = null
+    ui.active = null
+    render()
+  },
+  'wo-discard': () => {
+    const s = state.sessions.find((x) => x.id === ui.active)
+    const msg = s.log.endedAt
+      ? 'Alle gelogde sets van deze training wissen?'
+      : 'Training annuleren? Ingevulde sets gaan verloren.'
+    if (!confirm(msg)) return
+    delete s.log
+    if (s.done) s.done = false
+    save()
+    ui.active = null
+    render()
+  },
+}
+
+function openWorkoutSheet(s) {
+  const t = typeById(s.typeId)
+  const tpl = s.templateId && templateById(s.templateId)
+  const d = fromKey(s.date)
+  const when = [`${DAYS[(d.getDay() + 6) % 7]} ${shortDate(d)}`, s.time, s.duration ? fmtMinutes(Number(s.duration)) : '']
+    .filter(Boolean)
+    .join(' · ')
+  let summary = ''
+  if (s.log) {
+    let volume = 0
+    summary = s.log.exercises
+      .map((e) => {
+        const done = e.sets.filter((x) => x.done)
+        for (const x of done) volume += (parseNum(x.kg) || 0) * (parseInt(x.reps) || 0)
+        const sets = done.map((x) => `${esc(x.kg || '–')}×${esc(x.reps || '–')}`).join(', ')
+        const notes = [e.note, ...done.map((x, i) => (x.note ? `set ${i + 1}: ${x.note}` : ''))].filter(Boolean)
+        return `<div class="ex"><span class="grow">${esc(e.name)}<br><span class="muted">${sets || 'geen sets afgevinkt'}</span>${notes.length ? `<br><span class="muted">💬 ${esc(notes.join(' · '))}</span>` : ''}</span></div>`
+      })
+      .join('')
+    if (volume) summary += `<p class="muted">Totaal volume: ${Math.round(volume).toLocaleString('nl-NL')} kg</p>`
+  } else if (tpl) {
+    summary = tpl.exercises
+      .map(
+        (e) =>
+          `<div class="ex"><span class="grow">${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${esc(e.reps)}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}</span></span></div>`,
+      )
+      .join('')
+  }
+  const startLabel = !s.log ? '▶ Training starten' : s.log.endedAt ? 'Log bekijken / aanpassen' : '▶ Doorgaan met training'
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>${esc(t.emoji)} ${esc(t.name)}${tpl ? ' · ' + esc(tpl.name) : ''}</h2>
+      <p class="muted">${esc(when)}${s.note ? '<br>' + esc(s.note) : ''}</p>
+      ${summary}
+      <p></p>
+      <button type="button" class="btn primary block" id="start">${startLabel}</button>
+      <div class="actions">
+        <button type="button" class="btn" id="edit">Bewerken</button>
+        <button type="button" class="btn" id="cancel">Sluiten</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  sheet.querySelector('#start').onclick = () => startWorkout(s)
+  sheet.querySelector('#edit').onclick = () => {
+    closeSheet()
+    openSessionSheet(s)
+  }
+  sheet.querySelector('#cancel').onclick = closeSheet
 }
 
 function deleteSession(session) {
@@ -634,12 +1020,40 @@ const actions = {
     ui.weekStart = addDays(ui.weekStart, 7)
     render()
   },
+  'cal-mode': (el) => {
+    ui.calMode = el.dataset.mode
+    if (ui.calMode === 'maand') ui.month = new Date(ui.weekStart.getFullYear(), addDays(ui.weekStart, 3).getMonth(), 1)
+    render()
+  },
+  'prev-month': () => {
+    ui.month = new Date(ui.month.getFullYear(), ui.month.getMonth() - 1, 1)
+    render()
+  },
+  'next-month': () => {
+    ui.month = new Date(ui.month.getFullYear(), ui.month.getMonth() + 1, 1)
+    render()
+  },
+  'this-month': () => {
+    ui.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    render()
+  },
+  'cal-day': (el) => {
+    ui.weekStart = startOfWeek(fromKey(el.dataset.date))
+    ui.calMode = 'week'
+    render()
+    document.querySelector(`[data-date="${el.dataset.date}"]`)?.closest('.day')?.scrollIntoView({ block: 'center' })
+  },
   'this-week': () => {
     ui.weekStart = startOfWeek(new Date())
     render()
   },
   add: (el) => openSessionSheet(null, el.dataset.date),
-  edit: (el) => openSessionSheet(state.sessions.find((s) => s.id === el.dataset.id)),
+  edit: (el) => {
+    const s = state.sessions.find((x) => x.id === el.dataset.id)
+    if (isWorkoutSession(s)) openWorkoutSheet(s)
+    else openSessionSheet(s)
+  },
+  ...workoutActions,
   toggle: (el) => {
     const s = state.sessions.find((x) => x.id === el.dataset.id)
     s.done = !s.done
@@ -670,6 +1084,16 @@ const actions = {
 view.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]')
   if (el && actions[el.dataset.action]) actions[el.dataset.action](el)
+})
+
+view.addEventListener('input', (e) => {
+  const field = e.target.dataset.field
+  if (!field || !ui.active) return
+  const row = e.target.closest('.set-row')
+  const ex = activeLog().exercises[row ? row.dataset.ex : e.target.dataset.ex]
+  const target = row ? ex.sets[row.dataset.set] : ex
+  target[field] = field === 'note' ? e.target.value : e.target.value.trim()
+  save()
 })
 
 view.addEventListener('submit', (e) => {
@@ -737,6 +1161,11 @@ fab.addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') render()
 })
+
+// Een niet-afgeronde training van de afgelopen 12 uur meteen weer openen,
+// bijv. als iOS de app halverwege de training heeft afgesloten.
+const unfinished = state.sessions.find((s) => s.log && !s.log.endedAt && Date.now() - s.log.startedAt < 12 * 3600e3)
+if (unfinished) ui.active = unfinished.id
 
 render()
 
