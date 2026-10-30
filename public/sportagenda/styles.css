@@ -1432,6 +1432,8 @@ body.welcome main {
 }
 
 .drag-ghost {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
   position: fixed;
   left: 0;
   top: 0;

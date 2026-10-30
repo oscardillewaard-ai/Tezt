@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '10' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '11' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -1490,6 +1490,11 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
       st.trash = document.createElement('div')
       st.trash.className = 'trash-zone'
       st.trash.innerHTML = '<span>🗑️</span> Sleep hierheen om te verwijderen'
+      // Boven de tabbalk zetten in plaats van eroverheen.
+      const tabbar = document.querySelector('.tabbar')
+      if (layer === document.body && tabbar?.getBoundingClientRect().height > 0) {
+        st.trash.style.bottom = `${window.innerHeight - tabbar.getBoundingClientRect().top + 10}px`
+      }
       layer.append(st.trash)
     }
     layer.append(st.ghost)
