@@ -43,6 +43,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  /* Geen "trek omlaag om te verversen" (Chrome/Android) en geen
+     doorschieten van de pagina bij het einde van het scrollen. */
+  overscroll-behavior-y: none;
 }
 
 button,
@@ -445,6 +448,8 @@ table.types td:not(:first-child) {
 
 /* Dialog / sheet */
 dialog {
+  /* Scrollen in een venster niet doorgeven aan de pagina erachter. */
+  overscroll-behavior: contain;
   border: 0;
   padding: 0;
   width: 100%;
