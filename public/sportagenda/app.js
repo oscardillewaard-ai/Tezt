@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '13' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '15' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -57,6 +57,7 @@ function defaultState() {
       },
     ],
     sessions: [],
+    series: [],
   }
 }
 
@@ -72,6 +73,7 @@ function isValidState(s) {
 
 // Oudere gegevens: "30 s" als herhalingen -> eenheid seconden.
 function normalize(s) {
+  s.series ||= []
   const secMatch = (v) => /^\s*(\d+)\s*s(ec)?\s*$/i.exec(v ?? '')
   for (const t of s.templates) {
     for (const e of t.exercises) {
@@ -224,6 +226,10 @@ function renderWelcome() {
 }
 
 function render() {
+  if (state.series.length) {
+    const horizon = [toKey(addDays(new Date(), 84)), toKey(addDays(ui.weekStart, 6)), toKey(addDays(ui.month, 41))].sort().pop()
+    ensureRecurring(horizon)
+  }
   const welcome = !state.settings?.welcomed
   document.body.classList.toggle('welcome', welcome)
   if (welcome) {
@@ -409,7 +415,7 @@ function renderMonth() {
 function sessionRow(s) {
   const t = typeById(s.typeId)
   const tpl = s.templateId && templateById(s.templateId)
-  const inProgress = s.log && !s.log.endedAt ? '▶ bezig' : ''
+  const inProgress = [s.log && !s.log.endedAt ? '▶ bezig' : '', seriesOf(s) ? '🔁' : ''].filter(Boolean).join(' ')
   const shin = Number.isInteger(s.shin)
     ? ` <span class="shin-badge ${shinClass(s.shin)}" title="Scheenpijn ${s.shin}/10">🦵${s.shin}</span>`
     : ''
@@ -676,18 +682,9 @@ function openSessionSheet(session, date) {
           <select name="templateId"><option value="">Geen</option>${tplOptions}</select>
         </label>
       </div>
-      ${
-        isNew
-          ? `<label class="field">Herhalen
-              <select name="repeat">
-                <option value="1">Niet herhalen</option>
-                <option value="4">Elke week, 4 weken</option>
-                <option value="8">Elke week, 8 weken</option>
-                <option value="12">Elke week, 12 weken</option>
-              </select>
-            </label>`
-          : ''
-      }
+      <label class="ss-toggle repeat-toggle">
+        <input type="checkbox" name="weekly" ${!isNew && seriesOf(session) ? 'checked' : ''} /> 🔁 Elke week herhalen
+      </label>
       <label class="field" id="shin-field" ${tracksShin(s.typeId) ? '' : 'hidden'}>Scheenpijn (0–10)
         <select name="shin">
           <option value="">Niet ingevuld</option>
@@ -711,19 +708,30 @@ function openSessionSheet(session, date) {
         note: (fd.get('note') || '').trim(),
         shin: tracksShin(fd.get('typeId')) && fd.get('shin') !== '' && fd.get('shin') !== null ? Number(fd.get('shin')) : undefined,
       }
+      let target
       if (isNew) {
-        const count = Number(fd.get('repeat')) || 1
-        const seriesId = count > 1 ? uid() : undefined
-        const base = fromKey(data.date)
-        for (let i = 0; i < count; i++) {
-          state.sessions.push({ id: uid(), ...data, date: toKey(addDays(base, 7 * i)), done: false, seriesId })
-        }
-        ui.weekStart = startOfWeek(base)
+        target = { id: uid(), ...data, done: false }
+        state.sessions.push(target)
+        ui.weekStart = startOfWeek(fromKey(data.date))
       } else {
-        Object.assign(session, data)
+        target = Object.assign(session, data)
+      }
+      const wasWeekly = !!seriesOf(target)
+      const weekly = fd.get('weekly') === 'on'
+      let message = ''
+      if (weekly && !wasWeekly) {
+        startWeekly(target)
+        message = '🔁 Komt nu elke week terug'
+      } else if (!weekly && wasWeekly) {
+        message = stopWeekly(target)
       }
       save()
       render()
+      if (message && !isNew) {
+        // Eerst het venster dicht, anders belandt (en verdwijnt) de melding daarin.
+        closeSheet()
+        showToast(message)
+      }
     },
   )
 
@@ -1327,13 +1335,58 @@ function openShinSheet(s) {
   })
 }
 
+// ---------- Elke week herhalen ----------
+// Een herhaling is een regel { id, every, last, tpl }: vanaf de laatst
+// ingeplande datum (`last`) vult de app steeds nieuwe trainingen aan tot een
+// stuk vooruit. Wat vóór `last` is verwijderd of versleept komt dus niet terug.
+
+const seriesOf = (s) => s?.seriesId && state.series.find((r) => r.id === s.seriesId)
+
+function startWeekly(s) {
+  s.seriesId ||= uid()
+  state.series.push({
+    id: s.seriesId,
+    every: 7,
+    last: s.date,
+    tpl: { typeId: s.typeId, time: s.time, duration: s.duration, templateId: s.templateId, note: s.note },
+  })
+  ensureRecurring()
+}
+
+// Herhaling stoppen; de nog niet gedane trainingen ná deze mogen weg.
+function stopWeekly(s) {
+  state.series = state.series.filter((r) => r.id !== s.seriesId)
+  const later = state.sessions.filter((x) => x.seriesId === s.seriesId && x.date > s.date && !x.done && !x.log)
+  if (later.length && confirm(`Herhaling stopt. Ook de ${later.length} al ingeplande training(en) hierna verwijderen?`)) {
+    const ids = new Set(later.map((x) => x.id))
+    state.sessions = state.sessions.filter((x) => !ids.has(x.id))
+  }
+  return 'Herhaling gestopt'
+}
+
+// Herhalingen aanvullen tot `until` (standaard 12 weken vanaf vandaag).
+function ensureRecurring(until = toKey(addDays(new Date(), 84))) {
+  let changed = false
+  for (const r of state.series) {
+    let next = addDays(fromKey(r.last), r.every)
+    while (toKey(next) <= until) {
+      state.sessions.push({ id: uid(), ...r.tpl, date: toKey(next), done: false, seriesId: r.id })
+      r.last = toKey(next)
+      next = addDays(next, r.every)
+      changed = true
+    }
+  }
+  if (changed) save()
+}
+
 function deleteSession(session) {
   let ids = [session.id]
   if (session.seriesId) {
     const later = state.sessions.filter((s) => s.seriesId === session.seriesId && s.date > session.date)
-    if (later.length && confirm(`Ook de ${later.length} volgende training(en) uit deze herhaling verwijderen?`)) {
+    if (later.length && confirm(`Ook de ${later.length} volgende training(en) uit deze herhaling verwijderen? De herhaling stopt dan.`)) {
       ids = ids.concat(later.map((s) => s.id))
-    } else if (!confirm('Deze training verwijderen?')) return
+      state.series = state.series.filter((r) => r.id !== session.seriesId)
+    } else if (!confirm('Alleen deze training verwijderen?')) return
   } else if (!confirm('Deze training verwijderen?')) return
   state.sessions = state.sessions.filter((s) => !ids.includes(s.id))
   save()
