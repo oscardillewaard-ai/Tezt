@@ -559,14 +559,22 @@ dialog h2 {
 }
 
 .ex-edit {
-  display: grid;
-  grid-template-columns: 1fr 52px 64px 64px 36px;
-  gap: 4px;
-  align-items: center;
-  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 8px;
 }
 
-.ex-edit input {
+.ex-edit.ss {
+  border-left: 4px solid var(--accent);
+}
+
+.ex-edit:first-child .ss-toggle {
+  display: none;
+}
+
+.ex-edit input,
+.ex-edit select {
   width: 100%;
   min-width: 0;
   padding: 8px 6px;
@@ -574,22 +582,103 @@ dialog h2 {
   border-radius: 8px;
   background: var(--bg);
   font-size: 16px;
+  color: var(--text);
 }
 
-.ex-edit .del {
-  border: 0;
-  background: none;
-  color: var(--danger);
-  font-size: 1.1rem;
-}
-
-.ex-head {
+.ex-edit-top {
   display: grid;
-  grid-template-columns: 1fr 52px 64px 64px 36px;
+  grid-template-columns: 1fr 34px 34px 34px;
   gap: 4px;
+  align-items: center;
+}
+
+.ex-edit-grid {
+  display: grid;
+  grid-template-columns: 60px 1fr 72px;
+  gap: 6px;
+  margin-top: 6px;
   font-size: 0.72rem;
   color: var(--muted);
-  margin-bottom: 4px;
+}
+
+.ex-edit-grid label:nth-child(2) {
+  display: grid;
+  grid-template-columns: 1fr 56px;
+  gap: 4px;
+  align-items: end;
+}
+
+.ss-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.85rem;
+}
+
+.ss-toggle input {
+  width: 20px;
+  height: 20px;
+}
+
+.mini {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.mini.del {
+  color: var(--danger);
+  border-color: transparent;
+  background: none;
+  font-size: 1rem;
+}
+
+.mini.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.mini-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.wo-ex.ss {
+  border-left: 4px solid var(--accent);
+}
+
+.wo-ex.ss-mid {
+  margin-bottom: 2px;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.wo-ex.ss-cont {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.ss-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.unit-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: left;
 }
 
 .inline-form {
@@ -1108,4 +1197,13 @@ body.in-workout main {
 
 .shin-badge.high {
   background: #dc2626;
+}
+
+.wo-ex-head {
+  gap: 8px;
+}
+
+.wo-ex-head h3 {
+  flex: 1;
+  min-width: 0;
 }

@@ -3,12 +3,12 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1'
-const APP_VERSION = '5' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '6' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
 function defaultState() {
-  const ex = (name, sets, reps, weight = '') => ({ id: uid(), name, sets, reps, weight })
+  const ex = (name, sets, reps, weight = '', unit = 'reps') => ({ id: uid(), name, sets, reps, weight, unit })
   return {
     version: 1,
     types: [
@@ -41,7 +41,7 @@ function defaultState() {
           ex('Kabelroeien', 3, '10'),
           ex('Face pulls', 3, '15'),
           ex('Biceps curls', 3, '12'),
-          ex('Hangen aan stang', 3, '30 s'),
+          ex('Hangen aan stang', 3, '30', '', 'sec'),
         ],
       },
       {
@@ -52,7 +52,7 @@ function defaultState() {
           ex('Roemeense deadlift', 3, '10'),
           ex('Lunges', 3, '10 p/been'),
           ex('Kuitheffen', 3, '15'),
-          ex('Plank', 3, '45 s'),
+          ex('Plank', 3, '45', '', 'sec'),
         ],
       },
     ],
@@ -70,12 +70,34 @@ function isValidState(s) {
   )
 }
 
+// Oudere gegevens: "30 s" als herhalingen -> eenheid seconden.
+function normalize(s) {
+  const secMatch = (v) => /^\s*(\d+)\s*s(ec)?\s*$/i.exec(v ?? '')
+  for (const t of s.templates) {
+    for (const e of t.exercises) {
+      if (e.unit) continue
+      const m = secMatch(e.reps)
+      e.unit = m ? 'sec' : 'reps'
+      if (m) e.reps = m[1]
+    }
+  }
+  for (const x of s.sessions) {
+    for (const e of x.log?.exercises || []) {
+      if (e.unit) continue
+      const m = secMatch(e.target?.reps)
+      e.unit = m ? 'sec' : 'reps'
+      if (m) e.target.reps = m[1]
+    }
+  }
+  return s
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (isValidState(parsed)) return parsed
+      if (isValidState(parsed)) return normalize(parsed)
     }
   } catch {
     // Corrupte of ontoegankelijke opslag: begin met de standaardgegevens.
@@ -435,7 +457,7 @@ function renderSchemas() {
       <div class="list-item">
         <button class="grow" data-action="edit-template" data-id="${t.id}">
           <div class="s-title">${esc(t.name)}</div>
-          <div class="s-meta">${t.exercises.length} oefeningen · ${esc(t.exercises.map((e) => e.name).join(', '))}</div>
+          <div class="s-meta">${t.exercises.length} oefeningen · ${esc(t.exercises.map((e) => (e.superset ? '+ ' : '') + e.name).join(', ').replaceAll(', + ', ' + '))}</div>
         </button>
         <span class="muted">›</span>
       </div>`,
@@ -682,11 +704,57 @@ function renderRestBar() {
   if (left > 0) bar.querySelector('strong').textContent = fmtClock(left * 1000)
 }
 
-function newLogExercise(name, target) {
+const unitLabel = (unit) => (unit === 'sec' ? 'Sec' : 'Herh.')
+
+// "40×10", of bij seconden "30 s" (met gewicht: "10 kg · 30 s").
+function fmtSet(x, unit) {
+  if (unit === 'sec') return `${x.kg ? x.kg + ' kg · ' : ''}${x.reps || '–'} s`
+  return `${x.kg || '–'} × ${x.reps || '–'}`
+}
+
+// Een superset is een rij oefeningen waarvan elke volgende `superset: true` heeft.
+function supersetBounds(exs, i) {
+  let start = i
+  while (start > 0 && exs[start].superset) start--
+  let end = i
+  while (exs[end + 1]?.superset) end++
+  return { start, end }
+}
+
+// Oefening i een plek omhoog (dir -1) of omlaag (dir 1) zetten zonder
+// supersets uit elkaar te trekken. Binnen een superset wisselt de oefening
+// met de buur (de koppelingen blijven op hun plek); aan de rand van een
+// superset, of bij een losse oefening, schuift het hele blok langs het
+// volgende blok. Geeft de nieuwe index van oefening i terug.
+function moveExercise(exs, i, dir) {
+  const b = supersetBounds(exs, i)
+  const j = i + dir
+  if (b.end > b.start && j >= b.start && j <= b.end) {
+    ;[exs[i], exs[j]] = [exs[j], exs[i]]
+    ;[exs[i].superset, exs[j].superset] = [exs[j].superset, exs[i].superset]
+    return j
+  }
+  const size = b.end - b.start + 1
+  if (dir < 0) {
+    if (b.start === 0) return i
+    const nb = supersetBounds(exs, b.start - 1)
+    exs.splice(nb.start, 0, ...exs.splice(b.start, size))
+    return i - (nb.end - nb.start + 1)
+  }
+  if (b.end === exs.length - 1) return i
+  const nb = supersetBounds(exs, b.end + 1)
+  const shift = nb.end - nb.start + 1
+  exs.splice(b.start + shift, 0, ...exs.splice(b.start, size))
+  return i + shift
+}
+
+function newLogExercise(name, target, opts = {}) {
   const count = Math.max(1, Math.min(20, parseInt(target?.sets) || 3))
   return {
     id: uid(),
     name,
+    unit: opts.unit || 'reps',
+    superset: !!opts.superset,
     note: '',
     target: target || null,
     sets: Array.from({ length: count }, () => ({ kg: '', reps: '', note: '', done: false })),
@@ -700,7 +768,13 @@ function startWorkout(session) {
       startedAt: Date.now(),
       endedAt: null,
       exercises: tpl
-        ? tpl.exercises.map((e) => newLogExercise(e.name, { sets: e.sets, reps: e.reps, weight: e.weight }))
+        ? tpl.exercises.map((e, i) =>
+            newLogExercise(
+              e.name,
+              { sets: e.sets, reps: e.reps, weight: e.weight },
+              { unit: e.unit, superset: i > 0 && e.superset },
+            ),
+          )
         : [],
     }
   } else if (session.log.endedAt) {
@@ -732,13 +806,29 @@ function renderWorkout(s) {
   const doneSets = log.exercises.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0)
   const allSets = log.exercises.reduce((n, e) => n + e.sets.length, 0)
 
+  // Letters voor supersets (A, B, ...) in volgorde van voorkomen.
+  const ssLetter = {}
+  let letters = 0
+  log.exercises.forEach((ex, i) => {
+    const b = supersetBounds(log.exercises, i)
+    if (b.end > b.start && i === b.start) ssLetter[i] = String.fromCharCode(65 + letters++)
+  })
+
   const exercises = log.exercises
     .map((ex, i) => {
+      const b = supersetBounds(log.exercises, i)
+      const inSS = b.end > b.start
+      const ssLabel = inSS
+        ? `<div class="ss-label">🔗 Superset ${ssLetter[b.start]} · ${i - b.start + 1}/${b.end - b.start + 1}</div>`
+        : ''
+      const isSec = ex.unit === 'sec'
       const prevEx = previousExercise(ex.name, s.id)
       const prev = prevEx ? prevEx.sets : []
       const tg = ex.target
       const targetReps = tg && /^\d+$/.test(String(tg.reps).trim()) ? String(tg.reps).trim() : ''
-      const target = tg ? `Doel: ${esc(tg.sets)} × ${esc(tg.reps)}${tg.weight ? ' · ' + esc(tg.weight) + ' kg' : ''}` : ''
+      const target = tg
+        ? `Doel: ${esc(tg.sets)} × ${esc(tg.reps)}${isSec ? ' s' : ''}${tg.weight ? ' · ' + esc(tg.weight) + ' kg' : ''}`
+        : ''
       const rows = ex.sets
         .map((st, j) => {
           const p = prev[j] || prev[prev.length - 1]
@@ -747,9 +837,9 @@ function renderWorkout(s) {
           return `
           <div class="set-row ${st.done ? 'done' : ''}" data-ex="${i}" data-set="${j}">
             <button type="button" class="set-no" data-action="wo-set-note" aria-label="Opmerking bij set ${j + 1}">${j + 1}</button>
-            <span class="muted">${prev[j] ? `${esc(prev[j].kg || '–')} × ${esc(prev[j].reps || '–')}` : '–'}</span>
+            <span class="muted">${prev[j] ? esc(fmtSet(prev[j], ex.unit)) : '–'}</span>
             <input data-field="kg" inputmode="decimal" enterkeyhint="next" value="${esc(st.kg)}" placeholder="${esc(phKg)}" aria-label="Set ${j + 1} gewicht in kg" />
-            <input data-field="reps" inputmode="numeric" enterkeyhint="done" value="${esc(st.reps)}" placeholder="${esc(phReps)}" aria-label="Set ${j + 1} herhalingen" />
+            <input data-field="reps" inputmode="numeric" enterkeyhint="done" value="${esc(st.reps)}" placeholder="${esc(phReps)}" aria-label="Set ${j + 1} ${isSec ? 'seconden' : 'herhalingen'}" />
             <button type="button" class="check" data-action="wo-set" aria-label="Set ${j + 1} afvinken">${st.done ? '✓' : ''}</button>
           </div>
           ${st.note ? `<div class="set-note">💬 ${esc(st.note)}</div>` : ''}
@@ -757,15 +847,21 @@ function renderWorkout(s) {
         })
         .join('')
       return `
-        <section class="card wo-ex">
+        <section class="card wo-ex ${inSS ? 'ss' : ''} ${inSS && i > b.start ? 'ss-cont' : ''} ${inSS && i < b.end ? 'ss-mid' : ''}" data-wo-ex="${i}">
+          ${ssLabel}
           <div class="wo-ex-head">
             <h3>${esc(ex.name)}</h3>
-            <button type="button" class="del" data-action="wo-del-ex" data-ex="${i}" aria-label="${esc(ex.name)} verwijderen">✕</button>
+            <div class="mini-btns">
+              ${i > 0 ? `<button type="button" class="mini" data-action="wo-move" data-ex="${i}" data-dir="-1" aria-label="Omhoog">▲</button>` : ''}
+              ${i < log.exercises.length - 1 ? `<button type="button" class="mini" data-action="wo-move" data-ex="${i}" data-dir="1" aria-label="Omlaag">▼</button>` : ''}
+              ${i > 0 ? `<button type="button" class="mini ${ex.superset ? 'on' : ''}" data-action="wo-ss" data-ex="${i}" aria-label="Superset met vorige oefening">🔗</button>` : ''}
+              <button type="button" class="mini del" data-action="wo-del-ex" data-ex="${i}" aria-label="${esc(ex.name)} verwijderen">✕</button>
+            </div>
           </div>
           ${target ? `<div class="muted">${target}</div>` : ''}
           ${prevEx?.note ? `<div class="muted">Vorige keer: ${esc(prevEx.note)}</div>` : ''}
           <input class="ex-note" data-field="note" data-ex="${i}" value="${esc(ex.note)}" placeholder="Opmerking (bijv. rode band, smalle grip)" aria-label="Opmerking bij ${esc(ex.name)}" />
-          <div class="set-row set-head"><span>Set</span><span>Vorige</span><span>kg</span><span>Herh.</span><span></span></div>
+          <div class="set-row set-head"><span>Set</span><span>Vorige</span><span>kg</span><button type="button" class="unit-btn" data-action="wo-unit" data-ex="${i}" aria-label="Wissel tussen herhalingen en seconden">${unitLabel(ex.unit)} ⇄</button><span></span></div>
           ${rows}
           <div class="wo-set-actions">
             <button type="button" class="linkbtn" data-action="wo-add-set" data-ex="${i}">+ Set</button>
@@ -835,13 +931,43 @@ const workoutActions = {
       }
     }
     set.done = !set.done
-    if (set.done && restSeconds() > 0) {
+    const exs = activeLog().exercises
+    const i = Number(row.dataset.ex)
+    const { end } = supersetBounds(exs, i)
+    // In een superset pas rusten na de laatste oefening van de ronde;
+    // anders meteen door naar dezelfde set van de volgende oefening.
+    const nextInSuperset = set.done && i < end ? i + 1 : null
+    if (set.done && nextInSuperset === null && restSeconds() > 0) {
       unlockAudio()
       ui.restEnd = Date.now() + restSeconds() * 1000
     }
     save()
     render()
     renderRestBar()
+    if (nextInSuperset !== null) {
+      const sets = exs[nextInSuperset].sets
+      const j = Math.min(Number(row.dataset.set), sets.length - 1)
+      view.querySelector(`.set-row[data-ex="${nextInSuperset}"][data-set="${j}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  },
+  'wo-move': (el) => {
+    const exs = activeLog().exercises
+    const j = moveExercise(exs, Number(el.dataset.ex), Number(el.dataset.dir))
+    save()
+    render()
+    view.querySelector(`[data-wo-ex="${j}"]`)?.scrollIntoView({ block: 'nearest' })
+  },
+  'wo-ss': (el) => {
+    const ex = activeLog().exercises[el.dataset.ex]
+    ex.superset = !ex.superset
+    save()
+    render()
+  },
+  'wo-unit': (el) => {
+    const ex = activeLog().exercises[el.dataset.ex]
+    ex.unit = ex.unit === 'sec' ? 'reps' : 'sec'
+    save()
+    render()
   },
   'wo-set-note': (el) => {
     const row = el.closest('.set-row')
@@ -894,6 +1020,7 @@ const workoutActions = {
     const log = activeLog()
     if (!confirm(`"${log.exercises[el.dataset.ex].name}" uit deze training halen?`)) return
     log.exercises.splice(el.dataset.ex, 1)
+    if (log.exercises[0]) log.exercises[0].superset = false
     save()
     render()
   },
@@ -938,8 +1065,8 @@ function openWorkoutSheet(s) {
     summary = s.log.exercises
       .map((e) => {
         const done = e.sets.filter((x) => x.done)
-        for (const x of done) volume += (parseNum(x.kg) || 0) * (parseInt(x.reps) || 0)
-        const sets = done.map((x) => `${esc(x.kg || '–')}×${esc(x.reps || '–')}`).join(', ')
+        if (e.unit !== 'sec') for (const x of done) volume += (parseNum(x.kg) || 0) * (parseInt(x.reps) || 0)
+        const sets = done.map((x) => esc(fmtSet(x, e.unit))).join(', ')
         const notes = [e.note, ...done.map((x, i) => (x.note ? `set ${i + 1}: ${x.note}` : ''))].filter(Boolean)
         return `<div class="ex"><span class="grow">${esc(e.name)}<br><span class="muted">${sets || 'geen sets afgevinkt'}</span>${notes.length ? `<br><span class="muted">💬 ${esc(notes.join(' · '))}</span>` : ''}</span></div>`
       })
@@ -949,7 +1076,7 @@ function openWorkoutSheet(s) {
     summary = tpl.exercises
       .map(
         (e) =>
-          `<div class="ex"><span class="grow">${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${esc(e.reps)}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}</span></span></div>`,
+          `<div class="ex"><span class="grow">${e.superset ? '🔗 ' : ''}${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${esc(e.reps)}${e.unit === 'sec' ? ' s' : ''}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}</span></span></div>`,
       )
       .join('')
   }
@@ -1019,15 +1146,45 @@ function deleteSession(session) {
   render()
 }
 
-function exerciseRow(e = { id: uid(), name: '', sets: 3, reps: '10', weight: '' }) {
+function exerciseRow(e = { id: uid(), name: '', sets: 3, reps: '10', weight: '', unit: 'reps', superset: false }) {
   return `
-    <div class="ex-edit" data-id="${e.id}">
-      <input name="name" value="${esc(e.name)}" placeholder="Oefening" aria-label="Oefening" />
-      <input name="sets" value="${esc(e.sets)}" inputmode="numeric" aria-label="Sets" />
-      <input name="reps" value="${esc(e.reps)}" aria-label="Herhalingen" />
-      <input name="weight" value="${esc(e.weight)}" inputmode="decimal" placeholder="–" aria-label="Gewicht in kg" />
-      <button type="button" class="del" aria-label="Oefening verwijderen">✕</button>
+    <div class="ex-edit ${e.superset ? 'ss' : ''}" data-id="${e.id}">
+      <div class="ex-edit-top">
+        <input name="name" value="${esc(e.name)}" placeholder="Oefening" aria-label="Oefening" />
+        <button type="button" class="mini" data-move="-1" aria-label="Omhoog">▲</button>
+        <button type="button" class="mini" data-move="1" aria-label="Omlaag">▼</button>
+        <button type="button" class="mini del" aria-label="Oefening verwijderen">✕</button>
+      </div>
+      <div class="ex-edit-grid">
+        <label>Sets<input name="sets" value="${esc(e.sets)}" inputmode="numeric" /></label>
+        <label>
+          <select name="unit" aria-label="Eenheid">
+            <option value="reps" ${e.unit !== 'sec' ? 'selected' : ''}>Herhalingen</option>
+            <option value="sec" ${e.unit === 'sec' ? 'selected' : ''}>Seconden</option>
+          </select>
+          <input name="reps" value="${esc(e.reps)}" inputmode="numeric" aria-label="Aantal" />
+        </label>
+        <label>Kg<input name="weight" value="${esc(e.weight)}" inputmode="decimal" placeholder="–" /></label>
+      </div>
+      <label class="ss-toggle"><input type="checkbox" name="superset" ${e.superset ? 'checked' : ''} /> 🔗 Superset met vorige oefening</label>
     </div>`
+}
+
+function readExerciseRows(root) {
+  const rows = [...root.querySelectorAll('.ex-edit')].map((row) => {
+    const v = (n) => row.querySelector(`[name="${n}"]`).value.trim()
+    return {
+      id: row.dataset.id,
+      name: v('name'),
+      sets: v('sets'),
+      reps: v('reps'),
+      weight: v('weight'),
+      unit: v('unit'),
+      superset: row.querySelector('[name="superset"]').checked,
+    }
+  })
+  if (rows[0]) rows[0].superset = false
+  return rows
 }
 
 function openTemplateSheet(tpl) {
@@ -1039,7 +1196,6 @@ function openTemplateSheet(tpl) {
     <form method="dialog">
       <h2>${isNew ? 'Nieuw schema' : 'Schema bewerken'}</h2>
       <label class="field">Naam<input name="tplName" value="${esc(t.name)}" placeholder="Bijv. Full body A" required /></label>
-      <div class="ex-head"><span>Oefening</span><span>Sets</span><span>Herh.</span><span>Kg</span><span></span></div>
       <div id="ex-rows">${rows}</div>
       <button type="button" class="linkbtn" id="add-ex">+ Oefening toevoegen</button>
       <div class="actions">
@@ -1049,12 +1205,8 @@ function openTemplateSheet(tpl) {
       </div>
     </form>`,
     (fd, form) => {
-      const exercises = [...form.querySelectorAll('.ex-edit')]
-        .map((row) => {
-          const v = (n) => row.querySelector(`[name="${n}"]`).value.trim()
-          return { id: row.dataset.id, name: v('name'), sets: v('sets'), reps: v('reps'), weight: v('weight') }
-        })
-        .filter((e) => e.name)
+      const exercises = readExerciseRows(form).filter((e) => e.name)
+      if (exercises[0]) exercises[0].superset = false
       const name = fd.get('tplName').trim()
       if (isNew) state.templates.push({ id: uid(), name, exercises })
       else Object.assign(tpl, { name, exercises })
@@ -1069,7 +1221,18 @@ function openTemplateSheet(tpl) {
     rowsEl.lastElementChild.querySelector('input').focus()
   }
   rowsEl.addEventListener('click', (e) => {
-    if (e.target.classList.contains('del')) e.target.closest('.ex-edit').remove()
+    const row = e.target.closest('.ex-edit')
+    if (e.target.classList.contains('del')) row.remove()
+    if (e.target.dataset.move) {
+      const exs = readExerciseRows(rowsEl)
+      const i = [...rowsEl.children].indexOf(row)
+      const j = moveExercise(exs, i, Number(e.target.dataset.move))
+      rowsEl.innerHTML = exs.map((x) => exerciseRow(x)).join('')
+      rowsEl.children[j]?.scrollIntoView({ block: 'nearest' })
+    }
+  })
+  rowsEl.addEventListener('change', (e) => {
+    if (e.target.name === 'superset') e.target.closest('.ex-edit').classList.toggle('ss', e.target.checked)
   })
   const del = sheet.querySelector('#del-tpl')
   if (del)
@@ -1203,7 +1366,7 @@ view.addEventListener('change', async (e) => {
     const parsed = JSON.parse(await e.target.files[0].text())
     if (!isValidState(parsed)) throw new Error('ongeldig')
     if (!confirm('Huidige gegevens vervangen door deze back-up?')) return
-    state = parsed
+    state = normalize(parsed)
     save()
     render()
     alert('Back-up teruggezet.')
