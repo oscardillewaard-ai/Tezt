@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '8' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '9' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -279,7 +279,7 @@ function renderWeek() {
     const k = toKey(d)
     const daySessions = sortSessions(list.filter((s) => s.date === k))
     days += `
-      <div class="wday ${k === tKey ? 'today' : ''}">
+      <div class="wday ${k === tKey ? 'today' : ''}" data-drop-date="${k}">
         <div class="wday-label"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}</strong></div>
         <div class="wday-items">
           ${daySessions.length ? daySessions.map(sessionRow).join('') : '<span class="rest">rust</span>'}
@@ -1290,6 +1290,7 @@ function exerciseRow(e = { id: uid(), name: '', sets: 3, reps: '10', weight: '',
   return `
     <div class="ex-edit ${e.superset ? 'ss' : ''}" data-id="${e.id}">
       <div class="ex-edit-top">
+        <span class="drag-handle" aria-label="Slepen om te verplaatsen">⠿</span>
         <input name="name" value="${esc(e.name)}" placeholder="Oefening" aria-label="Oefening" />
         <button type="button" class="mini" data-move="-1" aria-label="Omhoog">▲</button>
         <button type="button" class="mini" data-move="1" aria-label="Omlaag">▼</button>
@@ -1374,6 +1375,36 @@ function openTemplateSheet(tpl) {
   rowsEl.addEventListener('change', (e) => {
     if (e.target.name === 'superset') e.target.closest('.ex-edit').classList.toggle('ss', e.target.checked)
   })
+  // Invoegpositie = vóór de eerste rij waarvan het midden onder de vinger ligt.
+  const dropIndex = (y) => {
+    const rows = [...rowsEl.children]
+    const k = rows.findIndex((r) => {
+      const b = r.getBoundingClientRect()
+      return y < b.top + b.height / 2
+    })
+    return k === -1 ? rows.length : k
+  }
+  const clearMarks = () => rowsEl.querySelectorAll('.drop-before, .drop-after').forEach((r) => r.classList.remove('drop-before', 'drop-after'))
+  makeDraggable(rowsEl, {
+    item: '.ex-edit',
+    handle: '.drag-handle',
+    scroller: sheet,
+    onMove: (x, y) => {
+      clearMarks()
+      const rows = rowsEl.children
+      const k = dropIndex(y)
+      if (k < rows.length) rows[k].classList.add('drop-before')
+      else rows[rows.length - 1]?.classList.add('drop-after')
+    },
+    onDrop: (x, y, el) => {
+      clearMarks()
+      if (!Number.isFinite(y)) return
+      const exs = readExerciseRows(rowsEl)
+      const k = dragExercise(exs, [...rowsEl.children].indexOf(el), dropIndex(y))
+      rowsEl.innerHTML = exs.map((x) => exerciseRow(x)).join('')
+      rowsEl.children[k]?.classList.add('just-dropped')
+    },
+  })
   const del = sheet.querySelector('#del-tpl')
   if (del)
     del.onclick = () => {
@@ -1388,6 +1419,163 @@ function openTemplateSheet(tpl) {
       closeSheet()
       render()
     }
+}
+
+// ---------- Slepen ----------
+
+// Slepen met de vinger (pointer events; HTML5 drag-and-drop werkt niet op de
+// iPhone). Met `delay` moet je eerst even vasthouden, zodat gewoon scrollen en
+// tikken blijven werken; met delay 0 sleept een aparte greep direct.
+function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMove, onDrop }) {
+  let st = null
+
+  // Bij de rand van een scrollend venster blijven = meescrollen.
+  const autoScroll = () => {
+    if (!st?.active) return
+    const r = scroller.getBoundingClientRect()
+    const edge = 64
+    const speed = st.y < r.top + edge ? -12 : st.y > r.bottom - edge ? 12 : 0
+    if (speed) {
+      scroller.scrollTop += speed
+      onMove?.(st.x, st.y, st.el)
+    }
+    st.raf = requestAnimationFrame(autoScroll)
+  }
+
+  const cleanup = () => {
+    clearTimeout(st?.timer)
+    cancelAnimationFrame(st?.raf)
+    st?.ghost?.remove()
+    st?.el.classList.remove('dragging')
+    document.body.classList.remove('is-dragging')
+    st = null
+  }
+
+  const activate = () => {
+    st.active = true
+    const r = st.el.getBoundingClientRect()
+    st.dx = st.x - r.left
+    st.dy = st.y - r.top
+    st.ghost = st.el.cloneNode(true)
+    st.ghost.classList.add('drag-ghost')
+    st.ghost.style.width = `${r.width}px`
+    // In een modaal venster (top layer) moet het spook ín dat venster staan om zichtbaar te zijn.
+    ;(root.closest('dialog') || document.body).append(st.ghost)
+    st.el.classList.add('dragging')
+    document.body.classList.add('is-dragging')
+    navigator.vibrate?.(20)
+    onStart?.(st.el)
+    position()
+    if (scroller) autoScroll()
+  }
+
+  const position = () => {
+    st.ghost.style.transform = `translate(${st.x - st.dx}px, ${st.y - st.dy}px)`
+    onMove?.(st.x, st.y, st.el)
+  }
+
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return
+    const h = e.target.closest(handle)
+    const el = h?.closest(item)
+    if (!el || !root.contains(el)) return
+    st = { el, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, active: false }
+    if (delay) st.timer = setTimeout(activate, delay)
+    else {
+      e.preventDefault()
+      activate()
+    }
+  })
+
+  window.addEventListener('pointermove', (e) => {
+    if (!st) return
+    st.x = e.clientX
+    st.y = e.clientY
+    // Bewegen vóór het vasthouden voorbij is = scrollen, geen slepen.
+    if (!st.active) {
+      if (Math.hypot(st.x - st.x0, st.y - st.y0) > 8) cleanup()
+      return
+    }
+    position()
+  })
+
+  window.addEventListener('pointerup', () => {
+    if (!st) return
+    if (st.active) {
+      onDrop?.(st.x, st.y, st.el)
+      // De klik die na het loslaten volgt mag geen venster openen.
+      const swallow = (ev) => {
+        ev.stopPropagation()
+        ev.preventDefault()
+      }
+      const release = () => {
+        window.removeEventListener('click', swallow, { capture: true })
+        window.removeEventListener('pointerdown', release, { capture: true })
+      }
+      window.addEventListener('click', swallow, { capture: true, once: true })
+      // Alleen de klik van dít loslaten; een volgende aanraking telt gewoon.
+      window.addEventListener('pointerdown', release, { capture: true, once: true })
+      setTimeout(release, 100)
+    }
+    cleanup()
+  })
+
+  window.addEventListener('pointercancel', () => {
+    if (st?.active) onDrop?.(NaN, NaN, st.el)
+    cleanup()
+  })
+
+  // Tijdens slepen niet laten scrollen (iOS negeert touch-action halverwege een gebaar).
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (st?.active) e.preventDefault()
+    },
+    { passive: false },
+  )
+  // Lang indrukken opent op iOS/desktop anders een contextmenu.
+  root.addEventListener('contextmenu', (e) => {
+    if (st) e.preventDefault()
+  })
+}
+
+// Element onder de vinger, met het sleep-spook zelf genegeerd (pointer-events: none).
+const elementAt = (x, y) => (Number.isFinite(x) ? document.elementFromPoint(x, y) : null)
+
+// Agenda: training naar een andere dag slepen.
+makeDraggable(view, {
+  item: '.session',
+  handle: '.s-body',
+  delay: 350,
+  onMove: (x, y) => {
+    const target = elementAt(x, y)?.closest('[data-drop-date]')
+    view.querySelectorAll('.drop-target').forEach((d) => d !== target && d.classList.remove('drop-target'))
+    target?.classList.add('drop-target')
+  },
+  onDrop: (x, y, el) => {
+    view.querySelectorAll('.drop-target').forEach((d) => d.classList.remove('drop-target'))
+    const date = elementAt(x, y)?.closest('[data-drop-date]')?.dataset.dropDate
+    const id = el.querySelector('[data-id]')?.dataset.id
+    const s = state.sessions.find((x) => x.id === id)
+    if (!s || !date || date === s.date) return
+    s.date = date
+    save()
+    render()
+  },
+})
+
+// Oefening in een lijst van i naar positie `to` (index vóór het verwijderen)
+// verplaatsen. Supersets blijven kloppen: wie uit het begin van een superset
+// wordt gehaald draagt die rol over, en wie midden in een superset landt doet mee.
+function dragExercise(exs, i, to) {
+  if (to === i || to === i + 1) return i
+  const [moved] = exs.splice(i, 1)
+  if (!moved.superset && exs[i]?.superset) exs[i].superset = false
+  const k = to > i ? to - 1 : to
+  moved.superset = k > 0 && !!exs[k]?.superset
+  exs.splice(k, 0, moved)
+  if (exs[0]) exs[0].superset = false
+  return k
 }
 
 // ---------- Acties ----------
