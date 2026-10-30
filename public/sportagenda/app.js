@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '15' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '16' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -630,7 +630,8 @@ function openSheet(html, onSubmit) {
     e.preventDefault()
     if (onSubmit(new FormData(form), form) !== false) closeSheet()
   })
-  sheet.showModal()
+  // Een vervolgvraag kan in het al geopende venster verschijnen.
+  if (!sheet.open) sheet.showModal()
 }
 
 function closeSheet() {
@@ -714,6 +715,22 @@ function openSessionSheet(session, date) {
         state.sessions.push(target)
         ui.weekStart = startOfWeek(fromKey(data.date))
       } else {
+        // Wijziging aan een herhalende training: vragen of de volgende weken meegaan.
+        const changes = Object.fromEntries(
+          SERIES_FIELDS.filter((k) => String(data[k] ?? '') !== String(session[k] ?? '')).map((k) => [k, data[k]]),
+        )
+        const dayDelta = daysBetween(session.date, data.date)
+        if (seriesOf(session) && fd.get('weekly') === 'on' && (Object.keys(changes).length || dayDelta)) {
+          const origDate = session.date
+          askSeriesScope((all) => {
+            Object.assign(session, data)
+            if (all) applyToFollowing(session, origDate, changes, dayDelta)
+            save()
+            render()
+            if (all) showToast('🔁 Aangepast voor alle volgende weken')
+          })
+          return false
+        }
         target = Object.assign(session, data)
       }
       const wasWeekly = !!seriesOf(target)
@@ -1364,6 +1381,48 @@ function stopWeekly(s) {
   return 'Herhaling gestopt'
 }
 
+const SERIES_FIELDS = ['typeId', 'time', 'duration', 'templateId', 'note']
+const daysBetween = (a, b) => Math.round((fromKey(b) - fromKey(a)) / 86400000)
+
+// Wijziging ook doorvoeren in de nog niet gedane trainingen van deze reeks ná
+// `fromDate`, en in de regel zelf zodat nieuwe weken het ook krijgen. Een
+// andere dag schuift alle volgende weken evenveel dagen op.
+function applyToFollowing(s, fromDate, changes, dayDelta) {
+  const r = seriesOf(s)
+  for (const x of state.sessions) {
+    if (x.seriesId !== s.seriesId || x.id === s.id || x.date <= fromDate || x.done || x.log) continue
+    Object.assign(x, changes)
+    if (dayDelta) x.date = toKey(addDays(fromKey(x.date), dayDelta))
+  }
+  Object.assign(r.tpl, changes)
+  if (dayDelta) r.last = toKey(addDays(fromKey(r.last), dayDelta))
+}
+
+// Vraag: alleen deze training, of ook alle volgende weken? `apply(all)` wordt
+// alleen aangeroepen bij een keuze; Annuleren laat alles zoals het was.
+function askSeriesScope(apply) {
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>🔁 Herhalende training</h2>
+      <p class="muted">Geldt deze wijziging alleen voor deze training, of ook voor alle volgende weken?</p>
+      <div class="scope-btns">
+        <button type="button" class="btn block" id="scope-one">Alleen deze</button>
+        <button type="button" class="btn primary block" id="scope-all">Deze en alle volgende</button>
+        <button type="button" class="btn block" id="cancel">Annuleren</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  const choose = (all) => () => {
+    closeSheet()
+    apply(all)
+  }
+  sheet.querySelector('#scope-one').onclick = choose(false)
+  sheet.querySelector('#scope-all').onclick = choose(true)
+  sheet.querySelector('#cancel').onclick = closeSheet
+}
+
 // Herhalingen aanvullen tot `until` (standaard 12 weken vanaf vandaag).
 function ensureRecurring(until = toKey(addDays(new Date(), 84))) {
   let changed = false
@@ -1727,9 +1786,16 @@ makeDraggable(view, {
     const id = el.querySelector('[data-id]')?.dataset.id
     const s = state.sessions.find((x) => x.id === id)
     if (!s || !date || date === s.date) return
-    s.date = date
-    save()
-    render()
+    const move = (all) => {
+      const origDate = s.date
+      s.date = date
+      if (all) applyToFollowing(s, origDate, {}, daysBetween(origDate, date))
+      save()
+      render()
+      if (all) showToast('🔁 Alle volgende weken ook verplaatst')
+    }
+    if (seriesOf(s)) askSeriesScope(move)
+    else move(false)
   },
   onTrash: (el) => {
     const id = el.querySelector('[data-id]')?.dataset.id

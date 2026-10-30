@@ -1580,3 +1580,9 @@ dialog .toast {
   margin: 0 0 12px;
   font-size: 0.95rem;
 }
+
+.scope-btns {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
