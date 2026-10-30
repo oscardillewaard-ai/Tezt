@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '9' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '10' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -576,6 +576,7 @@ function openSheet(html, onSubmit) {
 }
 
 function closeSheet() {
+  sheet.querySelectorAll('.toast').forEach((t) => t.remove())
   sheet.close()
   sheet.innerHTML = ''
 }
@@ -1391,6 +1392,7 @@ function openTemplateSheet(tpl) {
     scroller: sheet,
     onMove: (x, y) => {
       clearMarks()
+      if (!Number.isFinite(y)) return
       const rows = rowsEl.children
       const k = dropIndex(y)
       if (k < rows.length) rows[k].classList.add('drop-before')
@@ -1403,6 +1405,19 @@ function openTemplateSheet(tpl) {
       const k = dragExercise(exs, [...rowsEl.children].indexOf(el), dropIndex(y))
       rowsEl.innerHTML = exs.map((x) => exerciseRow(x)).join('')
       rowsEl.children[k]?.classList.add('just-dropped')
+    },
+    onTrash: (el) => {
+      const exs = readExerciseRows(rowsEl)
+      const backup = exs.map((x) => ({ ...x }))
+      const i = [...rowsEl.children].indexOf(el)
+      const [removed] = exs.splice(i, 1)
+      // Was dit het begin van een superset, dan begint die nu bij de volgende.
+      if (!removed.superset && exs[i]?.superset) exs[i].superset = false
+      if (exs[0]) exs[0].superset = false
+      rowsEl.innerHTML = exs.map((x) => exerciseRow(x)).join('')
+      showToast(`${removed.name || 'Oefening'} verwijderd`, () => {
+        rowsEl.innerHTML = backup.map((x) => exerciseRow(x)).join('')
+      })
     },
   })
   const del = sheet.querySelector('#del-tpl')
@@ -1426,15 +1441,24 @@ function openTemplateSheet(tpl) {
 // Slepen met de vinger (pointer events; HTML5 drag-and-drop werkt niet op de
 // iPhone). Met `delay` moet je eerst even vasthouden, zodat gewoon scrollen en
 // tikken blijven werken; met delay 0 sleept een aparte greep direct.
-function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMove, onDrop }) {
+// Met `onTrash` verschijnt tijdens het slepen onderin een prullenbak.
+function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMove, onDrop, onTrash }) {
   let st = null
 
-  // Bij de rand van een scrollend venster blijven = meescrollen.
+  const overTrash = () => {
+    if (!st?.trash) return false
+    const r = st.trash.getBoundingClientRect()
+    return st.y >= r.top && st.y <= r.bottom && st.x >= r.left && st.x <= r.right
+  }
+
+  // Bij de rand van een scrollend venster blijven = meescrollen
+  // (niet boven de prullenbak, die zit zelf onderaan).
   const autoScroll = () => {
     if (!st?.active) return
     const r = scroller.getBoundingClientRect()
+    const bottom = st.trash ? Math.min(r.bottom, st.trash.getBoundingClientRect().top) : r.bottom
     const edge = 64
-    const speed = st.y < r.top + edge ? -12 : st.y > r.bottom - edge ? 12 : 0
+    const speed = overTrash() ? 0 : st.y < r.top + edge ? -12 : st.y > bottom - edge ? 12 : 0
     if (speed) {
       scroller.scrollTop += speed
       onMove?.(st.x, st.y, st.el)
@@ -1446,6 +1470,7 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
     clearTimeout(st?.timer)
     cancelAnimationFrame(st?.raf)
     st?.ghost?.remove()
+    st?.trash?.remove()
     st?.el.classList.remove('dragging')
     document.body.classList.remove('is-dragging')
     st = null
@@ -1460,7 +1485,14 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
     st.ghost.classList.add('drag-ghost')
     st.ghost.style.width = `${r.width}px`
     // In een modaal venster (top layer) moet het spook ín dat venster staan om zichtbaar te zijn.
-    ;(root.closest('dialog') || document.body).append(st.ghost)
+    const layer = root.closest('dialog') || document.body
+    if (onTrash) {
+      st.trash = document.createElement('div')
+      st.trash.className = 'trash-zone'
+      st.trash.innerHTML = '<span>🗑️</span> Sleep hierheen om te verwijderen'
+      layer.append(st.trash)
+    }
+    layer.append(st.ghost)
     st.el.classList.add('dragging')
     document.body.classList.add('is-dragging')
     navigator.vibrate?.(20)
@@ -1471,7 +1503,11 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
 
   const position = () => {
     st.ghost.style.transform = `translate(${st.x - st.dx}px, ${st.y - st.dy}px)`
-    onMove?.(st.x, st.y, st.el)
+    const hot = overTrash()
+    st.trash?.classList.toggle('hot', hot)
+    st.ghost.classList.toggle('to-trash', hot)
+    // Boven de prullenbak geen dag/plek markeren.
+    onMove?.(hot ? NaN : st.x, hot ? NaN : st.y, st.el)
   }
 
   root.addEventListener('pointerdown', (e) => {
@@ -1502,7 +1538,10 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
   window.addEventListener('pointerup', () => {
     if (!st) return
     if (st.active) {
-      onDrop?.(st.x, st.y, st.el)
+      if (overTrash()) {
+        onMove?.(NaN, NaN, st.el)
+        onTrash(st.el)
+      } else onDrop?.(st.x, st.y, st.el)
       // De klik die na het loslaten volgt mag geen venster openen.
       const swallow = (ev) => {
         ev.stopPropagation()
@@ -1539,6 +1578,24 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
   })
 }
 
+// Melding onderin met een knop "Ongedaan maken" (verdwijnt na 5 s).
+let toastTimer
+function showToast(text, undo) {
+  document.querySelectorAll('.toast').forEach((t) => t.remove())
+  const t = document.createElement('div')
+  t.className = 'toast'
+  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button type="button">Ongedaan maken</button>' : ''}`
+  if (undo)
+    t.querySelector('button').onclick = () => {
+      t.remove()
+      undo()
+    }
+  // In een open venster moet de melding in dat venster staan om zichtbaar te zijn.
+  ;(sheet.open ? sheet : document.body).append(t)
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => t.remove(), 5000)
+}
+
 // Element onder de vinger, met het sleep-spook zelf genegeerd (pointer-events: none).
 const elementAt = (x, y) => (Number.isFinite(x) ? document.elementFromPoint(x, y) : null)
 
@@ -1561,6 +1618,20 @@ makeDraggable(view, {
     s.date = date
     save()
     render()
+  },
+  onTrash: (el) => {
+    const id = el.querySelector('[data-id]')?.dataset.id
+    const i = state.sessions.findIndex((x) => x.id === id)
+    if (i === -1) return
+    const [removed] = state.sessions.splice(i, 1)
+    save()
+    render()
+    const t = typeById(removed.typeId)
+    showToast(`${t.emoji} ${t.name} verwijderd`, () => {
+      state.sessions.splice(i, 0, removed)
+      save()
+      render()
+    })
   },
 })
 

@@ -1477,3 +1477,82 @@ body.is-dragging * {
     background: var(--accent-soft);
   }
 }
+
+/* Prullenbak tijdens slepen */
+.trash-zone {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  z-index: 49;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--danger);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--danger);
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+  animation: trash-in 0.15s ease-out;
+  transition: background 0.12s, transform 0.12s;
+}
+
+.trash-zone span {
+  font-size: 1.5rem;
+}
+
+.trash-zone.hot {
+  background: var(--danger);
+  color: #fff;
+  border-style: solid;
+  transform: scale(1.04);
+}
+
+.drag-ghost.to-trash {
+  opacity: 0.5;
+  scale: 0.85;
+}
+
+@keyframes trash-in {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+/* Melding met ongedaan maken */
+.toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bar);
+  color: var(--bar-text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  animation: trash-in 0.2s ease-out;
+  max-width: 616px;
+  margin: 0 auto;
+}
+
+dialog .toast {
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
+}
+
+.toast button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+  padding: 4px 0;
+  white-space: nowrap;
+}
