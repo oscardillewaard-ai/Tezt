@@ -97,4 +97,13 @@ gegevens blijven werken. Bij een release `APP_VERSION` in `app.js` en `CACHE`
 in `sw.js` ophogen en bovenaan `CHANGELOG` in `app.js` een regel toevoegen;
 geïnstalleerde apps halen de update dan zelf op en tonen eenmalig wat er nieuw is.
 
+Horloge (Zepp/Amazfit): Tarapp koppelt via de API van Intervals.icu (Zepp OS 5
+koppelt zelf met Intervals.icu). De gebruiker plakt een persoonlijke API-sleutel
+onder Meer; die blijft alleen in de browser (`localStorage`, buiten de back-up).
+Looptrainingen met intervallen voor de komende 3 weken gaan als geplande
+trainingen naar Intervals.icu, gelopen trainingen van de afgelopen 2 weken
+komen terug en worden afgevinkt. Staat intervals.icu geen browserverbindingen
+toe (CORS), dan kan `proxy/intervals-cors-worker.js` als Cloudflare Worker
+worden neergezet en als tussenstation worden ingevuld.
+
 Iconen opnieuw genereren: `node scripts/gen-sportagenda-icons.mjs`.

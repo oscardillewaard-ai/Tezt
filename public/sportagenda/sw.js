@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v19'
+const CACHE = 'sportagenda-v20'
 const SHELL = [
   './',
   'index.html',
@@ -31,6 +31,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
+  // Alleen de app zelf; verzoeken naar andere sites (zoals de Intervals.icu-API,
+  // met persoonlijke gegevens) niet onderscheppen en zeker niet opslaan.
+  if (new URL(event.request.url).origin !== self.location.origin) return
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE)

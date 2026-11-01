@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '19' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '20' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -224,7 +224,7 @@ function renderWelcome() {
         <li><span>📅</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
         <li><span>🏋️</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
         <li><span>📊</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
-        <li><span>🔒</span><div><strong>Alleen op jouw telefoon</strong>Geen account, niets naar een server. Maak af en toe een back-up via Meer.</div></li>
+        <li><span>🔒</span><div><strong>Alleen op jouw telefoon</strong>Geen account nodig. Alles blijft op je telefoon, tenzij je zelf je horloge koppelt. Maak af en toe een back-up via Meer.</div></li>
       </ul>
       ${install}
       <button class="btn primary block" data-action="welcome-done">Aan de slag</button>
@@ -337,6 +337,14 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 20,
+    items: [
+      '⌚ Koppel je Amazfit-horloge (Zepp) via Intervals.icu: je looptrainingen staan dan op je pols 💛',
+      'Gelopen trainingen van je horloge vinken zichzelf af, met tijd en afstand',
+      'Daarna vraagt Tarapp meteen naar je scheenpijn 🦵',
+    ],
+  },
   { v: 19, items: ['🏃 Bij het 5 km-plan kun je nu kiezen voor 2× per week lopen in plaats van 3× 💛'] },
   {
     v: 18,
@@ -644,7 +652,16 @@ function sessionRow(s) {
     ? ` <span class="shin-badge ${shinClass(s.shin)}" title="Scheenpijn ${s.shin}/10">🦵${s.shin}</span>`
     : ''
   // Bij plantrainingen zegt de notitie (planweek) meer dan de schemanaam.
-  const meta = [inProgress, s.time, s.run?.label, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl && !s.planId ? tpl.name : '', s.note]
+  const meta = [
+    inProgress,
+    s.time,
+    s.run?.label,
+    s.duration ? fmtMinutes(Number(s.duration)) : '',
+    s.distance ? `${fmtNum(Math.round(s.distance / 100) / 10)} km` : '',
+    s.icuId ? '⌚' : '',
+    tpl && !s.planId ? tpl.name : '',
+    s.note,
+  ]
     .filter(Boolean)
     .map(esc)
     .join(' · ')
@@ -800,6 +817,7 @@ function renderMore() {
     )
     .join('')
   return `
+    ${renderIcuCard()}
     <section class="card">
       <h2>Activiteiten</h2>
       ${types}
@@ -1727,6 +1745,7 @@ function openRunSheet(s) {
       <h2>🏃 ${esc(run.label)}</h2>
       <p class="muted">${esc(when)} · ${fmtNum(runMinutes(run))} min lopen · ${fmtNum(runTotal(run))} min totaal${s.note ? '<br>' + esc(s.note) : ''}</p>
       ${runBar(run)}
+      ${icu?.sent?.[s.id] ? '<p class="muted">⌚ Staat op je horloge (via Intervals.icu)</p>' : ''}
       <p class="run-parts">${parts.map(esc).join(' → ')}</p>
       <button type="button" class="btn primary block" id="start">${busy ? '▶ Doorgaan' : s.done ? '▶ Nog een keer lopen' : '▶ Intervaltraining starten'}</button>
       ${planTools}
@@ -2163,10 +2182,320 @@ function renderPlanCard() {
         <summary>De spelregels</summary>
         <ul>${PLAN_5K.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
       </details>
+      ${
+        icu
+          ? '<button class="btn block" data-action="icu-sync">⌚ Naar mijn horloge sturen</button>'
+          : '<button class="btn block" data-action="icu-setup">⌚ Horloge koppelen (Zepp)</button>'
+      }
       <div class="actions">
         <button class="btn" data-action="plan-new">Opnieuw plannen</button>
         <button class="btn danger" data-action="plan-remove">Uit agenda halen</button>
       </div>
+    </section>`
+}
+
+// ---------- Horloge: Zepp via Intervals.icu ----------
+// Zepp (Amazfit) heeft geen open API, maar koppelt sinds Zepp OS 5 met
+// Intervals.icu: geplande trainingen gaan daar naar het horloge, gelopen
+// trainingen komen er terug. Tarapp praat met de API van Intervals.icu met de
+// persoonlijke API-sleutel (Basic auth "API_KEY:<sleutel>", athlete-ID 0 = de
+// eigenaar van de sleutel).
+//
+// De sleutel staat in een eigen localStorage-item, niet in `state`, zodat hij
+// niet in back-ups terechtkomt. `sent` onthoudt welke training als welk
+// Intervals.icu-event is verstuurd; bij een wijziging wordt het oude event
+// verwijderd en een nieuw aangemaakt (alleen aanmaken en verwijderen, zodat we
+// niet afhangen van upsert, dat volgens het forum niet met API-sleutels werkt).
+
+const ICU_STORE = 'tarapp.icu'
+const ICU_DAYS_AHEAD = 21
+const ICU_DAYS_BACK = 14
+
+function icuLoad() {
+  try {
+    return JSON.parse(localStorage.getItem(ICU_STORE)) || null
+  } catch {
+    return null
+  }
+}
+function icuSave() {
+  try {
+    if (icu) localStorage.setItem(ICU_STORE, JSON.stringify(icu))
+    else localStorage.removeItem(ICU_STORE)
+  } catch {
+    // Opslag geblokkeerd: de koppeling geldt dan alleen voor deze sessie.
+  }
+}
+let icu = icuLoad() // { key, athlete, base, name, sent: { [sessionId]: { id, hash } }, lastSync, lastError, auto }
+let icuBusy = false
+
+async function icuFetch(path, opts = {}, conf = icu) {
+  const base = (conf.base || 'https://intervals.icu').replace(/\/+$/, '')
+  let res
+  try {
+    res = await fetch(`${base}/api/v1/athlete/${encodeURIComponent(conf.athlete || '0')}${path}`, {
+      ...opts,
+      headers: {
+        Authorization: `Basic ${btoa(`API_KEY:${conf.key}`)}`,
+        ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+    })
+  } catch {
+    throw new Error('netwerk')
+  }
+  if (res.status === 401 || res.status === 403) throw new Error('sleutel')
+  if (!res.ok) throw new Error(`http ${res.status}`)
+  return res.json().catch(() => null)
+}
+
+function icuErrorText(err) {
+  if (err.message === 'netwerk')
+    return 'Intervals.icu is niet bereikbaar vanuit de app. Controleer je internet. Blijft dit zo, dan laat intervals.icu de app er waarschijnlijk niet rechtstreeks bij (CORS) en is een tussenstation nodig (zie Geavanceerd).'
+  if (err.message === 'sleutel')
+    return 'De API-sleutel wordt niet geaccepteerd. Kopieer hem opnieuw uit intervals.icu → Settings → Developer Settings.'
+  return `Intervals.icu gaf een fout (${err.message}). Probeer het later nog eens.`
+}
+
+// "1m", "30s", "1m30s"
+function icuDuration(min) {
+  const m = Math.floor(min)
+  const s = Math.round((min - m) * 60)
+  return s ? (m ? `${m}m${s}s` : `${s}s`) : `${m}m`
+}
+
+// Training in het tekstformaat van de Intervals.icu workout builder; de tekst
+// vóór de duur is de aanwijzing die het horloge laat zien.
+function icuWorkoutText(run) {
+  const step = (t, min) => `- ${t === 'run' ? 'Lopen' : 'Wandelen'} ${icuDuration(min)}`
+  const lines = []
+  if (run.warmup) lines.push('Warmup', step('walk', run.warmup), '')
+  const sr = simpleRun(run)
+  if (sr && sr.reps > 1) {
+    lines.push(`${sr.reps}x`, step('run', sr.run))
+    if (sr.walk) lines.push(step('walk', sr.walk))
+  } else {
+    for (const x of run.steps) lines.push(step(x.t, x.min))
+  }
+  lines.push('')
+  if (run.cooldown) lines.push('Cooldown', step('walk', run.cooldown))
+  return lines.join('\n').trim()
+}
+
+const icuHash = (s) => JSON.stringify([s.date, s.run.label, s.run.steps, s.run.warmup, s.run.cooldown])
+
+function icuEvent(s) {
+  const label = s.run.label.replaceAll('×', 'x')
+  return {
+    category: 'WORKOUT',
+    type: 'Run',
+    start_date_local: `${s.date}T00:00:00`,
+    name: s.planId ? `5K ${weekName(s.planWeek)}: ${label}` : `Tarapp: ${label}`,
+    description: icuWorkoutText(s.run),
+    external_id: `tarapp-${s.id}`,
+  }
+}
+
+// Looptrainingen met intervallen die de komende weken op het horloge horen.
+const icuWanted = (s) =>
+  isRunType(s.typeId) && s.run && !s.done && !s.runLog && s.date >= todayKey() && s.date <= toKey(addDays(new Date(), ICU_DAYS_AHEAD))
+
+async function icuPushRuns(result) {
+  icu.sent ||= {}
+  const want = new Map(state.sessions.filter(icuWanted).map((s) => [s.id, s]))
+  for (const [sid, ev] of Object.entries(icu.sent)) {
+    const s = state.sessions.find((x) => x.id === sid)
+    // Gelopen: het event mag blijven staan (Intervals.icu koppelt het aan de run).
+    if (s && (s.done || s.runLog)) {
+      delete icu.sent[sid]
+      continue
+    }
+    const w = want.get(sid)
+    if (w && ev.hash === icuHash(w)) continue
+    // Verwijderd, verplaatst, aangepast of voorbij: oude event weghalen.
+    if (ev.id != null) {
+      await icuFetch(`/events/${encodeURIComponent(ev.id)}`, { method: 'DELETE' }).catch((err) => {
+        if (err.message !== 'http 404') throw err
+      })
+    }
+    delete icu.sent[sid]
+    icuSave()
+    result.removed++
+  }
+  for (const s of want.values()) {
+    if (icu.sent[s.id]) continue
+    const ev = await icuFetch('/events', { method: 'POST', body: JSON.stringify(icuEvent(s)) })
+    icu.sent[s.id] = { id: ev?.id ?? null, hash: icuHash(s) }
+    icuSave()
+    result.sent++
+  }
+}
+
+// Soort activiteit in Intervals.icu -> activiteit(en) in Tarapp.
+const ICU_TYPES = {
+  Run: ['hardlopen'],
+  TrailRun: ['hardlopen'],
+  VirtualRun: ['hardlopen'],
+  Walk: ['wandelen'],
+  Hike: ['wandelen'],
+  Ride: ['fietsen'],
+  VirtualRide: ['fietsen'],
+  GravelRide: ['fietsen'],
+  MountainBikeRide: ['fietsen'],
+  EBikeRide: ['fietsen'],
+  Swim: ['zwemmen'],
+  OpenWaterSwim: ['zwemmen'],
+  WeightTraining: ['kracht', 'gym'],
+  RockClimbing: ['klimmen', 'boulderen'],
+  Yoga: ['yoga'],
+}
+
+// Gelopen trainingen van de afgelopen twee weken ophalen: een geplande training
+// van dezelfde soort op dezelfde dag wordt afgevinkt; een run zonder planning
+// komt er als nieuwe (gedane) training bij.
+async function icuImportActivities(result) {
+  const oldest = toKey(addDays(new Date(), -ICU_DAYS_BACK))
+  const acts = await icuFetch(`/activities?oldest=${oldest}&newest=${todayKey()}`)
+  for (const act of Array.isArray(acts) ? acts : []) {
+    const id = String(act.id)
+    if (state.sessions.some((s) => s.icuId === id)) continue
+    const types = ICU_TYPES[act.type] || []
+    const when = String(act.start_date_local || act.start_date || '')
+    const date = when.slice(0, 10)
+    if (!types.length || !/^\d{4}-\d\d-\d\d$/.test(date)) continue
+    const minutes = Math.max(1, Math.round((act.moving_time || act.elapsed_time || 0) / 60))
+    const info = { icuId: id, distance: act.distance > 0 ? act.distance : undefined, duration: minutes }
+    const match = state.sessions
+      .filter((s) => s.date === date && types.includes(s.typeId) && !s.icuId)
+      .sort((x, y) => Number(x.done) - Number(y.done))[0]
+    if (match) {
+      const wasDone = match.done
+      Object.assign(match, info, { done: true })
+      if (!wasDone) result.done.push(match)
+    } else if (types[0] === 'hardlopen') {
+      const s = {
+        id: uid(),
+        typeId: 'hardlopen',
+        date,
+        time: when.slice(11, 16),
+        templateId: '',
+        note: act.name ? `⌚ ${act.name}` : '⌚ Van je horloge',
+        done: true,
+        ...info,
+      }
+      state.sessions.push(s)
+      result.done.push(s)
+    }
+  }
+}
+
+async function icuSync({ quiet = false } = {}) {
+  if (!icu || icuBusy) return
+  icuBusy = true
+  const result = { sent: 0, removed: 0, done: [] }
+  try {
+    await icuPushRuns(result)
+    await icuImportActivities(result)
+    icu.lastSync = Date.now()
+    icu.lastError = null
+    icuSave()
+    save()
+    render()
+    const parts = []
+    if (result.sent) parts.push(`${result.sent} op je horloge gezet`)
+    if (result.done.length) parts.push(`${result.done.length} van je horloge afgevinkt`)
+    if (parts.length || !quiet) showToast(`⌚ ${parts.join(', ') || 'Alles is bijgewerkt'} 💛`)
+    // Scheenpijn invullen voor de laatste run die net binnenkwam.
+    const run = result.done.filter((s) => isRunType(s.typeId) && !Number.isInteger(s.shin)).pop()
+    if (run && !sheet.open && !ui.active && !ui.run) setTimeout(() => !sheet.open && openShinSheet(run), 600)
+  } catch (err) {
+    icu.lastError = icuErrorText(err)
+    icuSave()
+    if (ui.tab === 'meer') render()
+    if (!quiet) alert(icu.lastError)
+  } finally {
+    icuBusy = false
+  }
+}
+
+// Bij openen (en terugkomen in) de app, hooguit eens per 10 minuten.
+function icuAutoSync() {
+  if (icu && icu.auto !== false && Date.now() - (icu.lastSync || 0) > 10 * 60e3) icuSync({ quiet: true })
+}
+
+async function icuConnect(form) {
+  const fd = new FormData(form)
+  const conf = {
+    key: String(fd.get('key') || '').trim(),
+    athlete: String(fd.get('athlete') || '').trim() || '0',
+    base: String(fd.get('base') || '').trim() || 'https://intervals.icu',
+  }
+  if (!conf.key) return
+  const btn = form.querySelector('button[type=submit]')
+  btn.disabled = true
+  btn.textContent = 'Bezig met koppelen…'
+  try {
+    const me = await icuFetch('', {}, conf)
+    icu = { ...conf, athlete: me?.id || conf.athlete, name: me?.name || '', sent: {}, auto: true }
+    icuSave()
+    render()
+    await icuSync()
+  } catch (err) {
+    alert(icuErrorText(err))
+    btn.disabled = false
+    btn.textContent = 'Koppelen'
+  }
+}
+
+async function icuDisconnect() {
+  if (!confirm('Horloge ontkoppelen? De trainingen die Tarapp naar Intervals.icu heeft gestuurd, worden daar weggehaald. Je trainingen in Tarapp blijven staan.')) return
+  for (const ev of Object.values(icu.sent || {})) {
+    if (ev.id != null) await icuFetch(`/events/${encodeURIComponent(ev.id)}`, { method: 'DELETE' }).catch(() => {})
+  }
+  icu = null
+  icuSave()
+  render()
+  showToast('⌚ Horloge ontkoppeld')
+}
+
+function renderIcuCard() {
+  if (!icu) {
+    return `
+      <section class="card">
+        <h2>⌚ Horloge (Zepp)</h2>
+        <p class="muted">Stuur je looptrainingen met intervallen naar je Amazfit-horloge, en laat gelopen trainingen vanzelf afvinken. Dat gaat via Intervals.icu (gratis), want Zepp koppelt alleen met dat soort diensten.</p>
+        <details class="plan-rules">
+          <summary>Zo koppel je het (eenmalig)</summary>
+          <ol>
+            <li>Maak een gratis account op <strong>intervals.icu</strong>.</li>
+            <li>Zepp-app → Profiel → accounts van derden koppelen → <strong>Intervals.icu</strong> (Zepp OS 5).</li>
+            <li>Op intervals.icu: Settings → <strong>Developer Settings</strong> → API key. Kopieer de sleutel.</li>
+            <li>Plak hem hieronder en tik op Koppelen.</li>
+          </ol>
+          <p class="muted">Let op: daarna staan je looptrainingen en gelopen trainingen ook bij Intervals.icu. Scheenpijn en notities blijven alleen in Tarapp.</p>
+        </details>
+        <form id="icu-form" class="icu-form">
+          <input name="key" placeholder="API-sleutel van intervals.icu" autocomplete="off" autocapitalize="off" spellcheck="false" required />
+          <details class="plan-rules">
+            <summary>Geavanceerd</summary>
+            <input name="athlete" placeholder="Athlete-ID (leeg = automatisch)" autocomplete="off" autocapitalize="off" />
+            <input name="base" placeholder="Tussenstation (leeg = https://intervals.icu)" autocomplete="off" autocapitalize="off" inputmode="url" />
+          </details>
+          <button type="submit" class="btn primary block">Koppelen</button>
+        </form>
+      </section>`
+  }
+  const sentCount = Object.keys(icu.sent || {}).length
+  const last = icu.lastSync ? new Date(icu.lastSync) : null
+  const lastText = last ? `${shortDate(last)} ${pad(last.getHours())}:${pad(last.getMinutes())}` : 'nog niet'
+  return `
+    <section class="card">
+      <h2>⌚ Horloge (Zepp)</h2>
+      <p>✅ Gekoppeld met Intervals.icu${icu.name ? ` als <strong>${esc(icu.name)}</strong>` : ''}</p>
+      <p class="muted">Laatst bijgewerkt: ${lastText} · ${sentCount} looptraining${sentCount === 1 ? '' : 'en'} op je horloge gezet (de komende ${ICU_DAYS_AHEAD / 7} weken)</p>
+      ${icu.lastError ? `<p class="icu-error">⚠️ ${esc(icu.lastError)}</p>` : ''}
+      <button class="btn primary block" data-action="icu-sync">⌚ Nu bijwerken</button>
+      <label class="ss-toggle"><input type="checkbox" data-icu="auto" ${icu.auto === false ? '' : 'checked'} /> Automatisch bijwerken als je de app opent</label>
+      <button class="btn danger block" data-action="icu-disconnect">Ontkoppelen</button>
     </section>`
 }
 
@@ -2697,6 +3026,13 @@ const actions = {
     render()
   },
   'plan-new': () => openPlanSheet(),
+  'icu-sync': () => icuSync(),
+  'icu-disconnect': () => icuDisconnect(),
+  'icu-setup': () => {
+    ui.tab = 'meer'
+    render()
+    window.scrollTo(0, 0)
+  },
   'plan-repeat': (el) => askRepeatPlanWeek(state.sessions.find((s) => s.id === el.dataset.id), false),
   'plan-back': (el) => askRepeatPlanWeek(state.sessions.find((s) => s.id === el.dataset.id), true),
   'plan-remove': () => askRemovePlan(activePlan()?.id),
@@ -2781,6 +3117,11 @@ view.addEventListener('input', (e) => {
 })
 
 view.addEventListener('submit', (e) => {
+  if (e.target.id === 'icu-form') {
+    e.preventDefault()
+    icuConnect(e.target)
+    return
+  }
   if (e.target.id !== 'type-form') return
   e.preventDefault()
   const fd = new FormData(e.target)
@@ -2792,6 +3133,10 @@ view.addEventListener('submit', (e) => {
 })
 
 view.addEventListener('change', (e) => {
+  if (e.target.dataset.icu === 'auto' && icu) {
+    icu.auto = e.target.checked
+    icuSave()
+  }
   const key = e.target.dataset.setting
   if (!key) return
   state.settings ||= {}
@@ -2852,7 +3197,9 @@ fab.addEventListener('click', () => {
 
 // Bij terugkeren naar de app op een nieuwe dag: "vandaag" bijwerken.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') render()
+  if (document.visibilityState !== 'visible') return
+  render()
+  icuAutoSync()
 })
 
 // Een niet-afgeronde training van de afgelopen 12 uur meteen weer openen,
@@ -2864,6 +3211,7 @@ if (unfinishedRun) ui.run = unfinishedRun.id
 
 render()
 showChangesSinceLastVisit()
+icuAutoSync()
 
 // Vraag de browser de opslag niet op te ruimen bij ruimtegebrek.
 async function requestPersistence() {
