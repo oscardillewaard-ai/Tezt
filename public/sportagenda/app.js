@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '20' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '21' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -337,6 +337,10 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 21,
+    items: ['Het weekritme bij het 5 km-plan laat nu precies zien wat je kiest, met een voorbeeldweek: bij 2× per week staan er ook echt 2 loopdagen 💛'],
+  },
   {
     v: 20,
     items: [
@@ -2054,6 +2058,39 @@ function askRepeatPlanWeek(s, back) {
   showToast(back ? '🔴 Een stapje terug. Rustig aan, Tara 💛' : '🟡 Week herhaald. Goed dat je naar je been luistert 💛')
 }
 
+const DAY_ABBR = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+
+// Welke dagen in een loopweek wat zijn, met de gekozen opties (zelfde keuzes als addPlanWeek).
+function rhythmDays(r, { twice, strength, cross }) {
+  return {
+    run: twice ? [r.run[0], r.run[2]] : r.run,
+    strength: strength ? r.strength : [],
+    cross: cross ? [r.cross] : [],
+  }
+}
+
+function rhythmLabel(r, opts) {
+  const d = rhythmDays(r, opts)
+  const list = (days) => days.map((i) => DAY_ABBR[i]).join(' · ')
+  return [`${list(d.run)} lopen`, d.strength.length && `kracht ${list(d.strength)}`, d.cross.length && `fietsen ${list(d.cross)}`]
+    .filter(Boolean)
+    .join(' — ')
+}
+
+function weekPreview(r, opts) {
+  const d = rhythmDays(r, opts)
+  return DAY_ABBR.map((name, i) => {
+    const [kind, icon] = d.run.includes(i)
+      ? ['run', '🏃']
+      : d.strength.includes(i)
+        ? ['strength', '💪']
+        : d.cross.includes(i)
+          ? ['cross', '🚴']
+          : ['rest', '·']
+    return `<span class="wp-day wp-${kind}"><b>${name}</b>${icon}</span>`
+  }).join('')
+}
+
 function planWeekOptions(version, extra) {
   return PLAN_5K.versions[version].weeks
     .filter((w) => extra || !w.extra)
@@ -2083,15 +2120,17 @@ function openPlanSheet() {
       <label class="field">Vanaf de week van
         <input type="date" name="startDate" value="${nextMonday()}" required />
       </label>
-      <label class="field">Weekritme
-        <select name="rhythm">${PLAN_5K.rhythms.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select>
-      </label>
       <label class="ss-toggle"><input type="checkbox" name="twice" /> 🏃 2× per week lopen in plaats van 3×</label>
       <p class="muted">Je houdt dan per week training 1 en de langste training, op de eerste en laatste loopdag.</p>
       <label class="ss-toggle"><input type="checkbox" name="strength" checked /> 💪 Kracht + springen, 2× per week op dagen zonder lopen</label>
       <label class="ss-toggle"><input type="checkbox" name="cross" checked /> 🚴 Fietsen of zwemmen, 1× per week</label>
       <label class="ss-toggle"><input type="checkbox" name="extra" /> Extra weken meenemen</label>
       <p class="muted" id="extra-note">${esc(v.B.fiveKmNote)}</p>
+      <label class="field">Weekritme
+        <select name="rhythm"></select>
+      </label>
+      <div class="week-preview" id="week-preview" aria-label="Voorbeeld van een loopweek"></div>
+      <p class="muted" id="bridge-note">In de brugweken loop je nog niet: dan kracht en springen op de loopdagen, en wandelen op de krachtdagen.</p>
       <details class="plan-rules">
         <summary>De spelregels</summary>
         <ul>${PLAN_5K.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
@@ -2133,10 +2172,16 @@ function openPlanSheet() {
     form.startWeek.innerHTML = planWeekOptions(version, form.extra.checked)
     if ([...form.startWeek.options].some((o) => o.value === keep)) form.startWeek.value = keep
     sheet.querySelector('#extra-note').textContent = PLAN_5K.versions[version].fiveKmNote
+    // Weekritme en voorbeeldweek volgen de vinkjes (2×, kracht, fietsen).
+    const opts = { twice: form.twice.checked, strength: form.strength.checked, cross: form.cross.checked }
+    const rhythm = form.rhythm.value || PLAN_5K.rhythms[0].id
+    form.rhythm.innerHTML = PLAN_5K.rhythms.map((r) => `<option value="${r.id}">${esc(rhythmLabel(r, opts))}</option>`).join('')
+    form.rhythm.value = rhythm
+    sheet.querySelector('#week-preview').innerHTML = weekPreview(PLAN_5K.rhythms.find((r) => r.id === rhythm), opts)
+    sheet.querySelector('#bridge-note').hidden = !form.startWeek.value.startsWith('B')
   }
-  form.addEventListener('change', (e) => {
-    if (e.target.name === 'version' || e.target.name === 'extra') refresh()
-  })
+  refresh()
+  form.addEventListener('change', refresh)
   sheet.querySelector('#cancel').onclick = closeSheet
 }
 

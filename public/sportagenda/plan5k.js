@@ -105,12 +105,13 @@ const PLAN_5K = {
 
   // Weekritme uit hoofdstuk 4 ("Ma lopen, Di kracht + springen, ...") plus
   // varianten met dezelfde regel: nooit twee loopdagen achter elkaar.
-  // Dagen: 0 = maandag ... 6 = zondag.
+  // Dagen: 0 = maandag ... 6 = zondag. De tekst in het keuzemenu maakt de app
+  // zelf, zodat die klopt met de gekozen opties (2× lopen, kracht, fietsen).
   rhythms: [
-    { id: 'mwv', label: 'Ma · Wo · Vr lopen (kracht Di · Za, fietsen Do)', run: [0, 2, 4], strength: [1, 5], cross: 3 },
-    { id: 'dds', label: 'Di · Do · Za lopen (kracht Wo · Zo, fietsen Vr)', run: [1, 3, 5], strength: [2, 6], cross: 4 },
-    { id: 'mdz', label: 'Ma · Do · Za lopen (kracht Di · Vr, fietsen Wo)', run: [0, 3, 5], strength: [1, 4], cross: 2 },
-    { id: 'dvz', label: 'Di · Vr · Zo lopen (kracht Wo · Za, fietsen Ma)', run: [1, 4, 6], strength: [2, 5], cross: 0 },
+    { id: 'mwv', run: [0, 2, 4], strength: [1, 5], cross: 3 },
+    { id: 'dds', run: [1, 3, 5], strength: [2, 6], cross: 4 },
+    { id: 'mdz', run: [0, 3, 5], strength: [1, 4], cross: 2 },
+    { id: 'dvz', run: [1, 4, 6], strength: [2, 5], cross: 0 },
   ],
 
   // Hoofdstuk 7: kracht en springen.
