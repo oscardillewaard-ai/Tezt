@@ -84,7 +84,10 @@ build-stap (plain HTML/CSS/JS): een sportagenda om trainingen te plannen
 (gym, klimmen, boulderen, wandelen, … en eigen activiteiten), af te vinken,
 week- en maandoverzichten te bekijken en gymtrainingen per set te loggen
 (supersets, rusttimer, aftelklok voor oefeningen op tijd). Bij hardlopen
-houdt hij een scheenpijnscore bij. Gegevens staan in `localStorage` (sleutel
+houdt hij een scheenpijnscore bij, en looptrainingen kunnen intervallen hebben
+met een intervaltimer (piepjes en gesproken aanwijzingen). Het herstelplan
+"Terug naar 5 km" staat als data in `public/sportagenda/plan5k.js` en kan vanaf
+een gekozen planweek in de agenda worden gezet. Gegevens staan in `localStorage` (sleutel
 `sportagenda.v1`); via "Meer" kun je een JSON-back-up exporteren/importeren.
 
 Na deploy staat hij op `https://<user>.github.io/Tezt/sportagenda/`. Open dat

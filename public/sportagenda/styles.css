@@ -11,6 +11,7 @@
   --done: #16a34a;
   --done-soft: #dcfce7;
   --danger: #dc2626;
+  --plan: #4f46e5; /* paars van het 5 km-plan */
   --bar: #1c1917;
   --bar-text: #fafaf9;
   color-scheme: light dark;
@@ -25,6 +26,7 @@
     --line: #292524;
     --accent-soft: #3f2d05;
     --accent-text: #facc15;
+    --plan: #818cf8;
     --done-soft: #052e16;
     --bar: #0c0a09;
   }
@@ -1654,4 +1656,325 @@ dialog .toast {
   border-left-color: var(--accent);
   border-radius: 0 10px 10px 0;
   padding: 8px 10px 8px 12px;
+}
+
+/* Swipen tussen weken */
+#view.swipe-next {
+  animation: swipe-from-right 0.22s ease-out;
+}
+
+#view.swipe-prev {
+  animation: swipe-from-left 0.22s ease-out;
+}
+
+@keyframes swipe-from-right {
+  from {
+    transform: translateX(48px);
+    opacity: 0.3;
+  }
+}
+
+@keyframes swipe-from-left {
+  from {
+    transform: translateX(-48px);
+    opacity: 0.3;
+  }
+}
+
+/* Doorlopende agenda */
+.wk-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 16px 2px 6px;
+}
+
+.wk-head.current strong {
+  color: var(--accent-text);
+}
+
+.wk-head .wk-count {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.load-earlier {
+  margin-bottom: 4px;
+}
+
+.load-more {
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Intervallen in het bewerkvenster */
+.run-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.run-grid input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 16px;
+  color: var(--text);
+}
+
+#run-field {
+  margin-bottom: 12px;
+}
+
+#run-field[hidden] {
+  display: none;
+}
+
+/* Balk met loop- en wandelblokken, zoals in het plan */
+.run-bar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  margin: 8px 0;
+}
+
+.run-bar.big {
+  height: 22px;
+  margin: 18px 0 6px;
+}
+
+.run-bar .seg {
+  flex-basis: 0;
+  border-radius: 4px;
+  min-width: 3px;
+  transition: opacity 0.2s;
+}
+
+.seg-run {
+  background: var(--bar);
+}
+
+.seg-walk {
+  background: #a5b4fc;
+}
+
+.seg-warm,
+.seg-cool {
+  background: var(--line);
+}
+
+.run-bar .seg.past {
+  opacity: 0.3;
+}
+
+.run-bar .seg.now {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.run-parts {
+  font-size: 0.9rem;
+  margin: 4px 0 14px;
+}
+
+/* Intervaltimer */
+body.in-run main {
+  padding: 0;
+  max-width: none;
+}
+
+.run-player {
+  min-height: var(--rp-height, 100dvh);
+  padding: 16px 20px calc(env(safe-area-inset-bottom) + 20px);
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  transition: background 0.3s;
+}
+
+.run-player.ph-run {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.run-player.ph-walk {
+  background: #c7d2fe;
+  color: #1e1b4b;
+}
+
+.run-player.ph-warm,
+.run-player.ph-cool {
+  background: var(--card);
+}
+
+.run-player.paused {
+  filter: saturate(0.4);
+}
+
+.rp-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.rp-top .iconbtn {
+  background: rgb(255 255 255 / 0.6);
+  color: inherit;
+}
+
+.rp-title {
+  font-weight: 700;
+}
+
+.rp-phase {
+  margin-top: 6vh;
+  font-size: 2.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rp-clock {
+  font-size: 5.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.rp-sub {
+  font-size: 1.05rem;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+
+.rp-next {
+  margin-top: 6px;
+  opacity: 0.75;
+}
+
+.run-player .seg-run {
+  background: #1c1917;
+}
+
+.run-player.ph-run .run-bar .seg.now {
+  outline-color: #1c1917;
+}
+
+.rp-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.rp-btns {
+  margin-top: auto;
+  padding-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.rp-btns .btn {
+  padding: 14px 6px;
+  background: rgb(255 255 255 / 0.7);
+  border-color: transparent;
+  color: #1c1917;
+}
+
+/* Terug naar 5 km */
+.plan-card p {
+  margin: 4px 0;
+}
+
+.plan-versions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plan-opt {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.plan-opt:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.plan-opt input {
+  margin-top: 3px;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.plan-opt small {
+  display: block;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.plan-rules {
+  margin: 10px 0;
+  font-size: 0.88rem;
+}
+
+.plan-rules summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-rules ul {
+  padding-left: 18px;
+  line-height: 1.45;
+}
+
+.plan-tools {
+  margin-top: 10px;
+}
+
+/* Trainingen uit het 5 km-plan */
+.session.plan {
+  box-shadow: inset 4px 0 0 var(--plan);
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--plan);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  vertical-align: 2px;
+  text-decoration: none;
+}
+
+.cal-mark.plan {
+  border-color: var(--plan);
+}
+
+.cal-mark.plan.done {
+  border-color: var(--done);
+}
+
+.plan-remove-all {
+  margin-top: 10px;
 }

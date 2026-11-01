@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '17' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '18' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -58,6 +58,7 @@ function defaultState() {
     ],
     sessions: [],
     series: [],
+    plans: [],
   }
 }
 
@@ -74,6 +75,7 @@ function isValidState(s) {
 // Oudere gegevens: "30 s" als herhalingen -> eenheid seconden.
 function normalize(s) {
   s.series ||= []
+  s.plans ||= []
   const secMatch = (v) => /^\s*(\d+)\s*s(ec)?\s*$/i.exec(v ?? '')
   for (const t of s.templates) {
     for (const e of t.exercises) {
@@ -161,6 +163,7 @@ const typeById = (id) => state.types.find((t) => t.id === id) || { id, name: 'On
 const templateById = (id) => state.templates.find((t) => t.id === id)
 // Bij hardlopen houden we scheenpijn bij (0 = geen, 10 = ergst denkbaar).
 const tracksShin = (typeId) => typeId === 'hardlopen'
+const isRunType = tracksShin
 const shinClass = (v) => (v <= 2 ? 'low' : v <= 5 ? 'mid' : 'high')
 
 function fmtMinutes(min) {
@@ -188,6 +191,9 @@ const ui = {
   restEnd: null, // tijdstip (ms) waarop de lopende rusttimer afloopt
   hold: null, // lopende aftelklok voor een set op tijd: { ex, set, target, startAt, name }
   calMode: 'week', // 'week' | 'maand'
+  run: null, // id van de looptraining die nu in de intervaltimer staat
+  scrollFrom: -2, // doorlopende agenda: weken t.o.v. deze week
+  scrollTo: 10,
   month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 }
 
@@ -227,7 +233,14 @@ function renderWelcome() {
 
 function render() {
   if (state.series.length) {
-    const horizon = [toKey(addDays(new Date(), 84)), toKey(addDays(ui.weekStart, 6)), toKey(addDays(ui.month, 41))].sort().pop()
+    const horizon = [
+      toKey(addDays(new Date(), 84)),
+      toKey(addDays(ui.weekStart, 6)),
+      toKey(addDays(ui.month, 41)),
+      toKey(addDays(startOfWeek(new Date()), 7 * ui.scrollTo + 6)),
+    ]
+      .sort()
+      .pop()
     ensureRecurring(horizon)
   }
   const welcome = !state.settings?.welcomed
@@ -236,8 +249,18 @@ function render() {
     view.innerHTML = renderWelcome()
     return
   }
-  const active = ui.active && state.sessions.find((s) => s.id === ui.active)
-  document.body.classList.toggle('in-workout', !!active)
+  const running = runSession()
+  if (ui.run && !running) ui.run = null
+  const active = !running && ui.active && state.sessions.find((s) => s.id === ui.active)
+  document.body.classList.toggle('in-workout', !!(active || running))
+  document.body.classList.toggle('in-run', !!running)
+  if (running) {
+    topActions.innerHTML = ''
+    view.innerHTML = renderRunPlayer(running)
+    // De timer vult de hele hoogte onder de bovenbalk.
+    view.style.setProperty('--rp-height', `${window.innerHeight - topbarBottom()}px`)
+    return
+  }
   if (active) {
     topActions.innerHTML = ''
     view.innerHTML = renderWorkout(active)
@@ -252,7 +275,11 @@ function render() {
   fab.hidden = ui.tab !== 'schemas'
   topActions.innerHTML = ui.tab === 'week' ? calToggle() : ''
   const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore }
+  const scrolling = ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()
+  const anchor = scrolling ? scrollAnchor() : null
   view.innerHTML = renderers[ui.tab]()
+  if (anchor) restoreScrollAnchor(anchor)
+  watchMoreWeeks(scrolling)
 }
 
 // ---------- Complimentjes voor Tara ----------
@@ -310,6 +337,16 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 18,
+    items: [
+      '🏃 Terug naar 5 km: je herstelplan in je agenda, beginnend in de week die bij jou past 💛',
+      'Intervaltraining met timer: lopen en wandelen, met piepjes en een stem die je erdoorheen helpt 🎧',
+      'De pijn bepaalt het tempo: met één tik een week herhalen 🟡 of een stap terug 🔴',
+      'Swipe links en rechts door je weken 👆',
+      'Of zet onder Meer "doorlopend scrollen" aan 📜💖',
+    ],
+  },
   {
     v: 17,
     items: [
@@ -391,17 +428,8 @@ function calToggle() {
 
 const DAYS_SHORT = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
 
-function renderWeek() {
-  if (ui.calMode === 'maand') return renderMonth()
-  const ws = ui.weekStart
-  const we = addDays(ws, 6)
-  const list = sessionsBetween(toKey(ws), toKey(we))
-  const done = list.filter((s) => s.done)
-  const doneMin = done.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
-  const pct = list.length ? Math.round((done.length / list.length) * 100) : 0
-  const isCurrent = toKey(ws) === toKey(startOfWeek(new Date()))
-  title.textContent = 'Tarapp'
-
+// De zeven dagregels van één week.
+function weekDaysHtml(ws, list) {
   const tKey = todayKey()
   let days = ''
   for (let i = 0; i < 7; i++) {
@@ -417,6 +445,22 @@ function renderWeek() {
         <button class="day-add" data-action="add" data-date="${k}" aria-label="Training toevoegen op ${DAYS[i]}">+</button>
       </div>`
   }
+  return days
+}
+
+function renderWeek() {
+  if (ui.calMode === 'maand') return renderMonth()
+  if (agendaScrolls()) return renderWeekScroll()
+  const ws = ui.weekStart
+  const we = addDays(ws, 6)
+  const list = sessionsBetween(toKey(ws), toKey(we))
+  const done = list.filter((s) => s.done)
+  const doneMin = done.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
+  const pct = list.length ? Math.round((done.length / list.length) * 100) : 0
+  const isCurrent = toKey(ws) === toKey(startOfWeek(new Date()))
+  title.textContent = 'Tarapp'
+
+  const days = weekDaysHtml(ws, list)
 
   return `
     <div class="weeknav compact">
@@ -435,6 +479,111 @@ function renderWeek() {
     </div>
     <div class="wdays">${days}</div>`
 }
+
+// ---------- Doorlopende agenda ----------
+// Instelling onder Meer: alle weken onder elkaar, verder laden bij het scrollen.
+
+const agendaScrolls = () => !!state.settings?.agendaScroll
+
+function renderWeekScroll() {
+  title.textContent = 'Tarapp'
+  const base = startOfWeek(new Date())
+  let html = `
+    <div class="compliment">💛 ${esc(dailyCompliment())}</div>
+    <button class="btn block load-earlier" data-action="weeks-earlier">↑ Eerdere weken</button>`
+  for (let w = ui.scrollFrom; w <= ui.scrollTo; w++) {
+    const ws = addDays(base, 7 * w)
+    const we = addDays(ws, 6)
+    const list = sessionsBetween(toKey(ws), toKey(we))
+    const done = list.filter((s) => s.done).length
+    html += `
+      <div class="wk-head ${w === 0 ? 'current' : ''}" id="wk-${toKey(ws)}">
+        <strong>Week ${isoWeek(ws)}</strong>
+        <span class="muted">${shortDate(ws)} – ${shortDate(we)}</span>
+        <span class="wk-count">${list.length ? `${done}/${list.length}` : ''}</span>
+      </div>
+      <div class="wdays">${weekDaysHtml(ws, list)}</div>`
+  }
+  return html + '<div id="weeks-more" class="muted load-more">Meer weken…</div>'
+}
+
+const topbarBottom = () => document.querySelector('.topbar').getBoundingClientRect().bottom
+
+// Bij opnieuw opbouwen dezelfde week op dezelfde hoogte houden.
+function scrollAnchor() {
+  const head = [...view.querySelectorAll('.wk-head')].find((h) => h.getBoundingClientRect().bottom > topbarBottom())
+  return head && { id: head.id, top: head.getBoundingClientRect().top }
+}
+function restoreScrollAnchor({ id, top }) {
+  const el = document.getElementById(id)
+  if (el) window.scrollBy(0, el.getBoundingClientRect().top - top)
+}
+
+function scrollToWeek(d) {
+  const off = Math.round(daysBetween(toKey(startOfWeek(new Date())), toKey(startOfWeek(d))) / 7)
+  if (off - 1 < ui.scrollFrom || off + 4 > ui.scrollTo) {
+    ui.scrollFrom = Math.min(ui.scrollFrom, off - 1)
+    ui.scrollTo = Math.max(ui.scrollTo, off + 4)
+    render()
+  }
+  const el = document.getElementById(`wk-${toKey(startOfWeek(d))}`)
+  if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - topbarBottom() - 8)
+}
+
+let moreObserver
+function watchMoreWeeks(on) {
+  moreObserver?.disconnect()
+  const el = on && document.getElementById('weeks-more')
+  if (!el || !('IntersectionObserver' in window)) return
+  moreObserver = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting) || ui.scrollTo > 156) return
+      ui.scrollTo += 8
+      render()
+    },
+    { rootMargin: '400px' },
+  )
+  moreObserver.observe(el)
+}
+
+// ---------- Swipen tussen weken ----------
+// Snel horizontaal vegen = vorige/volgende week (of maand). Niet vanaf de
+// schermrand (systeemgebaren) en niet tijdens slepen of in de doorlopende agenda.
+
+let swipe = null
+view.addEventListener(
+  'touchstart',
+  (e) => {
+    swipe = null
+    if (ui.tab !== 'week' || ui.active || ui.run || e.touches.length !== 1) return
+    if (ui.calMode === 'week' && agendaScrolls()) return
+    const t = e.touches[0]
+    if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return
+    swipe = { x: t.clientX, y: t.clientY, t: Date.now() }
+  },
+  { passive: true },
+)
+view.addEventListener(
+  'touchend',
+  (e) => {
+    const sw = swipe
+    swipe = null
+    if (!sw || document.body.classList.contains('is-dragging') || sheet.open) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - sw.x
+    const dy = t.clientY - sw.y
+    if (Date.now() - sw.t > 700 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    const dir = dx < 0 ? 1 : -1
+    if (ui.calMode === 'maand') ui.month = new Date(ui.month.getFullYear(), ui.month.getMonth() + dir, 1)
+    else ui.weekStart = addDays(ui.weekStart, 7 * dir)
+    render()
+    view.classList.remove('swipe-next', 'swipe-prev')
+    void view.offsetWidth
+    view.classList.add(dir > 0 ? 'swipe-next' : 'swipe-prev')
+  },
+  { passive: true },
+)
+view.addEventListener('animationend', () => view.classList.remove('swipe-next', 'swipe-prev'))
 
 const MONTHS_FULL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
 
@@ -459,7 +608,7 @@ function renderMonth() {
     const inMonth = d.getMonth() === m.getMonth()
     const day = sortSessions(state.sessions.filter((s) => s.date === k))
     const marks = day
-      .map((s) => `<span class="cal-mark ${s.done ? 'done' : ''}">${esc(typeById(s.typeId).emoji)}</span>`)
+      .map((s) => `<span class="cal-mark ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''}">${esc(typeById(s.typeId).emoji)}</span>`)
       .join('')
     cells += `
       <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
@@ -488,19 +637,21 @@ function renderMonth() {
 function sessionRow(s) {
   const t = typeById(s.typeId)
   const tpl = s.templateId && templateById(s.templateId)
-  const inProgress = [s.log && !s.log.endedAt ? '▶ bezig' : '', seriesOf(s) ? '🔁' : ''].filter(Boolean).join(' ')
+  const busy = (s.log && !s.log.endedAt) || (s.runLog && !s.runLog.endedAt)
+  const inProgress = [busy ? '▶ bezig' : '', seriesOf(s) ? '🔁' : ''].filter(Boolean).join(' ')
   const shin = Number.isInteger(s.shin)
     ? ` <span class="shin-badge ${shinClass(s.shin)}" title="Scheenpijn ${s.shin}/10">🦵${s.shin}</span>`
     : ''
-  const meta = [inProgress, s.time, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl ? tpl.name : '', s.note]
+  // Bij plantrainingen zegt de notitie (planweek) meer dan de schemanaam.
+  const meta = [inProgress, s.time, s.run?.label, s.duration ? fmtMinutes(Number(s.duration)) : '', tpl && !s.planId ? tpl.name : '', s.note]
     .filter(Boolean)
     .map(esc)
     .join(' · ')
   return `
-    <div class="session ${s.done ? 'done' : ''}">
+    <div class="session ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''}">
       <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? '✓' : ''}</button>
       <button class="s-body" data-action="edit" data-id="${s.id}">
-        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}${shin}</span>
+        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}${s.planId ? ' <span class="plan-badge">5K</span>' : ''}${shin}</span>
         ${meta ? `<span class="s-meta">${meta}</span>` : ''}
       </button>
     </div>`
@@ -625,6 +776,7 @@ function renderSchemas() {
     )
     .join('')
   return `
+    ${renderPlanCard()}
     <section class="card">
       ${items || '<div class="muted">Nog geen schema\'s. Tik op + om er een te maken.</div>'}
     </section>
@@ -655,6 +807,12 @@ function renderMore() {
         <input name="name" placeholder="Bijv. Kajakken" required aria-label="Naam" />
         <button class="btn primary" type="submit">Toevoegen</button>
       </form>
+    </section>
+    <section class="card">
+      <h2>Agenda</h2>
+      <label class="ss-toggle"><input type="checkbox" data-setting="agendaScroll" ${agendaScrolls() ? 'checked' : ''} /> 📜 Doorlopend scrollen door de weken</label>
+      <p class="muted">Uit: één week per scherm. Swipe naar links of rechts voor de volgende of vorige week.</p>
+      <label class="ss-toggle"><input type="checkbox" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} /> 🎧 Gesproken aanwijzingen bij intervaltraining</label>
     </section>
     <section class="card">
       <h2>Back-up</h2>
@@ -743,6 +901,7 @@ function openSessionSheet(session, date) {
   const tplOptions = state.templates
     .map((t) => `<option value="${t.id}" ${t.id === s.templateId ? 'selected' : ''}>${esc(t.name)}</option>`)
     .join('')
+  const sr = simpleRun(s.run)
   openSheet(
     `
     <form method="dialog">
@@ -758,6 +917,16 @@ function openSessionSheet(session, date) {
           <select name="templateId"><option value="">Geen</option>${tplOptions}</select>
         </label>
       </div>
+      <div id="run-field" ${isRunType(s.typeId) ? '' : 'hidden'}>
+        <div class="field">🏃 Intervallen <span class="muted">(leeg laten = geen)</span></div>
+        ${s.run && !sr ? `<p class="muted">Uit je plan: <strong>${esc(s.run.label)}</strong>. Vul hieronder iets in om dit te vervangen.</p>` : ''}
+        <div class="run-grid">
+          <label>Herhalingen<input name="runReps" inputmode="numeric" value="${sr ? sr.reps : ''}" placeholder="5" /></label>
+          <label>Lopen (min)<input name="runRun" inputmode="decimal" value="${sr ? fmtNum(sr.run) : ''}" placeholder="2" /></label>
+          <label>Wandelen (min)<input name="runWalk" inputmode="decimal" value="${sr ? fmtNum(sr.walk) : ''}" placeholder="2" /></label>
+        </div>
+        <label class="ss-toggle"><input type="checkbox" name="runWarm" ${!s.run || s.run.warmup ? 'checked' : ''} /> 5 min wandelen vooraf en achteraf</label>
+      </div>
       <label class="ss-toggle repeat-toggle">
         <input type="checkbox" name="weekly" ${!isNew && seriesOf(session) ? 'checked' : ''} /> 🔁 Elke week herhalen
       </label>
@@ -768,6 +937,7 @@ function openSessionSheet(session, date) {
         </select>
       </label>
       <label class="field">Notitie<textarea name="note" rows="2" placeholder="Bijv. route, hal, met wie">${esc(s.note)}</textarea></label>
+      ${isNew ? '' : planRemoveButton(s)}
       <div class="actions">
         ${isNew ? '' : '<button type="button" class="btn danger" id="del-session">Verwijderen</button>'}
         <button type="button" class="btn" id="cancel">Annuleren</button>
@@ -784,6 +954,16 @@ function openSessionSheet(session, date) {
         note: (fd.get('note') || '').trim(),
         shin: tracksShin(fd.get('typeId')) && fd.get('shin') !== '' && fd.get('shin') !== null ? Number(fd.get('shin')) : undefined,
       }
+      if (isRunType(data.typeId)) {
+        const reps = parseInt(fd.get('runReps'))
+        const runMin = parseNum(fd.get('runRun'))
+        const warm = fd.get('runWarm') === 'on'
+        if (reps > 0 && runMin > 0) data.run = makeRun(reps, runMin, parseNum(fd.get('runWalk')) || 0, warm)
+        // Een reeks uit het plan die niet in het formulier past: bewaren.
+        else if (s.run && !sr) data.run = { ...s.run, warmup: warm ? RUN_WARMUP : 0, cooldown: warm ? RUN_WARMUP : 0 }
+        if (data.run && !data.duration) data.duration = Math.round(runTotal(data.run))
+      }
+      if (!data.run) data.run = undefined
       let target
       if (isNew) {
         target = { id: uid(), ...data, done: false }
@@ -792,7 +972,7 @@ function openSessionSheet(session, date) {
       } else {
         // Wijziging aan een herhalende training: vragen of de volgende weken meegaan.
         const changes = Object.fromEntries(
-          SERIES_FIELDS.filter((k) => String(data[k] ?? '') !== String(session[k] ?? '')).map((k) => [k, data[k]]),
+          SERIES_FIELDS.filter((k) => JSON.stringify(data[k] ?? '') !== JSON.stringify(session[k] ?? '')).map((k) => [k, data[k]]),
         )
         const dayDelta = daysBetween(session.date, data.date)
         if (seriesOf(session) && fd.get('weekly') === 'on' && (Object.keys(changes).length || dayDelta)) {
@@ -830,6 +1010,7 @@ function openSessionSheet(session, date) {
   sheet.querySelector('#cancel').onclick = closeSheet
   sheet.querySelector('.type-grid').addEventListener('change', (e) => {
     sheet.querySelector('#shin-field').hidden = !tracksShin(e.target.value)
+    sheet.querySelector('#run-field').hidden = !isRunType(e.target.value)
   })
   const del = sheet.querySelector('#del-session')
   if (del) del.onclick = () => deleteSession(session)
@@ -1162,6 +1343,7 @@ setInterval(() => {
   }
   renderRestBar()
   tickHold()
+  tickRun()
 }, 250)
 
 // Set afvinken en daarna rust starten, of in een superset doorgaan naar de
@@ -1384,6 +1566,7 @@ function openWorkoutSheet(s) {
       ${summary}
       <p></p>
       <button type="button" class="btn primary block" id="start">${startLabel}</button>
+      ${planRemoveButton(s)}
       <div class="actions">
         <button type="button" class="btn" id="edit">Bewerken</button>
         <button type="button" class="btn" id="cancel">Sluiten</button>
@@ -1427,6 +1610,557 @@ function openShinSheet(s) {
   })
 }
 
+// ---------- Hardlopen: intervallen ----------
+// Een looptraining kan `run` hebben: { label, steps: [{ t: 'run'|'walk', min }],
+// warmup, cooldown } (minuten). Tijdens het lopen houdt `runLog` de klok bij:
+// { startedAt, paused (ms), pausedAt, endedAt }, op tijdstempels, zodat de stand
+// klopt als de telefoon even op slot is geweest.
+
+const RUN_WARMUP = 5
+const fmtNum = (n) => String(Math.round(n * 100) / 100).replace('.', ',')
+const PHASE_NAMES = { warm: 'Warming-up', run: 'Lopen', walk: 'Wandelen', cool: 'Cooling-down' }
+const PHASE_SPOKEN = {
+  warm: 'Warming-up. Rustig wandelen.',
+  run: 'Lopen!',
+  walk: 'Wandelen.',
+  cool: 'Cooling-down. Rustig uitwandelen.',
+}
+
+// n × (lopen / wandelen), met na elk loopblok een wandelblok (zoals het 5 km-plan).
+function makeRun(reps, run, walk, warm = true) {
+  const steps = []
+  for (let i = 0; i < reps; i++) {
+    steps.push({ t: 'run', min: run })
+    if (walk) steps.push({ t: 'walk', min: walk })
+  }
+  const label = walk
+    ? `${reps} × (${fmtNum(run)} L / ${fmtNum(walk)} W)`
+    : reps > 1
+      ? `${reps} × ${fmtNum(run)} min lopen`
+      : `${fmtNum(run)} min aan één stuk`
+  return { label, steps, warmup: warm ? RUN_WARMUP : 0, cooldown: warm ? RUN_WARMUP : 0 }
+}
+
+// De simpele vorm (herhalingen, lopen, wandelen) voor het formulier, of null
+// als het een losse reeks is (zoals "15 L + 2 W + 10 L" uit het plan).
+function simpleRun(run) {
+  const st = run?.steps || []
+  const runs = st.filter((x) => x.t === 'run')
+  const walks = st.filter((x) => x.t === 'walk')
+  if (!runs.length || runs.some((x) => x.min !== runs[0].min)) return null
+  const alternates = walks.length === runs.length && walks.every((x) => x.min === walks[0].min) && st.every((x, i) => x.t === (i % 2 ? 'walk' : 'run'))
+  if (walks.length && !alternates) return null
+  return { reps: runs.length, run: runs[0].min, walk: walks[0]?.min || 0 }
+}
+
+function runPhases(run) {
+  const ph = []
+  if (run.warmup) ph.push({ t: 'warm', min: run.warmup })
+  for (const x of run.steps) ph.push({ ...x })
+  if (run.cooldown) ph.push({ t: 'cool', min: run.cooldown })
+  return ph
+}
+const runTotal = (run) => runPhases(run).reduce((n, p) => n + p.min, 0)
+const runMinutes = (run) => run.steps.filter((x) => x.t === 'run').reduce((n, x) => n + x.min, 0)
+
+// Balk zoals in het plan: lopen donker, wandelen licht, breedte naar duur.
+function runBar(run, big = false) {
+  const total = runTotal(run)
+  return `<div class="run-bar ${big ? 'big' : ''}">${runPhases(run)
+    .map((p, i) => `<span class="seg seg-${p.t}" data-seg="${i}" style="flex-grow:${((p.min / total) * 100).toFixed(2)}"></span>`)
+    .join('')}</div>`
+}
+
+function runElapsed(lg) {
+  const now = lg.endedAt || lg.pausedAt || Date.now()
+  return Math.max(0, (now - lg.startedAt - lg.paused) / 1000)
+}
+
+// Waar zit je na `sec` seconden? Index van de fase, en hoeveel er nog over is.
+function runPosition(run, sec) {
+  const ph = runPhases(run)
+  let acc = 0
+  for (let i = 0; i < ph.length; i++) {
+    const len = ph[i].min * 60
+    if (sec < acc + len) return { i, ph, left: acc + len - sec }
+    acc += len
+  }
+  return { i: ph.length - 1, ph, left: 0, done: true }
+}
+
+function speak(text) {
+  if (state.settings?.voice === false) return
+  try {
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = 'nl-NL'
+    speechSynthesis.cancel()
+    speechSynthesis.speak(u)
+  } catch {
+    // Geen spraak beschikbaar; de piepjes werken ook zonder.
+  }
+}
+
+function openRunSheet(s) {
+  const run = s.run
+  const d = fromKey(s.date)
+  const when = [`${DAYS[(d.getDay() + 6) % 7]} ${shortDate(d)}`, s.time].filter(Boolean).join(' · ')
+  const busy = s.runLog && !s.runLog.endedAt
+  const parts = [
+    run.warmup ? `${fmtNum(run.warmup)} min wandelen (warming-up)` : '',
+    run.label,
+    run.cooldown ? `${fmtNum(run.cooldown)} min wandelen (cooling-down)` : '',
+  ].filter(Boolean)
+  const planTools = planOf(s)
+    ? `
+      <div class="plan-tools">
+        <p class="muted">Hoe ging het? De pijn bepaalt het tempo, niet de kalender.</p>
+        <div class="actions">
+          <button type="button" class="btn" id="plan-repeat">🟡 Week herhalen</button>
+          <button type="button" class="btn" id="plan-back">🔴 Week terug</button>
+        </div>
+      </div>`
+    : ''
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>🏃 ${esc(run.label)}</h2>
+      <p class="muted">${esc(when)} · ${fmtNum(runMinutes(run))} min lopen · ${fmtNum(runTotal(run))} min totaal${s.note ? '<br>' + esc(s.note) : ''}</p>
+      ${runBar(run)}
+      <p class="run-parts">${parts.map(esc).join(' → ')}</p>
+      <button type="button" class="btn primary block" id="start">${busy ? '▶ Doorgaan' : s.done ? '▶ Nog een keer lopen' : '▶ Intervaltraining starten'}</button>
+      ${planTools}
+      ${planRemoveButton(s)}
+      <div class="actions">
+        <button type="button" class="btn" id="edit">Bewerken</button>
+        <button type="button" class="btn" id="cancel">Sluiten</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  sheet.querySelector('#start').onclick = () => startRun(s)
+  sheet.querySelector('#edit').onclick = () => {
+    closeSheet()
+    openSessionSheet(s)
+  }
+  sheet.querySelector('#cancel').onclick = closeSheet
+  sheet.querySelector('#plan-repeat')?.addEventListener('click', () => askRepeatPlanWeek(s, false))
+  sheet.querySelector('#plan-back')?.addEventListener('click', () => askRepeatPlanWeek(s, true))
+}
+
+let lastRunPhase = null
+let lastCountBeep = null
+
+function startRun(s) {
+  if (!s.runLog || s.runLog.endedAt) s.runLog = { startedAt: Date.now(), paused: 0, pausedAt: null, endedAt: null }
+  unlockAudio()
+  keepScreenOn(true)
+  closeSheet()
+  ui.run = s.id
+  lastRunPhase = null
+  lastCountBeep = null
+  save()
+  render()
+  window.scrollTo(0, 0)
+  const pos = runPosition(s.run, runElapsed(s.runLog))
+  speak(PHASE_SPOKEN[pos.ph[pos.i].t])
+}
+
+const runSession = () => ui.run && state.sessions.find((x) => x.id === ui.run)
+
+function renderRunPlayer(s) {
+  const run = s.run
+  const lg = s.runLog
+  const sec = runElapsed(lg)
+  const pos = runPosition(run, sec)
+  const p = pos.ph[pos.i]
+  const next = pos.ph[pos.i + 1]
+  const runBlocks = pos.ph.filter((x) => x.t === 'run').length
+  const runNo = pos.ph.slice(0, pos.i + 1).filter((x) => x.t === 'run').length
+  const total = runTotal(run) * 60
+  title.textContent = '🏃 Intervaltraining'
+  return `
+    <div class="run-player ph-${p.t} ${lg.pausedAt ? 'paused' : ''}">
+      <div class="rp-top">
+        <button class="iconbtn" data-action="run-back" aria-label="Terug naar agenda">‹</button>
+        <div class="rp-title">${esc(run.label)}</div>
+      </div>
+      <div class="rp-phase">${lg.pausedAt ? '⏸ Pauze' : PHASE_NAMES[p.t]}</div>
+      <div class="rp-clock" id="rp-clock">${fmtClock(pos.left * 1000)}</div>
+      <div class="rp-sub">${p.t === 'run' ? `Loopblok ${runNo} van ${runBlocks}` : p.t === 'walk' ? 'Lekker op adem komen' : ''}</div>
+      <div class="rp-next">${next ? `Straks: ${PHASE_NAMES[next.t].toLowerCase()} ${fmtNum(next.min)} min` : 'Laatste stuk, Tara! 💛'}</div>
+      ${runBar(run, true)}
+      <div class="rp-times"><span id="rp-elapsed">${fmtClock(sec * 1000)}</span><span>${fmtClock(total * 1000)}</span></div>
+      <div class="rp-btns">
+        <button class="btn" data-action="run-pause">${lg.pausedAt ? '▶ Verder' : '⏸ Pauze'}</button>
+        <button class="btn" data-action="run-skip">⏭ Volgende</button>
+        <button class="btn" data-action="run-stop">■ Stoppen</button>
+      </div>
+    </div>`
+}
+
+// Elke 250 ms: klok bijwerken, 3-2-1 piepjes voor een wissel, en bij een nieuwe
+// fase piepen, de fase uitspreken en het scherm opnieuw opbouwen.
+function tickRun() {
+  const s = runSession()
+  if (!s?.runLog) return
+  const lg = s.runLog
+  const sec = runElapsed(lg)
+  const pos = runPosition(s.run, sec)
+  if (pos.done) return finishRun(s)
+  if (lastRunPhase !== null && pos.i !== lastRunPhase) {
+    lastRunPhase = pos.i
+    lastCountBeep = null
+    beep(pos.ph[pos.i].t === 'run' ? [880, 1320] : [1320, 880])
+    speak(PHASE_SPOKEN[pos.ph[pos.i].t])
+    render()
+    return
+  }
+  lastRunPhase = pos.i
+  const left = Math.ceil(pos.left)
+  if (!lg.pausedAt && left <= 3 && left >= 1 && left !== lastCountBeep) {
+    lastCountBeep = left
+    beep([660])
+  }
+  const clock = document.getElementById('rp-clock')
+  if (clock) clock.textContent = fmtClock(pos.left * 1000)
+  const el = document.getElementById('rp-elapsed')
+  if (el) el.textContent = fmtClock(sec * 1000)
+  view.querySelectorAll('.run-bar.big .seg').forEach((seg, i) => {
+    seg.classList.toggle('past', i < pos.i)
+    seg.classList.toggle('now', i === pos.i)
+  })
+}
+
+function finishRun(s) {
+  const lg = s.runLog
+  if (lg.pausedAt) {
+    lg.paused += Date.now() - lg.pausedAt
+    lg.pausedAt = null
+  }
+  lg.endedAt = Date.now()
+  s.done = true
+  s.duration = Math.max(1, Math.round(runElapsed(lg) / 60))
+  ui.run = null
+  keepScreenOn(false)
+  beep()
+  speak('Klaar! Goed gedaan, Tara.')
+  save()
+  render()
+  openShinSheet(s)
+  cheer()
+}
+
+const runActions = {
+  'run-back': () => {
+    ui.run = null
+    keepScreenOn(false)
+    render()
+  },
+  'run-pause': () => {
+    const lg = runSession().runLog
+    if (lg.pausedAt) {
+      lg.paused += Date.now() - lg.pausedAt
+      lg.pausedAt = null
+    } else lg.pausedAt = Date.now()
+    save()
+    render()
+  },
+  'run-skip': () => {
+    const s = runSession()
+    const pos = runPosition(s.run, runElapsed(s.runLog))
+    s.runLog.paused -= pos.left * 1000 + 1
+    save()
+    tickRun()
+  },
+  'run-stop': () => {
+    if (!confirm('Training stoppen? Wat je gelopen hebt wordt bewaard en de training afgevinkt.')) return
+    finishRun(runSession())
+  },
+}
+
+// ---------- Terug naar 5 km ----------
+// Het plan staat als data in plan5k.js. Een plan in de agenda is
+// { id, version, rhythm, strength, cross, extra, startDate, startWeek };
+// de trainingen dragen `planId` en `planWeek` (bijv. 'B2' of '7').
+
+const planWeeks = (plan) => PLAN_5K.versions[plan.version].weeks.filter((w) => plan.extra || !w.extra)
+const weekName = (id) => (id.startsWith('B') ? `brugweek ${id}` : `week ${id}`)
+const activePlan = () => state.plans[state.plans.length - 1]
+
+// Maandag van deze week als het vandaag maandag is, anders volgende maandag.
+function nextMonday() {
+  const today = new Date()
+  const m = startOfWeek(today)
+  return toKey(toKey(m) === toKey(today) ? m : addDays(m, 7))
+}
+
+// Activiteit (uit de standaardlijst of het plan) terugzetten of toevoegen.
+const PLAN_TYPES = [{ id: 'kracht', name: 'Kracht & springen', emoji: '💪' }]
+function ensureType(id) {
+  const t = state.types.find((x) => x.id === id)
+  if (t) delete t.hidden
+  else state.types.push([...defaultState().types, ...PLAN_TYPES].find((x) => x.id === id))
+}
+
+function strengthTemplateId() {
+  const def = PLAN_5K.strength
+  let tpl = state.templates.find((t) => t.name === def.name)
+  if (!tpl) {
+    tpl = { id: uid(), name: def.name, exercises: def.exercises.map((e) => ({ id: uid(), ...e })) }
+    state.templates.push(tpl)
+  }
+  return tpl.id
+}
+
+// Eén planweek in de agenda zetten, in de kalenderweek die op `monday` begint.
+function addPlanWeek(plan, week, monday) {
+  const r = PLAN_5K.rhythms.find((x) => x.id === plan.rhythm)
+  const tag = `5 km-plan · ${weekName(week.id)}`
+  const at = (day) => toKey(addDays(monday, day))
+  const add = (s) => state.sessions.push({ id: uid(), time: '', templateId: '', done: false, planId: plan.id, planWeek: week.id, ...s })
+  const strength = (date, extra = '') =>
+    add({ typeId: 'kracht', templateId: strengthTemplateId(), date, duration: 30, note: `${tag}${extra}` })
+  let n = 0
+  if (week.kind === 'run') {
+    week.runs.forEach((spec, i) => {
+      const run = { label: spec.label, steps: spec.steps.map((x) => ({ ...x })), warmup: RUN_WARMUP, cooldown: RUN_WARMUP }
+      add({ typeId: 'hardlopen', date: at(r.run[i]), run, duration: Math.round(runTotal(run)), note: `${tag} · training ${i + 1}` })
+      n++
+    })
+    if (plan.strength) r.strength.forEach((d) => (strength(at(d)), n++))
+  } else {
+    // Brugweek: nog niet hardlopen. Kracht (en springen) op de loopdagen, wandelen op de krachtdagen.
+    r.run.forEach((d, i) => (strength(at(d), week.jumps[i] ? ` · springen: ${week.jumps[i]}` : ' · zonder springen'), n++))
+    r.strength.forEach((d, i) => (add({ typeId: 'wandelen', date: at(d), duration: week.walkMin[i], note: `${tag} · ${week.walk}` }), n++))
+  }
+  if (plan.cross) {
+    add({ typeId: 'fietsen', date: at(r.cross), duration: 40, note: `${tag} · fietsen of zwemmen, 30–45 min${week.kind === 'bridge' ? ' (2–3× per week)' : ''}` })
+    n++
+  }
+  return n
+}
+
+function schedulePlan(opts) {
+  for (const id of ['hardlopen', 'kracht', 'wandelen', 'fietsen']) ensureType(id)
+  const plan = { id: uid(), ...opts }
+  state.plans.push(plan)
+  const weeks = planWeeks(plan)
+  const start = weeks.findIndex((w) => w.id === plan.startWeek)
+  let monday = fromKey(plan.startDate)
+  let n = 0
+  for (const week of weeks.slice(start)) {
+    n += addPlanWeek(plan, week, monday)
+    monday = addDays(monday, 7)
+  }
+  return n
+}
+
+// Alle nog niet gedane trainingen van het plan weghalen; wat al gedaan is blijft
+// als geschiedenis staan. Geeft de weggehaalde trainingen terug (voor ongedaan maken).
+const openPlanSession = (s, plan) => s.planId === plan.id && !s.done && !s.log && !s.runLog
+function removePlan(plan) {
+  const removed = state.sessions.filter((s) => openPlanSession(s, plan))
+  state.sessions = state.sessions.filter((s) => !openPlanSession(s, plan))
+  state.plans = state.plans.filter((p) => p.id !== plan.id)
+  return removed
+}
+
+const planOf = (s) => s?.planId && state.plans.find((p) => p.id === s.planId)
+
+function askRemovePlan(planId) {
+  const plan = state.plans.find((p) => p.id === planId)
+  if (!plan) return
+  const count = state.sessions.filter((s) => openPlanSession(s, plan)).length
+  if (!confirm(`Het hele 5 km-plan uit je agenda halen? Dat zijn ${count} trainingen. Wat je al gedaan hebt, blijft staan.`)) return
+  const removed = removePlan(plan)
+  save()
+  closeSheet()
+  render()
+  showToast(`🗑️ ${removed.length} trainingen van het plan weggehaald`, () => {
+    state.plans.push(plan)
+    state.sessions.push(...removed)
+    save()
+    render()
+  })
+}
+
+// Knop "hele plan weghalen" in de vensters van plantrainingen.
+const planRemoveButton = (s) =>
+  planOf(s)
+    ? `<button type="button" class="btn danger block plan-remove-all" data-plan="${s.planId}">🗑️ Hele 5 km-plan uit agenda halen</button>`
+    : ''
+sheet.addEventListener('click', (e) => {
+  const btn = e.target.closest('.plan-remove-all')
+  if (btn) askRemovePlan(btn.dataset.plan)
+})
+
+// 🟡 week herhalen / 🔴 week terug: alles van het plan vanaf volgende week schuift
+// een week op, en volgende week komt deze (of de vorige) planweek nog een keer.
+function repeatPlanWeek(s, back) {
+  const plan = state.plans.find((p) => p.id === s.planId)
+  const weeks = planWeeks(plan)
+  const idx = Math.max(0, weeks.findIndex((w) => w.id === s.planWeek))
+  const nextMon = addDays(startOfWeek(fromKey(s.date)), 7)
+  for (const x of state.sessions) {
+    if (x.planId === plan.id && x.date >= toKey(nextMon)) x.date = toKey(addDays(fromKey(x.date), 7))
+  }
+  const src = weeks[back ? Math.max(0, idx - 1) : idx]
+  addPlanWeek(plan, src, nextMon)
+  return src
+}
+
+function askRepeatPlanWeek(s, back) {
+  const plan = state.plans.find((p) => p.id === s.planId)
+  if (!plan) return
+  const weeks = planWeeks(plan)
+  const idx = Math.max(0, weeks.findIndex((w) => w.id === s.planWeek))
+  const src = weeks[back ? Math.max(0, idx - 1) : idx]
+  const msg = back
+    ? `🔴 Een week terug: volgende week doe je ${weekName(src.id)}. De rest van het plan schuift een week op.\n\nStop met lopen en neem eerst 2 rustdagen. Twee keer rood achter elkaar: bel je fysio.`
+    : `🟡 Week herhalen: volgende week doe je ${weekName(src.id)} nog een keer. De rest van het plan schuift een week op.\n\nHerhalen is geen falen 💛`
+  if (!confirm(msg)) return
+  repeatPlanWeek(s, back)
+  save()
+  closeSheet()
+  ui.tab = 'week'
+  ui.calMode = 'week'
+  ui.weekStart = addDays(startOfWeek(fromKey(s.date)), 7)
+  render()
+  showToast(back ? '🔴 Een stapje terug. Rustig aan, Tara 💛' : '🟡 Week herhaald. Goed dat je naar je been luistert 💛')
+}
+
+function planWeekOptions(version, extra) {
+  return PLAN_5K.versions[version].weeks
+    .filter((w) => extra || !w.extra)
+    .map((w) => {
+      const what = w.kind === 'bridge' ? 'wandelen, kracht, springen' : w.runs[0].label
+      return `<option value="${w.id}">${w.id.startsWith('B') ? 'Brug ' + w.id : 'Week ' + w.id} · ${esc(what)}${w.extra ? ' (extra)' : ''}</option>`
+    })
+    .join('')
+}
+
+function openPlanSheet() {
+  const v = PLAN_5K.versions
+  const versionOpt = (id, checked) => `
+    <label class="plan-opt">
+      <input type="radio" name="version" value="${id}" ${checked ? 'checked' : ''} />
+      <span><strong>${esc(v[id].name)}</strong><small>${esc(v[id].info)}</small></span>
+    </label>`
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>🏃 Terug naar 5 km</h2>
+      <p class="muted">Het herstelplan van Tara, stap voor stap in je agenda 💛</p>
+      <div class="plan-versions">${versionOpt('B', true)}${versionOpt('A', false)}</div>
+      <label class="field">Beginnen in
+        <select name="startWeek">${planWeekOptions('B', false)}</select>
+      </label>
+      <label class="field">Vanaf de week van
+        <input type="date" name="startDate" value="${nextMonday()}" required />
+      </label>
+      <label class="field">Weekritme
+        <select name="rhythm">${PLAN_5K.rhythms.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select>
+      </label>
+      <label class="ss-toggle"><input type="checkbox" name="strength" checked /> 💪 Kracht + springen, 2× per week op dagen zonder lopen</label>
+      <label class="ss-toggle"><input type="checkbox" name="cross" checked /> 🚴 Fietsen of zwemmen, 1× per week</label>
+      <label class="ss-toggle"><input type="checkbox" name="extra" /> Extra weken meenemen</label>
+      <p class="muted" id="extra-note">${esc(v.B.fiveKmNote)}</p>
+      <details class="plan-rules">
+        <summary>De spelregels</summary>
+        <ul>${PLAN_5K.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      </details>
+      <div class="actions">
+        <button type="button" class="btn" id="cancel">Annuleren</button>
+        <button type="submit" class="btn primary">In agenda zetten</button>
+      </div>
+    </form>`,
+    (fd) => {
+      const old = activePlan()
+      if (old && !confirm('Er staat al een 5 km-plan in je agenda. Vervangen? De nog niet gedane trainingen van het oude plan worden weggehaald.')) return false
+      if (old) removePlan(old)
+      const startDate = toKey(startOfWeek(fromKey(fd.get('startDate'))))
+      const n = schedulePlan({
+        version: fd.get('version'),
+        startWeek: fd.get('startWeek'),
+        startDate,
+        rhythm: fd.get('rhythm'),
+        strength: fd.get('strength') === 'on',
+        cross: fd.get('cross') === 'on',
+        extra: fd.get('extra') === 'on',
+      })
+      save()
+      closeSheet()
+      ui.tab = 'week'
+      ui.calMode = 'week'
+      ui.weekStart = fromKey(startDate)
+      render()
+      if (agendaScrolls()) scrollToWeek(fromKey(startDate))
+      showToast(`📅 ${n} trainingen ingepland. Succes, Tara! 💛`)
+    },
+  )
+  const form = sheet.querySelector('form')
+  const refresh = () => {
+    const version = form.version.value
+    const keep = form.startWeek.value
+    form.startWeek.innerHTML = planWeekOptions(version, form.extra.checked)
+    if ([...form.startWeek.options].some((o) => o.value === keep)) form.startWeek.value = keep
+    sheet.querySelector('#extra-note').textContent = PLAN_5K.versions[version].fiveKmNote
+  }
+  form.addEventListener('change', (e) => {
+    if (e.target.name === 'version' || e.target.name === 'extra') refresh()
+  })
+  sheet.querySelector('#cancel').onclick = closeSheet
+}
+
+function renderPlanCard() {
+  const plan = activePlan()
+  if (!plan) {
+    return `
+      <section class="card plan-card">
+        <h2>🏃 Terug naar 5 km</h2>
+        <p class="muted">Het herstelplan van Tara: stap voor stap weer naar 5 km. Kies je versie en de week waarin je begint, en Tarapp zet alles in je agenda 💛</p>
+        <button class="btn primary block" data-action="plan-new">In agenda zetten</button>
+      </section>`
+  }
+  const v = PLAN_5K.versions[plan.version]
+  const sessions = state.sessions.filter((s) => s.planId === plan.id)
+  const runs = sessions.filter((s) => s.typeId === 'hardlopen')
+  const doneRuns = runs.filter((s) => s.done).length
+  const ws = toKey(startOfWeek(new Date()))
+  const we = toKey(addDays(startOfWeek(new Date()), 6))
+  const now = sessions.find((s) => s.date >= ws && s.date <= we)
+  const next = sessions.filter((s) => s.date >= todayKey() && !s.done).sort((a, b) => a.date.localeCompare(b.date))[0]
+  const status = now
+    ? `Deze week: <strong>${weekName(now.planWeek)}</strong>`
+    : next
+      ? `Begint ${shortDate(fromKey(next.date))} met ${weekName(next.planWeek)}`
+      : 'Alles gedaan! 🎉'
+  return `
+    <section class="card plan-card">
+      <h2>🏃 Terug naar 5 km</h2>
+      <p>${esc(v.short)} · ${status}</p>
+      <p class="muted"><span class="plan-badge">5K</span> Trainingen uit het plan herken je aan de paarse streep.</p>
+      <div class="progress"><div style="width:${runs.length ? Math.round((doneRuns / runs.length) * 100) : 0}%"></div></div>
+      <p class="muted">${doneRuns} van ${runs.length} looptrainingen gedaan 💛</p>
+      ${
+        now
+          ? `<div class="actions">
+              <button class="btn" data-action="plan-repeat" data-id="${now.id}">🟡 Week herhalen</button>
+              <button class="btn" data-action="plan-back" data-id="${now.id}">🔴 Week terug</button>
+            </div>`
+          : ''
+      }
+      <details class="plan-rules">
+        <summary>De spelregels</summary>
+        <ul>${PLAN_5K.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      </details>
+      <div class="actions">
+        <button class="btn" data-action="plan-new">Opnieuw plannen</button>
+        <button class="btn danger" data-action="plan-remove">Uit agenda halen</button>
+      </div>
+    </section>`
+}
+
 // ---------- Elke week herhalen ----------
 // Een herhaling is een regel { id, every, last, tpl }: vanaf de laatst
 // ingeplande datum (`last`) vult de app steeds nieuwe trainingen aan tot een
@@ -1440,7 +2174,7 @@ function startWeekly(s) {
     id: s.seriesId,
     every: 7,
     last: s.date,
-    tpl: { typeId: s.typeId, time: s.time, duration: s.duration, templateId: s.templateId, note: s.note },
+    tpl: { typeId: s.typeId, time: s.time, duration: s.duration, templateId: s.templateId, note: s.note, run: s.run },
   })
   ensureRecurring()
 }
@@ -1456,7 +2190,7 @@ function stopWeekly(s) {
   return 'Herhaling gestopt'
 }
 
-const SERIES_FIELDS = ['typeId', 'time', 'duration', 'templateId', 'note']
+const SERIES_FIELDS = ['typeId', 'time', 'duration', 'templateId', 'note', 'run']
 const daysBetween = (a, b) => Math.round((fromKey(b) - fromKey(a)) / 86400000)
 
 // Wijziging ook doorvoeren in de nog niet gedane trainingen van deze reeks ná
@@ -1504,7 +2238,7 @@ function ensureRecurring(until = toKey(addDays(new Date(), 84))) {
   for (const r of state.series) {
     let next = addDays(fromKey(r.last), r.every)
     while (toKey(next) <= until) {
-      state.sessions.push({ id: uid(), ...r.tpl, date: toKey(next), done: false, seriesId: r.id })
+      state.sessions.push({ id: uid(), ...JSON.parse(JSON.stringify(r.tpl)), date: toKey(next), done: false, seriesId: r.id })
       r.last = toKey(next)
       next = addDays(next, r.every)
       changed = true
@@ -1696,12 +2430,14 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
   // (niet boven de prullenbak, die zit zelf onderaan).
   const autoScroll = () => {
     if (!st?.active) return
-    const r = scroller.getBoundingClientRect()
+    const win = scroller === window
+    const r = win ? { top: topbarBottom(), bottom: window.innerHeight } : scroller.getBoundingClientRect()
     const bottom = st.trash ? Math.min(r.bottom, st.trash.getBoundingClientRect().top) : r.bottom
     const edge = 64
     const speed = overTrash() ? 0 : st.y < r.top + edge ? -12 : st.y > bottom - edge ? 12 : 0
     if (speed) {
-      scroller.scrollTop += speed
+      if (win) window.scrollBy(0, speed)
+      else scroller.scrollTop += speed
       onMove?.(st.x, st.y, st.el)
     }
     st.raf = requestAnimationFrame(autoScroll)
@@ -1850,6 +2586,10 @@ makeDraggable(view, {
   item: '.session',
   handle: '.s-body',
   delay: 350,
+  scroller: window,
+  onStart: () => {
+    swipe = null
+  },
   onMove: (x, y) => {
     const target = elementAt(x, y)?.closest('[data-drop-date]')
     view.querySelectorAll('.drop-target').forEach((d) => d !== target && d.classList.remove('drop-target'))
@@ -1917,6 +2657,8 @@ const actions = {
     ui.calMode = el.dataset.mode
     if (ui.calMode === 'maand') ui.month = new Date(ui.weekStart.getFullYear(), addDays(ui.weekStart, 3).getMonth(), 1)
     render()
+    if (ui.calMode === 'week' && agendaScrolls()) scrollToWeek(ui.weekStart)
+    else window.scrollTo(0, 0)
   },
   'prev-month': () => {
     ui.month = new Date(ui.month.getFullYear(), ui.month.getMonth() - 1, 1)
@@ -1934,19 +2676,30 @@ const actions = {
     ui.weekStart = startOfWeek(fromKey(el.dataset.date))
     ui.calMode = 'week'
     render()
+    if (agendaScrolls()) scrollToWeek(ui.weekStart)
     document.querySelector(`[data-date="${el.dataset.date}"]`)?.closest('.day')?.scrollIntoView({ block: 'center' })
   },
   'this-week': () => {
     ui.weekStart = startOfWeek(new Date())
     render()
   },
+  'weeks-earlier': () => {
+    ui.scrollFrom -= 8
+    render()
+  },
+  'plan-new': () => openPlanSheet(),
+  'plan-repeat': (el) => askRepeatPlanWeek(state.sessions.find((s) => s.id === el.dataset.id), false),
+  'plan-back': (el) => askRepeatPlanWeek(state.sessions.find((s) => s.id === el.dataset.id), true),
+  'plan-remove': () => askRemovePlan(activePlan()?.id),
   add: (el) => openSessionSheet(null, el.dataset.date),
   edit: (el) => {
     const s = state.sessions.find((x) => x.id === el.dataset.id)
-    if (isWorkoutSession(s)) openWorkoutSheet(s)
+    if (s.run && isRunType(s.typeId)) openRunSheet(s)
+    else if (isWorkoutSession(s)) openWorkoutSheet(s)
     else openSessionSheet(s)
   },
   ...workoutActions,
+  ...runActions,
   toggle: (el) => {
     const s = state.sessions.find((x) => x.id === el.dataset.id)
     s.done = !s.done
@@ -2029,6 +2782,14 @@ view.addEventListener('submit', (e) => {
   render()
 })
 
+view.addEventListener('change', (e) => {
+  const key = e.target.dataset.setting
+  if (!key) return
+  state.settings ||= {}
+  state.settings[key] = e.target.checked
+  save()
+})
+
 view.addEventListener('change', async (e) => {
   if (e.target.id !== 'import-file' || !e.target.files[0]) return
   try {
@@ -2069,7 +2830,8 @@ document.querySelector('.tabbar').addEventListener('click', (e) => {
   if (!btn) return
   ui.tab = btn.dataset.tab
   render()
-  window.scrollTo(0, 0)
+  if (ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()) scrollToWeek(new Date())
+  else window.scrollTo(0, 0)
 })
 
 fab.addEventListener('click', () => {
@@ -2088,6 +2850,8 @@ document.addEventListener('visibilitychange', () => {
 // bijv. als iOS de app halverwege de training heeft afgesloten.
 const unfinished = state.sessions.find((s) => s.log && !s.log.endedAt && Date.now() - s.log.startedAt < 12 * 3600e3)
 if (unfinished) ui.active = unfinished.id
+const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt && Date.now() - s.runLog.startedAt < 3 * 3600e3)
+if (unfinishedRun) ui.run = unfinishedRun.id
 
 render()
 showChangesSinceLastVisit()
@@ -2111,14 +2875,14 @@ requestPersistence()
 // dan wachten tot die klaar is. Gegevens staan in localStorage en blijven staan.
 let reloadPending = false
 function reloadWhenIdle() {
-  if (ui.restEnd || ui.hold || sheet.open) {
+  if (ui.restEnd || ui.hold || ui.run || sheet.open) {
     reloadPending = true
     return
   }
   location.reload()
 }
 setInterval(() => {
-  if (reloadPending && !ui.restEnd && !ui.hold && !sheet.open) location.reload()
+  if (reloadPending && !ui.restEnd && !ui.hold && !ui.run && !sheet.open) location.reload()
 }, 1000)
 
 async function checkForUpdate() {
