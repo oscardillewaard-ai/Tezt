@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '18' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '19' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -337,6 +337,7 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 19, items: ['🏃 Bij het 5 km-plan kun je nu kiezen voor 2× per week lopen in plaats van 3× 💛'] },
   {
     v: 18,
     items: [
@@ -1922,9 +1923,14 @@ function addPlanWeek(plan, week, monday) {
     add({ typeId: 'kracht', templateId: strengthTemplateId(), date, duration: 30, note: `${tag}${extra}` })
   let n = 0
   if (week.kind === 'run') {
-    week.runs.forEach((spec, i) => {
+    // 2× per week: training 1 en de langste van de andere twee, op de eerste
+    // en laatste loopdag van het ritme (zo blijft er ruim rust tussen).
+    const picks = plan.twice ? [0, runMinutes(week.runs[2]) > runMinutes(week.runs[1]) ? 2 : 1] : [0, 1, 2]
+    const days = plan.twice ? [r.run[0], r.run[2]] : r.run
+    picks.forEach((i, k) => {
+      const spec = week.runs[i]
       const run = { label: spec.label, steps: spec.steps.map((x) => ({ ...x })), warmup: RUN_WARMUP, cooldown: RUN_WARMUP }
-      add({ typeId: 'hardlopen', date: at(r.run[i]), run, duration: Math.round(runTotal(run)), note: `${tag} · training ${i + 1}` })
+      add({ typeId: 'hardlopen', date: at(days[k]), run, duration: Math.round(runTotal(run)), note: `${tag} · training ${i + 1}` })
       n++
     })
     if (plan.strength) r.strength.forEach((d) => (strength(at(d)), n++))
@@ -2061,6 +2067,8 @@ function openPlanSheet() {
       <label class="field">Weekritme
         <select name="rhythm">${PLAN_5K.rhythms.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select>
       </label>
+      <label class="ss-toggle"><input type="checkbox" name="twice" /> 🏃 2× per week lopen in plaats van 3×</label>
+      <p class="muted">Je houdt dan per week training 1 en de langste training, op de eerste en laatste loopdag.</p>
       <label class="ss-toggle"><input type="checkbox" name="strength" checked /> 💪 Kracht + springen, 2× per week op dagen zonder lopen</label>
       <label class="ss-toggle"><input type="checkbox" name="cross" checked /> 🚴 Fietsen of zwemmen, 1× per week</label>
       <label class="ss-toggle"><input type="checkbox" name="extra" /> Extra weken meenemen</label>
@@ -2084,6 +2092,7 @@ function openPlanSheet() {
         startWeek: fd.get('startWeek'),
         startDate,
         rhythm: fd.get('rhythm'),
+        twice: fd.get('twice') === 'on',
         strength: fd.get('strength') === 'on',
         cross: fd.get('cross') === 'on',
         extra: fd.get('extra') === 'on',
@@ -2138,7 +2147,7 @@ function renderPlanCard() {
   return `
     <section class="card plan-card">
       <h2>🏃 Terug naar 5 km</h2>
-      <p>${esc(v.short)} · ${status}</p>
+      <p>${esc(v.short)}${plan.twice ? ' · 2× per week lopen' : ''} · ${status}</p>
       <p class="muted"><span class="plan-badge">5K</span> Trainingen uit het plan herken je aan de paarse streep.</p>
       <div class="progress"><div style="width:${runs.length ? Math.round((doneRuns / runs.length) * 100) : 0}%"></div></div>
       <p class="muted">${doneRuns} van ${runs.length} looptrainingen gedaan 💛</p>
