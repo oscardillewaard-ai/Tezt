@@ -14,8 +14,10 @@
 // 1. dash.cloudflare.com -> Storage & Databases -> KV -> Create namespace,
 //    bijv. "parkenjacht".
 // 2. Workers & Pages -> Create -> Worker, plak dit script, Deploy.
-// 3. Worker -> Settings -> Bindings -> Add -> KV namespace: naam PARKEN,
-//    kies de namespace van stap 1. Deploy opnieuw.
+// 3. Worker -> Settings -> Bindings -> Add -> KV namespace: naam PARKEN
+//    (een andere naam werkt ook), kies de namespace van stap 1. Deploy opnieuw.
+//    Controle: open het adres van de worker in je browser; hij vertelt dan
+//    of alles klopt.
 // 4. Vul in Parkenjacht onder ⚙️ -> Samen synchroniseren het adres van de
 //    worker in (bijv. https://parkenjacht.<jouw-naam>.workers.dev), of zet
 //    het als DEFAULT_SYNC_URL in public/parken/app.js.
@@ -60,6 +62,37 @@ function merge(a, b) {
   return out
 }
 
+// De opslag zoeken: bij voorkeur de binding PARKEN, anders de eerste
+// KV-binding die er is (scheelt gedoe als de naam net anders is getypt).
+function findKv(env) {
+  if (env.PARKEN) return env.PARKEN
+  return Object.values(env || {}).find((v) => v && ['get', 'put', 'list'].every((f) => typeof v[f] === 'function'))
+}
+
+// Statuspagina op het hoofdadres, in gewone taal.
+async function statusPage(kv) {
+  const lines = ['Parkenjacht sync-server', '', '✅ De worker draait.']
+  if (!kv) {
+    lines.push(
+      '❌ Er is nog geen opslag gekoppeld.',
+      '',
+      'Zo los je het op:',
+      '1. Maak een KV namespace (Storage & Databases -> KV -> Create), bijv. "parkenjacht".',
+      '2. Ga naar deze worker -> Settings -> Bindings -> Add -> KV namespace.',
+      '3. Variable name: PARKEN, kies de namespace van stap 1, opslaan/deployen.',
+      '4. Ververs deze pagina.',
+    )
+  } else {
+    try {
+      await kv.put('health', String(Date.now()))
+      lines.push('✅ De opslag is gekoppeld en werkt.', '', 'Klaar! Vul dit adres in Parkenjacht in onder ⚙️ -> Samen synchroniseren.')
+    } catch (err) {
+      lines.push(`❌ Opslag gekoppeld, maar schrijven lukt niet: ${err?.message || err}`)
+    }
+  }
+  return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })
+}
+
 const json = (data, status, headers) =>
   new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
 
@@ -67,11 +100,14 @@ export default {
   async fetch(request, env) {
     const headers = cors(request)
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers })
-    const m = new URL(request.url).pathname.match(/^\/room\/([^/]+)$/)
+    const kv = findKv(env)
+    const path = new URL(request.url).pathname
+    if (path === '/' && request.method === 'GET') return statusPage(kv)
+    const m = path.match(/^\/room\/([^/]+)$/)
     if (!m || !ROOM_RE.test(m[1])) return json({ error: 'not found' }, 404, headers)
-    if (!env.PARKEN) return json({ error: 'KV-binding PARKEN ontbreekt' }, 500, headers)
+    if (!kv) return json({ error: 'Geen opslag gekoppeld aan de sync-server' }, 500, headers)
     const key = `room:${m[1]}`
-    const stored = clean((await env.PARKEN.get(key, 'json'))?.entries)
+    const stored = clean((await kv.get(key, 'json'))?.entries)
 
     if (request.method === 'GET') return json({ entries: stored }, 200, headers)
 
@@ -86,7 +122,7 @@ export default {
       }
       const merged = merge(stored, incoming)
       if (JSON.stringify(merged) !== JSON.stringify(stored)) {
-        await env.PARKEN.put(key, JSON.stringify({ entries: merged, updated: Date.now() }))
+        await kv.put(key, JSON.stringify({ entries: merged, updated: Date.now() }))
       }
       return json({ entries: merged }, 200, headers)
     }
