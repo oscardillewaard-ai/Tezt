@@ -70,6 +70,7 @@ h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
 
 .top-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .iconbtn {
+  position: relative;
   width: 40px; height: 40px; border-radius: 50%; border: 0; font-size: 19px;
   background: rgb(255 255 255 / 0.14); color: var(--bar-text);
 }
@@ -214,3 +215,13 @@ h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
 @media (max-width: 819px) {
   .leaflet-bottom { bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
+
+/* Sync-status op het ⚙️-knopje */
+.sync-dot {
+  position: absolute; top: 2px; right: 2px; width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--bar); background: #4ade80;
+}
+.sync-dot[data-status='busy'] { background: #facc15; animation: pulse 1s ease-in-out infinite; }
+.sync-dot[data-status='error'] { background: #f87171; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .sync-dot { animation: none !important; } }

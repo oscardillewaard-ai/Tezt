@@ -125,9 +125,19 @@ komen vanzelf binnen (niet terwijl er een venster openstaat) en tonen eenmalig
 "Wat is er nieuw?". Gegevens staan in `localStorage` (sleutel `parken.v1`);
 onder ⚙️ staan back-up exporteren/importeren en "Nu bijwerken".
 
-Samen bijhouden: "Deel voortgang" maakt een link met de voortgang in het
-`#`-deel (gaat niet naar een server). Wie hem opent, voegt hem samen met de
-eigen voortgang; er gaat niets verloren. Het is geen live synchronisatie.
+Samen synchroniseren: via een eigen Cloudflare Worker
+(`proxy/parken-sync-worker.js`, gratis, met een KV-opslag; stappen staan
+bovenin dat bestand). Onder ⚙️ start je een groep; de app maakt een lange,
+willekeurige groepscode en een koppel-link voor de andere telefoon(s).
+Gekoppelde telefoons sturen elke wijziging direct en halen elke 10 seconden
+(zolang de app open is, en bij terugkomen of weer online) de stand op. Per park
+wint de jongste wijziging, ook bij uitvinken (`tomb` in de opslag). Het adres
+van de worker kan vast in `DEFAULT_SYNC_URL` in `app.js`; de koppeling zelf
+staat onder sleutel `parken.sync`, buiten de back-up.
+
+Zonder sync kan het ook eenmalig: "Deel voortgang" maakt een link met de
+voortgang in het `#`-deel (gaat niet naar een server); wie hem opent, voegt hem
+samen met de eigen voortgang.
 
 De kaart gebruikt Leaflet (meegeleverd in `public/parken/vendor/`, BSD-2) met
 tegels van OpenStreetMap; die laadt de browser zelf en worden niet in de

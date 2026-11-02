@@ -33,7 +33,7 @@
         </svg>
         <span id="count">0/0</span>
       </div>
-      <button type="button" class="iconbtn" id="more" aria-label="Meer: back-up, updates en installeren">⚙️</button>
+      <button type="button" class="iconbtn" id="more" aria-label="Meer: synchroniseren, back-up en updates">⚙️<span id="sync-dot" class="sync-dot" hidden></span></button>
       </div>
     </header>
 
@@ -55,10 +55,7 @@
           <div class="tools">
             <button type="button" id="share">🔗 Deel voortgang met je reisgenoot</button>
           </div>
-          <p class="fineprint">
-            Voortgang staat alleen op dit apparaat. Met "Deel voortgang" stuur je een link naar je
-            reisgenoot; die voegt jullie bezoeken samen. Back-up en updates vind je onder ⚙️. Kaart: © OpenStreetMap-bijdragers.
-          </p>
+          <p class="fineprint" id="fineprint"></p>
         </div>
       </section>
     </main>

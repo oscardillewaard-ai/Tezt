@@ -1,11 +1,22 @@
 // Parkenjacht: vink de Nederlandse nationale parken af op een kaart.
 // Plain JS zonder build-stap, net als Tarapp. Gegevens in localStorage.
 
-const APP_VERSION = '1' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '2' // ophogen bij elke release, samen met CACHE in sw.js
 const KEY = 'parken.v1'
+// Adres van de sync-worker (proxy/parken-sync-worker.js). Leeg = de gebruiker
+// vult het zelf in onder ⚙️. Ingevuld = alleen nog "Nieuwe groep starten".
+const DEFAULT_SYNC_URL = ''
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 2,
+    items: [
+      'Samen synchroniseren: vink je iets af, dan ziet je reisgenoot het binnen een paar tellen 🔄',
+      'Koppel een tweede telefoon met één link 🤝',
+      'Uitvinken gaat ook mee naar de andere telefoon ↩️',
+    ],
+  },
   {
     v: 1,
     items: [
@@ -23,13 +34,15 @@ const byId = Object.fromEntries(PARKS.map((p) => [p.id, p]))
 // ---------- Opslag ----------
 
 function defaultState() {
-  return { visits: {}, settings: {} }
+  // visits: { id: { date, note, t } }, tomb: { id: t } (uitgevinkt op tijdstip t).
+  // Het tijdstip t bepaalt bij synchroniseren welke wijziging wint.
+  return { visits: {}, tomb: {}, settings: {} }
 }
 
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY))
-    if (s && typeof s === 'object' && s.visits) return { ...defaultState(), ...s }
+    if (s && typeof s === 'object' && s.visits) return { ...defaultState(), ...s, tomb: s.tomb || {} }
   } catch {
     // Kapotte of geblokkeerde opslag: met een lege lijst beginnen.
   }
@@ -173,10 +186,17 @@ handle.addEventListener('click', () => {
 
 function setVisited(id, visit) {
   const before = doneCount()
-  if (visit) state.visits[id] = visit
-  else delete state.visits[id]
+  const t = Math.max(Date.now(), (state.visits[id]?.t || 0) + 1, (state.tomb[id] || 0) + 1)
+  if (visit) {
+    state.visits[id] = { ...visit, t }
+    delete state.tomb[id]
+  } else {
+    delete state.visits[id]
+    state.tomb[id] = t
+  }
   save()
   render()
+  changedLocally()
   const after = doneCount()
   if (after > before) {
     if (after === PARKS.length) {
@@ -253,7 +273,7 @@ function openPark(id) {
 // De voortgang gaat mee in het #-deel van de link, dus niet naar een server.
 
 function encodeShare() {
-  const data = Object.fromEntries(Object.entries(state.visits).map(([id, v]) => [id, [v.date, v.note || '']]))
+  const data = Object.fromEntries(Object.entries(state.visits).map(([id, v]) => [id, [v.date, v.note || '', v.t || 0]]))
   const bytes = new TextEncoder().encode(JSON.stringify(data))
   let bin = ''
   for (const b of bytes) bin += String.fromCharCode(b)
@@ -267,29 +287,56 @@ function decodeShare(s) {
   const out = {}
   for (const [id, v] of Object.entries(data)) {
     if (!byId[id] || !Array.isArray(v) || !/^\d{4}-\d{2}-\d{2}$/.test(v[0])) continue
-    out[id] = { date: v[0], note: String(v[1] || '').slice(0, 2000) }
+    out[id] = { t: Number(v[2]) || 0, date: v[0], note: String(v[1] || '').slice(0, 2000) }
   }
   return out
 }
 
-// Samenvoegen: wat een van beiden bezocht heeft, telt. Bij allebei: vroegste
-// datum, en verschillende notities blijven allebei bewaard.
-function mergeVisits(incoming) {
-  let added = 0
-  for (const [id, v] of Object.entries(incoming)) {
-    const mine = state.visits[id]
-    if (!mine) {
-      state.visits[id] = v
-      added++
-      continue
-    }
-    const notes = [mine.note, v.note].filter(Boolean)
-    state.visits[id] = {
-      date: mine.date < v.date ? mine.date : v.date,
-      note: [...new Set(notes)].join('\n'),
-    }
+// ---------- Samenvoegen ----------
+// Alles wordt per park samengevoegd: de wijziging met het jongste tijdstip t
+// wint, ook een uitvinking. Zo komen twee telefoons altijd op dezelfde stand.
+
+function entries() {
+  const out = {}
+  for (const [id, t] of Object.entries(state.tomb)) out[id] = { t, gone: true }
+  for (const [id, v] of Object.entries(state.visits)) {
+    const t = v.t || 0
+    if (!out[id] || t >= out[id].t) out[id] = { t, date: v.date, note: v.note || '' }
   }
-  return added
+  return out
+}
+
+function mergeEntryMaps(a, b) {
+  const out = { ...a }
+  for (const [id, e] of Object.entries(b)) if (byId[id] && (!out[id] || e.t > out[id].t)) out[id] = e
+  return out
+}
+
+// Zet een samengevoegde stand terug in state. Geeft het aantal nieuw bezochte
+// parken terug, of -1 als er niets veranderde.
+function applyEntries(merged) {
+  const before = JSON.stringify([state.visits, state.tomb])
+  const wasDone = new Set(Object.keys(state.visits))
+  const visits = {}
+  const tomb = {}
+  for (const [id, e] of Object.entries(merged)) {
+    if (e.gone) tomb[id] = e.t
+    else visits[id] = { date: e.date, note: e.note || '', t: e.t }
+  }
+  state.visits = visits
+  state.tomb = tomb
+  if (JSON.stringify([visits, tomb]) === before) return -1
+  save()
+  render()
+  return Object.keys(visits).filter((id) => !wasDone.has(id)).length
+}
+
+// Voor deellinks en back-ups: alleen toevoegen wat je zelf nog niet had of wat
+// daar nieuwer is. Geeft het aantal nieuw bezochte parken terug.
+function mergeVisits(incoming) {
+  const added = applyEntries(mergeEntryMaps(entries(), incoming))
+  if (added >= 0) changedLocally()
+  return Math.max(0, added)
 }
 
 document.getElementById('share').addEventListener('click', async () => {
@@ -322,9 +369,239 @@ function handleIncomingShare() {
   const n = Object.keys(incoming).length
   if (!confirm(`Je hebt een deellink geopend met ${n} bezochte parken. Samenvoegen met jouw voortgang? Er gaat niets verloren.`)) return
   const added = mergeVisits(incoming)
-  save()
-  render()
   toast(added ? `🤝 Samengevoegd: ${added} nieuwe parken erbij!` : '🤝 Samengevoegd, jullie waren al gelijk!')
+}
+
+// ---------- Samen synchroniseren ----------
+// Via een eigen Cloudflare Worker (proxy/parken-sync-worker.js). Na elke
+// wijziging meteen, en zolang de app open is elke 10 seconden. De instellingen
+// staan apart van de voortgang (buiten de back-up), net als Tarapp's API-sleutel.
+
+const SYNC_KEY = 'parken.sync'
+const POLL_MS = 10_000
+
+function loadSync() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SYNC_KEY))
+    if (s && typeof s.url === 'string' && typeof s.room === 'string') return s
+  } catch {
+    // Geen of kapotte instellingen: niet gekoppeld.
+  }
+  return { url: '', room: '' }
+}
+let sync = loadSync()
+const syncOn = () => !!(sync.url && sync.room)
+function saveSync() {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify(sync))
+  } catch {
+    // Zonder opslag blijft de koppeling alleen deze sessie bestaan.
+  }
+}
+
+// status: 'off' | 'busy' | 'ok' | 'error'
+const syncUi = { status: 'off', last: 0, error: '', busy: false, again: false, dirty: true, retries: 0 }
+
+const b64url = (str) => {
+  let bin = ''
+  for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+const unb64url = (s) =>
+  new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)))
+
+function newRoomCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18))
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function cleanUrl(u) {
+  const url = String(u || '').trim().replace(/\/+$/, '')
+  return /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(url) || /^http:\/\/localhost(:\d+)?$/.test(url) ? url : ''
+}
+
+const roomUrl = () => `${sync.url}/room/${encodeURIComponent(sync.room)}`
+
+function setSyncStatus(status, error = '') {
+  syncUi.status = status
+  syncUi.error = error
+  const dot = document.getElementById('sync-dot')
+  dot.hidden = status === 'off'
+  dot.dataset.status = status
+  dot.title = syncText()
+  const live = document.getElementById('sync-status')
+  if (live) live.textContent = syncText()
+  renderFineprint()
+}
+
+function syncText() {
+  if (!syncOn()) return 'Niet gekoppeld'
+  if (syncUi.status === 'busy') return '⏳ Bezig met synchroniseren…'
+  if (syncUi.status === 'error') return `⚠️ ${syncUi.error}. Wijzigingen gaan mee zodra het weer lukt.`
+  if (syncUi.last) {
+    const time = new Date(syncUi.last).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return `✅ Gesynchroniseerd om ${time}`
+  }
+  return '🔄 Gekoppeld'
+}
+
+function changedLocally() {
+  syncUi.dirty = true
+  clearTimeout(changedLocally.timer)
+  changedLocally.timer = setTimeout(syncNow, 300)
+}
+
+async function syncNow() {
+  if (!syncOn()) return
+  if (syncUi.busy) {
+    syncUi.again = true
+    return
+  }
+  syncUi.busy = true
+  setSyncStatus('busy')
+  try {
+    // Iets te versturen: PUT (de worker voegt samen en stuurt alles terug).
+    // Anders alleen ophalen.
+    const push = syncUi.dirty
+    syncUi.dirty = false
+    const res = await fetch(roomUrl(), {
+      method: push ? 'PUT' : 'GET',
+      headers: push ? { 'Content-Type': 'application/json' } : {},
+      body: push ? JSON.stringify({ entries: entries() }) : undefined,
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const msg = res.status === 404 ? 'Sync-adres klopt niet' : `Sync-server gaf fout ${res.status}`
+      throw Object.assign(new Error(msg), { forUser: true })
+    }
+    const remote = (await res.json()).entries || {}
+    // Opnieuw entries() lezen: tijdens het wachten kan er afgevinkt zijn.
+    const merged = mergeEntryMaps(entries(), remote)
+    const before = doneCount()
+    const added = applyEntries(merged)
+    if (added > 0) {
+      if (doneCount() === PARKS.length && before < PARKS.length) {
+        confetti(true)
+        toast('🏆 ALLE nationale parken bezocht! Wat een avonturiers!')
+      } else {
+        toast(`🔄 Je reisgenoot vinkte ${added === 1 ? 'een park' : `${added} parken`} af!`)
+      }
+    }
+    // Hebben wij iets nieuwers dan de server (bijv. een gelijktijdige
+    // wijziging die KV kwijtraakte)? Dan nog een keer sturen.
+    if (Object.entries(merged).some(([id, e]) => !remote[id] || remote[id].t < e.t)) {
+      syncUi.dirty = true
+      if (syncUi.retries++ < 3) syncUi.again = true
+    } else {
+      syncUi.retries = 0
+    }
+    syncUi.last = Date.now()
+    setSyncStatus('ok')
+  } catch (err) {
+    syncUi.dirty = true // niet kwijtraken: volgende ronde opnieuw sturen
+    setSyncStatus('error', navigator.onLine === false ? 'Offline' : err?.forUser ? err.message : 'Sync-server niet bereikbaar')
+  } finally {
+    syncUi.busy = false
+    if (syncUi.again) {
+      syncUi.again = false
+      setTimeout(syncNow, 500)
+    }
+  }
+}
+
+setInterval(() => {
+  if (syncOn() && document.visibilityState === 'visible') syncNow()
+}, POLL_MS)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncNow()
+})
+addEventListener('online', syncNow)
+
+function startSync(url, room) {
+  sync = { url, room }
+  saveSync()
+  syncUi.dirty = true
+  syncUi.last = 0
+  setSyncStatus('busy')
+  syncNow()
+}
+
+function koppelLink() {
+  return `${location.origin}${location.pathname}#koppel=${b64url(JSON.stringify({ u: sync.url, r: sync.room }))}`
+}
+
+async function shareKoppelLink() {
+  const url = koppelLink()
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Parkenjacht koppelen', text: 'Open deze link op je telefoon, dan houden we Parkenjacht samen bij 🌳', url })
+      return
+    }
+    await navigator.clipboard.writeText(url)
+    toast('🔗 Koppel-link gekopieerd! Open hem op de andere telefoon.')
+  } catch (err) {
+    if (err?.name === 'AbortError') return
+    prompt('Kopieer deze link en open hem op de andere telefoon:', url)
+  }
+}
+
+function handleKoppelLink() {
+  const m = location.hash.match(/koppel=([\w-]+)/)
+  if (!m) return false
+  history.replaceState(null, '', location.pathname + location.search)
+  let data
+  try {
+    data = JSON.parse(unb64url(m[1]))
+  } catch {
+    data = null
+  }
+  const url = cleanUrl(data?.u)
+  if (!url || typeof data.r !== 'string' || !/^[\w-]{16,64}$/.test(data.r)) {
+    toast('⚠️ Deze koppel-link is kapot, vraag om een nieuwe.')
+    return true
+  }
+  if (syncOn() && sync.room === data.r) {
+    toast('🔄 Deze telefoon is al gekoppeld.')
+    return true
+  }
+  if (!confirm('Deze telefoon koppelen aan jullie Parkenjacht? Wat hier al staat, wordt samengevoegd; er gaat niets verloren.')) return true
+  startSync(url, data.r)
+  toast('🤝 Gekoppeld! Jullie zien nu elkaars afvinkjes.')
+  return true
+}
+
+function syncSection() {
+  if (syncOn()) {
+    return `
+    <h3>Samen synchroniseren 🔄</h3>
+    <p class="muted" id="sync-status">${esc(syncText())}</p>
+    <p class="muted">Afvinken gaat binnen een paar tellen naar elke gekoppelde telefoon.</p>
+    <div class="stack">
+      <button type="button" class="btn primary" data-act="sync-share">🔗 Koppel nog een telefoon</button>
+      <button type="button" class="btn" data-act="sync-now">Nu synchroniseren</button>
+      <button type="button" class="btn ghost" data-act="sync-off">Ontkoppelen</button>
+    </div>`
+  }
+  return `
+    <h3>Samen synchroniseren 🔄</h3>
+    <p class="muted">Koppel jullie telefoons, dan zien jullie meteen elkaars afvinkjes. Start hier een groep en stuur de koppel-link naar je reisgenoot.</p>
+    ${
+      DEFAULT_SYNC_URL
+        ? ''
+        : `<label class="field">Adres van de sync-server
+        <input type="url" id="sync-url" inputmode="url" autocomplete="off" placeholder="https://parkenjacht.jouw-naam.workers.dev" value="${esc(sync.url)}" />
+      </label>`
+    }
+    <div class="stack">
+      <button type="button" class="btn primary" data-act="sync-start">Nieuwe groep starten</button>
+    </div>
+    <p class="muted">Heb je een koppel-link gekregen? Open die gewoon op deze telefoon.</p>`
+}
+
+function renderFineprint() {
+  document.getElementById('fineprint').textContent = syncOn()
+    ? '🔄 Gekoppeld: wat je afvinkt, ziet je reisgenoot binnen een paar tellen. Back-up en updates vind je onder ⚙️. Kaart: © OpenStreetMap-bijdragers.'
+    : 'Voortgang staat alleen op dit apparaat. Koppel jullie telefoons onder ⚙️ om samen te synchroniseren, of stuur een deellink. Kaart: © OpenStreetMap-bijdragers.'
 }
 
 // ---------- Meer: back-up, opslag, updates, installeren ----------
@@ -334,8 +611,13 @@ const isStandalone = () => navigator.standalone === true || matchMedia('(display
 function openMore() {
   openSheet(`
     <h2>Meer</h2>
+    ${syncSection()}
     <h3>Back-up</h3>
-    <p class="muted">Je voortgang staat alleen op dit toestel. Maak af en toe een back-up, of gebruik dit om over te zetten naar een nieuw toestel.</p>
+    <p class="muted">${
+      syncOn()
+        ? 'Je voortgang staat op dit toestel en op jullie sync-server. Een back-up is een extra zekerheid.'
+        : 'Je voortgang staat alleen op dit toestel. Maak af en toe een back-up, of gebruik dit om over te zetten naar een nieuw toestel.'
+    }</p>
     ${
       ui.persisted === true
         ? '<p class="muted">✅ Opslag is als blijvend gemarkeerd.</p>'
@@ -376,6 +658,28 @@ sheet.addEventListener('click', async (e) => {
   if (act === 'export') exportData()
   if (act === 'import') document.getElementById('import-file').click()
   if (act === 'changelog') openChangelog(0)
+  if (act === 'sync-share') shareKoppelLink()
+  if (act === 'sync-now') {
+    syncUi.dirty = true
+    syncNow()
+  }
+  if (act === 'sync-off') {
+    if (!confirm('Deze telefoon ontkoppelen? Je voortgang blijft hier staan, maar wijzigingen gaan niet meer naar je reisgenoot.')) return
+    sync = { url: sync.url, room: '' }
+    saveSync()
+    setSyncStatus('off')
+    openMore()
+  }
+  if (act === 'sync-start') {
+    const url = cleanUrl(DEFAULT_SYNC_URL || document.getElementById('sync-url')?.value)
+    if (!url) {
+      toast('⚠️ Vul het https-adres van de sync-server in.')
+      return
+    }
+    startSync(url, newRoomCode())
+    openMore()
+    shareKoppelLink()
+  }
   if (act === 'force-update') {
     // Alleen de app-cache wissen (niet localStorage) en vers ophalen.
     try {
@@ -406,13 +710,18 @@ document.getElementById('import-file').addEventListener('change', async (e) => {
     const data = JSON.parse(await file.text())
     if (!data || typeof data.visits !== 'object') throw new Error('geen visits')
     const clean = {}
-    for (const [id, v] of Object.entries(data.visits)) {
-      if (byId[id] && v && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) clean[id] = { date: v.date, note: String(v.note || '') }
+    for (const [id, t] of Object.entries(data.tomb || {})) {
+      if (byId[id] && Number.isFinite(Number(t))) clean[id] = { t: Number(t), gone: true }
     }
-    if (!confirm(`Back-up met ${Object.keys(clean).length} bezochte parken samenvoegen met wat er nu staat?`)) return
+    let n = 0
+    for (const [id, v] of Object.entries(data.visits)) {
+      if (!byId[id] || !v || !/^\d{4}-\d{2}-\d{2}$/.test(v.date)) continue
+      const t = Number(v.t) || 0
+      if (!clean[id] || t >= clean[id].t) clean[id] = { t, date: v.date, note: String(v.note || '') }
+      n++
+    }
+    if (!confirm(`Back-up met ${n} bezochte parken samenvoegen met wat er nu staat?`)) return
     mergeVisits(clean)
-    save()
-    render()
     sheet.close()
     toast('✅ Back-up teruggezet')
   } catch {
@@ -492,8 +801,15 @@ function confetti(big) {
 // ---------- Start ----------
 
 render()
-handleIncomingShare()
+renderFineprint()
+if (!handleKoppelLink()) handleIncomingShare()
+// Een link openen terwijl de app al openstaat verandert alleen het #-deel.
+addEventListener('hashchange', () => {
+  if (!handleKoppelLink()) handleIncomingShare()
+})
 showChangesSinceLastVisit()
+if (syncOn()) setSyncStatus('busy')
+syncNow()
 
 // Vraag de browser de opslag niet op te ruimen bij ruimtegebrek.
 ;(async () => {
