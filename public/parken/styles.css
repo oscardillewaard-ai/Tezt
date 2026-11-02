@@ -1,0 +1,216 @@
+:root {
+  --bg: #f4f7f2;
+  --card: #ffffff;
+  --text: #14281a;
+  --muted: #5f7364;
+  --line: #dfe7dc;
+  --green: #15803d;
+  --green-soft: #dcfce7;
+  --todo: #9aa69c;
+  --bar: #14532d;
+  --bar-text: #f0fdf4;
+  --accent: #f59e0b;
+  --shadow: 0 8px 30px rgb(20 40 26 / 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b130e;
+    --card: #142019;
+    --text: #e8f3eb;
+    --muted: #93a99a;
+    --line: #22332a;
+    --green: #4ade80;
+    --green-soft: #12301d;
+    --todo: #5f7164;
+    --bar: #0f2417;
+    --shadow: 0 8px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  /* Zoals Tarapp: geen "trek omlaag om te verversen" (Chrome/Android), geen
+     doorschieten van de pagina en geen horizontaal scrollen. */
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+body { display: flex; flex-direction: column; }
+
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background: var(--bar);
+  color: var(--bar-text);
+  z-index: 1000;
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { font-size: 28px; }
+h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+.tagline { margin: 0; font-size: 13px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.top-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.iconbtn {
+  width: 40px; height: 40px; border-radius: 50%; border: 0; font-size: 19px;
+  background: rgb(255 255 255 / 0.14); color: var(--bar-text);
+}
+.progress { position: relative; width: 52px; height: 52px; flex: none; }
+.progress svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg, .ring { fill: none; stroke-width: 3.6; }
+.ring-bg { stroke: rgb(255 255 255 / 0.2); }
+.ring { stroke: #86efac; stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; transition: stroke-dashoffset 0.6s ease; }
+.progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+
+.layout { position: relative; flex: 1; min-height: 0; }
+.map { position: absolute; inset: 0; background: var(--bg); }
+
+/* Markers */
+.pin {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--card); color: var(--todo);
+  border: 3px solid var(--todo);
+  font-size: 15px; font-weight: 800;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  transition: transform 0.15s ease;
+}
+.pin.done { background: var(--green); border-color: #fff; color: #fff; }
+.pin:hover { transform: scale(1.12); }
+.pin-label {
+  background: var(--card); color: var(--text); border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 6px;
+}
+.pin-label::before { display: none; }
+.leaflet-container { font: inherit; background: var(--bg); }
+
+/* Panel: bottom sheet on phones, side panel on wide screens */
+.panel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1001; /* boven Leaflet's knoppen */
+  background: var(--card);
+  border-radius: 18px 18px 0 0;
+  box-shadow: var(--shadow);
+  max-height: 72%;
+  display: flex; flex-direction: column;
+  transform: translateY(calc(100% - 56px - env(safe-area-inset-bottom)));
+  transition: transform 0.3s ease;
+}
+.panel.open { transform: translateY(0); }
+.handle {
+  border: 0; background: none; padding: 8px 16px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-weight: 700; color: var(--muted);
+}
+.grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+.panel-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 16px calc(env(safe-area-inset-bottom) + 16px); }
+
+@media (min-width: 820px) {
+  .panel {
+    top: 16px; bottom: 16px; left: 16px; right: auto; width: 360px; max-height: none;
+    border-radius: 18px; transform: none;
+  }
+  .handle { display: none; }
+  .panel-body { padding-top: 16px; }
+}
+
+.filters { display: flex; gap: 6px; margin-bottom: 10px; }
+.filters button {
+  flex: 1; border: 1px solid var(--line); background: var(--bg); border-radius: 999px;
+  padding: 6px 8px; font-size: 14px;
+}
+.filters button.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 700; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .filters button.active { color: #052e16; }
+}
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.list li:last-child { border-bottom: 0; }
+.check {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--todo); background: none; display: grid; place-items: center;
+  font-weight: 800; color: transparent;
+}
+.check.done { background: var(--green); border-color: var(--green); color: #fff; }
+.item { flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 0; }
+.item strong { display: block; font-size: 15px; }
+.item small { color: var(--muted); }
+.empty { color: var(--muted); text-align: center; padding: 18px 0; }
+
+.tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+.tools button, .filebtn {
+  flex: 1 1 auto; border: 1px solid var(--line); background: var(--bg); border-radius: 10px;
+  padding: 8px 10px; font-size: 14px; text-align: center; cursor: pointer;
+}
+.fineprint { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
+
+/* Detail sheet */
+.sheet {
+  /* Scrollen in een venster niet doorgeven aan de pagina erachter. */
+  overscroll-behavior: contain;
+  max-height: 88dvh; overflow-y: auto;
+  border: 0; padding: 0; width: min(440px, calc(100% - 32px));
+  border-radius: 18px; background: var(--card); color: var(--text); box-shadow: var(--shadow);
+}
+.sheet::backdrop { background: rgb(0 0 0 / 0.4); }
+.sheet-in { padding: 18px; }
+.sheet h2 { margin: 0 0 2px; font-size: 21px; }
+.sheet .prov { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+.sheet p { margin: 0 0 12px; }
+.badge { display: inline-block; background: var(--green-soft); color: var(--green); font-weight: 700; font-size: 13px; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+.field { display: block; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.field input, .field textarea {
+  display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+}
+.field textarea { min-height: 70px; resize: vertical; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  flex: 1 1 auto; border: 0; border-radius: 12px; padding: 11px 14px; font-weight: 700;
+  background: var(--bg); border: 1px solid var(--line); text-align: center; text-decoration: none; color: var(--text);
+}
+.btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.ghost { color: #b91c1c; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .btn.primary { color: #052e16; }
+  :root:not([data-theme='light']) .btn.ghost { color: #fca5a5; }
+}
+.close { position: absolute; top: 10px; right: 10px; border: 0; background: none; font-size: 22px; color: var(--muted); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 76px); transform: translate(-50%, 20px);
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: all 0.25s ease; z-index: 3000; max-width: calc(100% - 32px); text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2500; }
+
+.sheet h3 { margin: 16px 0 6px; font-size: 16px; }
+.muted { color: var(--muted); font-size: 14px; }
+.steps { margin: 0 0 8px; padding-left: 20px; font-size: 14px; }
+.changelog ul { margin: 0 0 8px; padding-left: 20px; }
+.stack { display: grid; gap: 8px; margin-bottom: 8px; }
+
+/* Bronvermelding boven de ingeklapte lijst houden (telefoon). */
+@media (max-width: 819px) {
+  .leaflet-bottom { bottom: calc(56px + env(safe-area-inset-bottom)); }
+}

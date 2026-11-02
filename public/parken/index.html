@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Vink de Nederlandse nationale parken af op een kaart en houd bij welke jullie al bezocht hebben." />
+    <meta name="theme-color" content="#14532d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Parkenjacht" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="vendor/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Parkenjacht</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">🌳</span>
+        <div>
+          <h1>Parkenjacht</h1>
+          <p id="tagline" class="tagline"></p>
+        </div>
+      </div>
+      <div class="top-right">
+      <div class="progress" id="progress" aria-live="polite">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="ring-bg" cx="18" cy="18" r="15.9" />
+          <circle class="ring" id="ring" cx="18" cy="18" r="15.9" />
+        </svg>
+        <span id="count">0/0</span>
+      </div>
+      <button type="button" class="iconbtn" id="more" aria-label="Meer: back-up, updates en installeren">⚙️</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <div id="map" class="map" role="application" aria-label="Kaart met nationale parken"></div>
+
+      <section class="panel" id="panel">
+        <button type="button" class="handle" id="handle" aria-expanded="false" aria-controls="panel-body">
+          <span class="grip" aria-hidden="true"></span>
+          <span id="handle-text">Lijst</span>
+        </button>
+        <div class="panel-body" id="panel-body">
+          <div class="filters" role="tablist" aria-label="Filter">
+            <button type="button" data-filter="all" class="active">Alle</button>
+            <button type="button" data-filter="todo">Nog te gaan</button>
+            <button type="button" data-filter="done">Bezocht</button>
+          </div>
+          <ul id="list" class="list"></ul>
+          <div class="tools">
+            <button type="button" id="share">🔗 Deel voortgang met je reisgenoot</button>
+          </div>
+          <p class="fineprint">
+            Voortgang staat alleen op dit apparaat. Met "Deel voortgang" stuur je een link naar je
+            reisgenoot; die voegt jullie bezoeken samen. Back-up en updates vind je onder ⚙️. Kaart: © OpenStreetMap-bijdragers.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="sheet" class="sheet"></dialog>
+    <input type="file" id="import-file" accept="application/json,.json" hidden />
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
+
+    <script src="vendor/leaflet.js"></script>
+    <script src="parks.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
