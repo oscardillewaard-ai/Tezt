@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. midden in een park zonder bereik).
-const CACHE = 'parken-v2'
+const CACHE = 'parken-v3'
 const SHELL = [
   './',
   'index.html',

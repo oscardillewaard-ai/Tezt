@@ -1,14 +1,20 @@
 // Parkenjacht: vink de Nederlandse nationale parken af op een kaart.
 // Plain JS zonder build-stap, net als Tarapp. Gegevens in localStorage.
 
-const APP_VERSION = '2' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '3' // ophogen bij elke release, samen met CACHE in sw.js
 const KEY = 'parken.v1'
 // Adres van de sync-worker (proxy/parken-sync-worker.js). Leeg = de gebruiker
 // vult het zelf in onder ⚙️. Ingevuld = alleen nog "Nieuwe groep starten".
-const DEFAULT_SYNC_URL = ''
+const DEFAULT_SYNC_URL = 'https://parkenjacht.oscar-dillewaard.workers.dev'
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 3,
+    items: [
+      'De sync-server staat klaar: tik op "Samen synchroniseren" en stuur de koppel-link naar je reisgenoot 🤝',
+    ],
+  },
   {
     v: 2,
     items: [
@@ -339,7 +345,10 @@ function mergeVisits(incoming) {
   return Math.max(0, added)
 }
 
+// Met een sync-server: deze knop koppelt telefoons. Zonder: eenmalige deellink.
 document.getElementById('share').addEventListener('click', async () => {
+  if (syncOn()) return shareKoppelLink()
+  if (DEFAULT_SYNC_URL) return openMore()
   const url = `${location.origin}${location.pathname}#samen=${encodeShare()}`
   const text = `Onze Parkenjacht: ${doneCount()} van ${PARKS.length} nationale parken bezocht! 🌳`
   try {
@@ -599,9 +608,14 @@ function syncSection() {
 }
 
 function renderFineprint() {
+  if (DEFAULT_SYNC_URL || syncOn()) {
+    document.getElementById('share').textContent = syncOn() ? '🔗 Koppel nog een telefoon' : '🔄 Samen synchroniseren'
+  }
   document.getElementById('fineprint').textContent = syncOn()
     ? '🔄 Gekoppeld: wat je afvinkt, ziet je reisgenoot binnen een paar tellen. Back-up en updates vind je onder ⚙️. Kaart: © OpenStreetMap-bijdragers.'
-    : 'Voortgang staat alleen op dit apparaat. Koppel jullie telefoons onder ⚙️ om samen te synchroniseren, of stuur een deellink. Kaart: © OpenStreetMap-bijdragers.'
+    : DEFAULT_SYNC_URL
+      ? 'Voortgang staat nu alleen op dit apparaat. Tik op "Samen synchroniseren" om jullie telefoons te koppelen. Back-up en updates vind je onder ⚙️. Kaart: © OpenStreetMap-bijdragers.'
+      : 'Voortgang staat alleen op dit apparaat. Koppel jullie telefoons onder ⚙️ om samen te synchroniseren, of stuur een deellink. Kaart: © OpenStreetMap-bijdragers.'
 }
 
 // ---------- Meer: back-up, opslag, updates, installeren ----------
