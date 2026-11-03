@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '21' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '22' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -59,6 +59,7 @@ function defaultState() {
     sessions: [],
     series: [],
     plans: [],
+    blocks: [],
   }
 }
 
@@ -76,6 +77,7 @@ function isValidState(s) {
 function normalize(s) {
   s.series ||= []
   s.plans ||= []
+  s.blocks ||= []
   const secMatch = (v) => /^\s*(\d+)\s*s(ec)?\s*$/i.exec(v ?? '')
   for (const t of s.templates) {
     for (const e of t.exercises) {
@@ -164,6 +166,13 @@ const templateById = (id) => state.templates.find((t) => t.id === id)
 // Bij hardlopen houden we scheenpijn bij (0 = geen, 10 = ergst denkbaar).
 const tracksShin = (typeId) => typeId === 'hardlopen'
 const isRunType = tracksShin
+// Plek van de pijnscore: standaard de scheen; een geladen trainingsblok kan een
+// andere plek noemen ("Kniepijn ≤2/10" -> knie).
+const painSpot = (s) => (s?.blockId && state.blocks.find((b) => b.id === s.blockId)?.painSpot) || 'scheen'
+const painLabel = (s) => {
+  const p = painSpot(s)
+  return `${p.charAt(0).toUpperCase()}${p.slice(1)}pijn`
+}
 const shinClass = (v) => (v <= 2 ? 'low' : v <= 5 ? 'mid' : 'high')
 
 function fmtMinutes(min) {
@@ -338,6 +347,14 @@ function cheer() {
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
   {
+    v: 22,
+    items: [
+      '📥 Laad een trainingsblok als JSON: weekschema en krachtschema\'s in één keer in je agenda 💛',
+      'Schema\'s hebben nu kopjes, toelichting (zoals RIR) en een notitie',
+      'Bloktrainingen herken je aan het blauwgroene weeklabel, en ze kunnen in één keer weer weg',
+    ],
+  },
+  {
     v: 21,
     items: ['Het weekritme bij het 5 km-plan laat nu precies zien wat je kiest, met een voorbeeldweek: bij 2× per week staan er ook echt 2 loopdagen 💛'],
   },
@@ -486,6 +503,10 @@ function renderWeek() {
       <button class="iconbtn" data-action="next-week" aria-label="Volgende week">›</button>
     </div>
     <div class="compliment">💛 ${esc(dailyCompliment())}</div>
+    ${(() => {
+      const bw = blockWeekAt(ws)
+      return bw ? `<div class="block-week">📋 ${esc(blockWeekText(bw.week))}</div>` : ''
+    })()}
     <div class="wsummary">
       <span><strong>${done.length}/${list.length}</strong> gedaan · ${fmtMinutes(doneMin)}</span>
       <div class="progress"><div style="width:${pct}%"></div></div>
@@ -653,9 +674,9 @@ function sessionRow(s) {
   const busy = (s.log && !s.log.endedAt) || (s.runLog && !s.runLog.endedAt)
   const inProgress = [busy ? '▶ bezig' : '', seriesOf(s) ? '🔁' : ''].filter(Boolean).join(' ')
   const shin = Number.isInteger(s.shin)
-    ? ` <span class="shin-badge ${shinClass(s.shin)}" title="Scheenpijn ${s.shin}/10">🦵${s.shin}</span>`
+    ? ` <span class="shin-badge ${shinClass(s.shin)}" title="${painLabel(s)} ${s.shin}/10">🦵${s.shin}</span>`
     : ''
-  // Bij plantrainingen zegt de notitie (planweek) meer dan de schemanaam.
+  // Bij plan- en bloktrainingen zegt de notitie meer dan de schemanaam.
   const meta = [
     inProgress,
     s.time,
@@ -663,17 +684,17 @@ function sessionRow(s) {
     s.duration ? fmtMinutes(Number(s.duration)) : '',
     s.distance ? `${fmtNum(Math.round(s.distance / 100) / 10)} km` : '',
     s.icuId ? '⌚' : '',
-    tpl && !s.planId ? tpl.name : '',
+    tpl && !s.planId && !(s.blockId && (s.note || '').toLowerCase().includes(tplPrefix(tpl))) ? tpl.name : '',
     s.note,
   ]
     .filter(Boolean)
     .map(esc)
     .join(' · ')
   return `
-    <div class="session ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''}">
+    <div class="session ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''} ${s.blockId ? 'block' : ''}">
       <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? '✓' : ''}</button>
       <button class="s-body" data-action="edit" data-id="${s.id}">
-        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}${s.planId ? ' <span class="plan-badge">5K</span>' : ''}${shin}</span>
+        <span class="s-title">${esc(t.emoji)} ${esc(t.name)}${s.planId ? ' <span class="plan-badge">5K</span>' : ''}${s.blockWeek ? ` <span class="block-badge">${esc(s.blockWeek)}</span>` : ''}${shin}</span>
         ${meta ? `<span class="s-meta">${meta}</span>` : ''}
       </button>
     </div>`
@@ -773,9 +794,10 @@ function renderShinTrend() {
     })
     .join('')
   const avg = runs.reduce((n, s) => n + s.shin, 0) / runs.length
+  const labels = [...new Set(runs.map(painLabel))]
   return `
     <section class="card">
-      <h2>Scheenpijn bij hardlopen</h2>
+      <h2>${labels.length === 1 ? labels[0] : 'Pijn'} bij hardlopen</h2>
       <div class="muted">Laatste ${runs.length} run${runs.length === 1 ? '' : 's'} · gemiddeld ${avg.toFixed(1).replace('.', ',')}/10</div>
       <div class="bars" style="grid-template-columns: repeat(${runs.length}, 1fr)">${bars}</div>
     </section>`
@@ -798,7 +820,13 @@ function renderSchemas() {
     )
     .join('')
   return `
+    ${renderBlockCards()}
     ${renderPlanCard()}
+    <section class="card">
+      <h2>📥 Trainingsblok laden</h2>
+      <p class="muted">Heb je een weekschema met krachtschema's als JSON-bestand? Laad het in, dan zet Tarapp alles in je agenda.</p>
+      <button class="btn block" data-action="block-load">Trainingsblok laden</button>
+    </section>
     <section class="card">
       ${items || '<div class="muted">Nog geen schema\'s. Tik op + om er een te maken.</div>'}
     </section>
@@ -953,7 +981,7 @@ function openSessionSheet(session, date) {
       <label class="ss-toggle repeat-toggle">
         <input type="checkbox" name="weekly" ${!isNew && seriesOf(session) ? 'checked' : ''} /> 🔁 Elke week herhalen
       </label>
-      <label class="field" id="shin-field" ${tracksShin(s.typeId) ? '' : 'hidden'}>Scheenpijn (0–10)
+      <label class="field" id="shin-field" ${tracksShin(s.typeId) ? '' : 'hidden'}>${painLabel(s)} (0–10)
         <select name="shin">
           <option value="">Niet ingevuld</option>
           ${Array.from({ length: 11 }, (_, i) => `<option value="${i}" ${s.shin === i ? 'selected' : ''}>${i}${i === 0 ? ' – geen pijn' : i === 10 ? ' – ergst denkbaar' : ''}</option>`).join('')}
@@ -1156,6 +1184,15 @@ function renderRestBar() {
 
 const unitLabel = (unit) => (unit === 'sec' ? 'Sec' : 'Herh.')
 
+// Tijd van een oefening: "720" seconden -> "12 min", anders "30 s".
+function secText(v) {
+  const n = parseInt(v)
+  return n >= 60 && n % 60 === 0 && String(n) === String(v).trim() ? `${n / 60} min` : `${v} s`
+}
+
+// Eerste getal van een doel als voorstel ("12–15" -> "12", "8 p.z." -> "8").
+const firstNumber = (v) => String(v ?? '').trim().match(/^\d+/)?.[0] || ''
+
 // "40×10", of bij seconden "30 s" (met gewicht: "10 kg · 30 s").
 function fmtSet(x, unit) {
   if (unit === 'sec') return `${x.kg ? x.kg + ' kg · ' : ''}${x.reps || '–'} s`
@@ -1205,6 +1242,8 @@ function newLogExercise(name, target, opts = {}) {
     name,
     unit: opts.unit || 'reps',
     superset: !!opts.superset,
+    info: opts.info || '',
+    section: opts.section || '',
     note: '',
     target: target || null,
     sets: Array.from({ length: count }, () => ({ kg: '', reps: '', note: '', done: false })),
@@ -1222,7 +1261,7 @@ function startWorkout(session) {
             newLogExercise(
               e.name,
               { sets: e.sets, reps: e.reps, weight: e.weight },
-              { unit: e.unit, superset: i > 0 && e.superset },
+              { unit: e.unit, superset: i > 0 && e.superset, info: e.info, section: e.section },
             ),
           )
         : [],
@@ -1275,9 +1314,9 @@ function renderWorkout(s) {
       const prevEx = previousExercise(ex.name, s.id)
       const prev = prevEx ? prevEx.sets : []
       const tg = ex.target
-      const targetReps = tg && /^\d+$/.test(String(tg.reps).trim()) ? String(tg.reps).trim() : ''
+      const targetReps = tg ? firstNumber(tg.reps) : ''
       const target = tg
-        ? `Doel: ${esc(tg.sets)} × ${esc(tg.reps)}${isSec ? ' s' : ''}${tg.weight ? ' · ' + esc(tg.weight) + ' kg' : ''}`
+        ? `Doel: ${esc(tg.sets)} × ${isSec ? esc(secText(tg.reps)) : esc(tg.reps)}${tg.weight ? ' · ' + esc(tg.weight) + ' kg' : ''}`
         : ''
       const rows = ex.sets
         .map((st, j) => {
@@ -1297,6 +1336,7 @@ function renderWorkout(s) {
         })
         .join('')
       return `
+        ${ex.section ? `<h3 class="ex-section">${esc(ex.section)}</h3>` : ''}
         <section class="card wo-ex ${inSS ? 'ss' : ''} ${inSS && i > b.start ? 'ss-cont' : ''} ${inSS && i < b.end ? 'ss-mid' : ''}" data-wo-ex="${i}">
           ${ssLabel}
           <div class="wo-ex-head">
@@ -1309,6 +1349,7 @@ function renderWorkout(s) {
             </div>
           </div>
           ${target ? `<div class="muted">${target}</div>` : ''}
+          ${ex.info ? `<div class="muted ex-info-text">${esc(ex.info)}</div>` : ''}
           ${prevEx?.note ? `<div class="muted">Vorige keer: ${esc(prevEx.note)}</div>` : ''}
           <input class="ex-note" data-field="note" data-ex="${i}" value="${esc(ex.note)}" placeholder="Opmerking (bijv. rode band, smalle grip)" aria-label="Opmerking bij ${esc(ex.name)}" />
           <div class="set-row set-head"><span>Set</span><span>Vorige</span><span>kg</span><button type="button" class="unit-btn" data-action="wo-unit" data-ex="${i}" aria-label="Wissel tussen herhalingen en seconden">${unitLabel(ex.unit)} ⇄</button><span></span></div>
@@ -1573,12 +1614,14 @@ function openWorkoutSheet(s) {
       .join('')
     if (volume) summary += `<p class="muted">Totaal volume: ${Math.round(volume).toLocaleString('nl-NL')} kg</p>`
   } else if (tpl) {
-    summary = tpl.exercises
-      .map(
-        (e) =>
-          `<div class="ex"><span class="grow">${e.superset ? '🔗 ' : ''}${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${esc(e.reps)}${e.unit === 'sec' ? ' s' : ''}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}</span></span></div>`,
-      )
-      .join('')
+    summary =
+      (tpl.note ? `<p class="tpl-note">💬 ${esc(tpl.note)}</p>` : '') +
+      tpl.exercises
+        .map(
+          (e) =>
+            `${e.section ? `<div class="ex-section small">${esc(e.section)}</div>` : ''}<div class="ex"><span class="grow">${e.superset ? '🔗 ' : ''}${esc(e.name)}<br><span class="muted">${esc(e.sets)} × ${e.unit === 'sec' ? esc(secText(e.reps)) : esc(e.reps)}${e.weight ? ' · ' + esc(e.weight) + ' kg' : ''}${e.info ? ' · ' + esc(e.info) : ''}</span></span></div>`,
+        )
+        .join('')
   }
   const startLabel = !s.log ? '▶ Training starten' : s.log.endedAt ? 'Log bekijken / aanpassen' : '▶ Doorgaan met training'
   openSheet(
@@ -1613,7 +1656,7 @@ function openShinSheet(s) {
   openSheet(
     `
     <form method="dialog">
-      <h2>🏃 Scheenpijn na deze run?</h2>
+      <h2>🏃 ${painLabel(s)} na deze run?</h2>
       <p class="muted">0 = geen pijn · 10 = ergst denkbare pijn</p>
       <div class="shin-grid">${buttons}</div>
       <div class="actions">
@@ -2544,6 +2587,453 @@ function renderIcuCard() {
     </section>`
 }
 
+// ---------- Trainingsblok laden (JSON) ----------
+// Een trainingsblok is een JSON-bestand met weken (elke dag: datum, sessie,
+// omvang, type) en krachtschema's ("kracht": { A: { naam, dag, oefeningen } }).
+// Tarapp maakt er schema's en trainingen van; de trainingen dragen `blockId`
+// en `blockWeek` (bijv. 'W3') en kunnen in één keer weer weg.
+
+const DAY_INDEX = { maandag: 0, dinsdag: 1, woensdag: 2, donderdag: 3, vrijdag: 4, zaterdag: 5, zondag: 6 }
+// "Gym B — bovenlichaam" -> "gym b": het deel waarmee de weekschema's een schema noemen.
+const tplPrefix = (tpl) => tpl.name.split(/\s+[—–-]\s+/)[0].trim().toLowerCase()
+const isBlockJson = (o) => !!o && typeof o === 'object' && Array.isArray(o.weken) && o.weken.some((w) => Array.isArray(w?.dagen))
+const blockById = (id) => state.blocks.find((b) => b.id === id)
+const isDateKey = (v) => /^\d{4}-\d\d-\d\d$/.test(String(v || ''))
+
+// Soort in het blok -> activiteit in Tarapp.
+const BLOCK_TYPES = {
+  gym: 'gym',
+  kracht: 'kracht',
+  thuis: 'thuis',
+  run: 'hardlopen',
+  hardlopen: 'hardlopen',
+  long: 'hardlopen',
+  afdaal: 'hardlopen',
+  luhrs: 'hardlopen',
+  heuvel: 'hardlopen',
+  woonwerk: 'hardlopen',
+  interval: 'hardlopen',
+  tempo: 'hardlopen',
+  trail: 'hardlopen',
+  race: 'wedstrijd',
+  wedstrijd: 'wedstrijd',
+  klim: 'klimmen',
+  klimmen: 'klimmen',
+  boulder: 'boulderen',
+  boulderen: 'boulderen',
+  wandel: 'wandelen',
+  wandelen: 'wandelen',
+  fiets: 'fietsen',
+  fietsen: 'fietsen',
+  zwem: 'zwemmen',
+  zwemmen: 'zwemmen',
+  yoga: 'yoga',
+  mobiliteit: 'yoga',
+}
+
+// "2 × 12–15" -> 2 sets van "12–15"; "12 min" / "5 + 3 min" -> 1 × seconden.
+function parseSets(str) {
+  const s = String(str || '').trim()
+  const m = s.match(/^(\d+)\s*[×x]\s*(.+)$/i)
+  if (m) {
+    const t = m[2].trim().match(/^(\d+(?:[.,]\d+)?)\s*(s|sec|min)\b/i)
+    if (t) return { sets: Number(m[1]), reps: String(Math.round(parseNum(t[1]) * (/min/i.test(t[2]) ? 60 : 1))), unit: 'sec' }
+    return { sets: Number(m[1]), reps: m[2].trim(), unit: 'reps' }
+  }
+  const mins = s.match(/^([\d\s+.,]+)\s*min$/i)
+  if (mins) {
+    const total = mins[1].split('+').reduce((n, x) => n + (parseNum(x) || 0), 0)
+    return { sets: 1, reps: String(Math.round(total * 60)), unit: 'sec' }
+  }
+  const secs = s.match(/^(\d+)\s*(s|sec)$/i)
+  if (secs) return { sets: 1, reps: secs[1], unit: 'sec' }
+  return { sets: 1, reps: s, unit: 'reps' }
+}
+
+// De krachtschema's van het blok als Tarapp-schema's (nog niet opgeslagen).
+function blockSchemas(o) {
+  return Object.entries(o.kracht || o.schemas || {})
+    .filter(([, k]) => k && Array.isArray(k.oefeningen))
+    .map(([key, k]) => {
+      let section = ''
+      const exercises = []
+      for (const x of k.oefeningen) {
+        const name = String(x?.oefening || '').trim()
+        if (!name) continue
+        // Kopregel zonder sets ("— bovenlichaam —") wordt een kopje boven de volgende oefening.
+        if (!String(x.sets || '').trim() && /^[—–-]/.test(name)) {
+          section = name.replace(/^[—–-]+\s*|\s*[—–-]+$/g, '')
+          continue
+        }
+        const p = parseSets(x.sets)
+        const info = [x.toelichting, x.intensiteit]
+          .map((v) => String(v || '').trim())
+          .filter((v) => v && !/^[—–-]$/.test(v))
+          .join(' · ')
+        exercises.push({
+          id: uid(),
+          name,
+          sets: p.sets,
+          reps: p.reps,
+          weight: '',
+          unit: p.unit,
+          superset: exercises.length > 0 && /superset/i.test(x.toelichting || ''),
+          info,
+          section,
+        })
+        section = ''
+      }
+      const name = String(k.naam || key)
+      return {
+        key,
+        name,
+        prefix: name.split(/\s+[—–-]\s+/)[0].trim().toLowerCase(),
+        day: String(k.dag || '').toLowerCase(),
+        duration: Number(k.duur_min) || '',
+        note: [k.noot, k.werksets ? `${k.werksets} werksets` : ''].filter(Boolean).join(' · '),
+        exercises,
+      }
+    })
+}
+
+// Activiteit voor een schema dat een eigen training wordt.
+const schemaType = (sc) => (/gym/.test(sc.prefix) ? 'gym' : /thuis/.test(sc.prefix) ? 'thuis' : /warm/.test(sc.name.toLowerCase()) ? 'warming' : 'kracht')
+
+function blockDayType(day) {
+  const t = String(day.type || '').toLowerCase().trim()
+  const text = String(day.sessie || '').toLowerCase().trim()
+  if (t === 'rust') {
+    if (!text || text === 'rust') return null
+    return /^wandel/.test(text) ? 'wandelen' : 'yoga'
+  }
+  if (BLOCK_TYPES[t]) return BLOCK_TYPES[t]
+  if (t) return `blok-${t}`
+  return /km/.test(day.omvang || '') ? 'hardlopen' : null
+}
+
+// Alles wat het blok in de agenda zou zetten, zonder iets op te slaan.
+// opts.from: 'week' (vanaf deze week), 'today' of 'all'; opts.start: maandag
+// van week 1 voor blokken zonder datums.
+function blockPlan(o, opts) {
+  const schemas = blockSchemas(o)
+  const allText = o.weken.flatMap((w) => (w.dagen || []).map((d) => String(d?.sessie || '').toLowerCase())).join(' | ')
+  const fromKeyDate = opts.from === 'all' ? '' : opts.from === 'today' ? todayKey() : toKey(startOfWeek(new Date()))
+  const race = o.race && isDateKey(o.race.datum) ? o.race : null
+  const sessions = []
+  const weeks = []
+  let skipped = 0
+  o.weken.forEach((w, wi) => {
+    const code = String(w.code || `W${wi + 1}`)
+    const dates = []
+    for (const day of w.dagen || []) {
+      const date = isDateKey(day?.datum)
+        ? day.datum
+        : opts.start && DAY_INDEX[String(day?.dag || '').toLowerCase()] !== undefined
+          ? toKey(addDays(fromKey(opts.start), wi * 7 + DAY_INDEX[String(day.dag).toLowerCase()]))
+          : null
+      if (!date) continue
+      dates.push(date)
+      const typeId = blockDayType(day)
+      if (!typeId) continue
+      const text = String(day.sessie || '').trim()
+      const lower = text.toLowerCase()
+      const named = schemas.filter((sc) => sc.prefix && lower.includes(sc.prefix))
+      const dayBound = schemas.filter((sc) => sc.day === String(day.dag || '').toLowerCase() && !allText.includes(sc.prefix))
+      const strengthDay = ['gym', 'kracht', 'thuis'].includes(typeId)
+      const main = {
+        typeId,
+        date,
+        time: race && date === race.datum && race.start ? race.start : '',
+        note: [text, day.omvang].filter(Boolean).join(' · '),
+        blockWeek: code,
+        schemaKey: strengthDay ? named[0]?.key : undefined,
+        duration: strengthDay ? named[0]?.duration || '' : typeId === 'wandelen' ? Number(lower.match(/(\d+)\s*min/)?.[1]) || '' : '',
+      }
+      const extra = (sc) => ({ typeId: schemaType(sc), date, time: '', note: sc.name, blockWeek: code, schemaKey: sc.key, duration: sc.duration })
+      const group = [
+        ...(strengthDay ? [] : dayBound.map(extra)), // warming-up vóór de training
+        main,
+        ...named.filter((sc) => sc.key !== main.schemaKey).map(extra), // bijv. thuis heupsessie na de run
+      ]
+      for (const s of group) {
+        if (fromKeyDate && s.date < fromKeyDate) skipped++
+        else sessions.push(s)
+      }
+    }
+    weeks.push({
+      code,
+      periode: w.periode || '',
+      km: Number(w.km) || 0,
+      hm: Number(w.hm) || 0,
+      descent: Number(w.rennende_afdaling) || 0,
+      start: dates.length ? toKey(startOfWeek(fromKey(dates.sort()[0]))) : '',
+    })
+  })
+  const pain = (o.regels || []).join(' ').match(/(\p{L}+)pijn/iu)?.[1]?.toLowerCase()
+  return { schemas, sessions, weeks, skipped, race, painSpot: pain || 'scheen' }
+}
+
+const BLOCK_EXTRA_TYPES = [
+  { id: 'thuis', name: 'Thuistraining', emoji: '🏠' },
+  { id: 'warming', name: 'Warming-up', emoji: '🔥' },
+  { id: 'wedstrijd', name: 'Wedstrijd', emoji: '🏁' },
+]
+
+function importBlock(o, opts) {
+  const plan = blockPlan(o, opts)
+  const block = {
+    id: uid(),
+    naam: String(o.naam || 'Trainingsblok'),
+    periode: String(o.periode || ''),
+    race: plan.race,
+    regels: (o.regels || []).map(String),
+    weeks: plan.weeks,
+    painSpot: plan.painSpot,
+    templateIds: [],
+  }
+  const tplId = {}
+  for (const sc of plan.schemas) {
+    const tpl = { id: uid(), name: sc.name, note: sc.note, exercises: sc.exercises, blockId: block.id }
+    state.templates.push(tpl)
+    block.templateIds.push(tpl.id)
+    tplId[sc.key] = tpl.id
+  }
+  for (const s of plan.sessions) {
+    if (!state.types.some((t) => t.id === s.typeId)) {
+      const extra = BLOCK_EXTRA_TYPES.find((t) => t.id === s.typeId)
+      const custom = s.typeId.replace(/^blok-/, '')
+      state.types.push(extra || { id: s.typeId, name: custom.charAt(0).toUpperCase() + custom.slice(1), emoji: '⭐' })
+    } else ensureType(s.typeId)
+    state.sessions.push({
+      id: uid(),
+      typeId: s.typeId,
+      date: s.date,
+      time: s.time,
+      duration: s.duration,
+      templateId: s.schemaKey ? tplId[s.schemaKey] : '',
+      note: s.note,
+      done: false,
+      blockId: block.id,
+      blockWeek: s.blockWeek,
+    })
+  }
+  state.blocks.push(block)
+  return { block, count: plan.sessions.length }
+}
+
+// Week van een geladen blok die op maandag `ws` begint.
+function blockWeekAt(ws) {
+  const key = toKey(ws)
+  for (const b of state.blocks) {
+    const w = b.weeks.find((x) => x.start === key)
+    if (w) return { block: b, week: w }
+  }
+  return null
+}
+
+function blockWeekText(w) {
+  return [
+    w.code,
+    w.km ? `${fmtNum(w.km)} km` : '',
+    w.hm ? `${w.hm} hm` : '',
+    w.descent ? `${w.descent} m rennend afdalen` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function raceText(race) {
+  const d = fromKey(race.datum)
+  const days = daysBetween(todayKey(), race.datum)
+  const when = days > 1 ? `nog ${days} dagen` : days === 1 ? 'morgen!' : days === 0 ? 'vandaag! 💛' : 'geweest'
+  return { line: `${race.naam}${race.plaats ? ` · ${race.plaats}` : ''} · ${DAYS[(d.getDay() + 6) % 7]} ${shortDate(d)}${race.start ? ` ${race.start}` : ''}`, when }
+}
+
+function openBlockLoadSheet() {
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>📥 Trainingsblok laden</h2>
+      <p class="muted">Kies het JSON-bestand, of plak de tekst hieronder (handig als je het bestand in een chat of mail hebt).</p>
+      <button type="button" class="btn primary block" id="block-pick">JSON-bestand kiezen</button>
+      <input type="file" id="block-file" accept="application/json,.json,text/plain" hidden />
+      <label class="field">Of plak de tekst
+        <textarea name="json" rows="6" placeholder='{ "naam": "Blok 1", "weken": [ … ] }' spellcheck="false" autocapitalize="off"></textarea>
+      </label>
+      <div class="actions">
+        <button type="button" class="btn" id="cancel">Annuleren</button>
+        <button type="submit" class="btn primary">Verder</button>
+      </div>
+    </form>`,
+    (fd) => {
+      readBlockText(String(fd.get('json') || ''))
+      return false
+    },
+  )
+  sheet.querySelector('#cancel').onclick = closeSheet
+  sheet.querySelector('#block-pick').onclick = () => sheet.querySelector('#block-file').click()
+  sheet.querySelector('#block-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0]
+    if (file) readBlockText(await file.text())
+  })
+}
+
+function readBlockText(text) {
+  let o
+  try {
+    o = JSON.parse(text.replace(/^﻿/, ''))
+  } catch {
+    alert('Dit is geen geldige JSON. Controleer of je de hele tekst hebt gekopieerd, van { tot en met }.')
+    return
+  }
+  if (!isBlockJson(o)) {
+    alert('Dit bestand is geen trainingsblok. Tarapp verwacht "weken" met per week "dagen" (datum of dag, sessie, type) en eventueel "kracht" met schema\'s.')
+    return
+  }
+  openBlockImportSheet(o)
+}
+
+function openBlockImportSheet(o) {
+  const needsStart = o.weken.some((w) => (w.dagen || []).some((d) => !isDateKey(d?.datum)))
+  const firstDate = o.weken.flatMap((w) => (w.dagen || []).map((d) => d?.datum)).filter(isDateKey).sort()[0]
+  const optsFrom = (form) => ({ from: form.from.value, start: form.start?.value ? toKey(startOfWeek(fromKey(form.start.value))) : '' })
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>📥 ${esc(o.naam || 'Trainingsblok')}</h2>
+      ${o.periode ? `<p class="muted">${esc(o.periode)}</p>` : ''}
+      ${
+        o.race && isDateKey(o.race.datum)
+          ? `<div class="race-box">🏁 <strong>${esc(raceText(o.race).line)}</strong><br>${[o.race.km ? `${fmtNum(o.race.km)} km` : '', o.race.hm ? `${o.race.hm} hm` : '', o.race.voorspeld ? `voorspeld ${o.race.voorspeld}` : ''].filter(Boolean).map(esc).join(' · ')}</div>`
+          : ''
+      }
+      <p id="block-summary"></p>
+      <div class="chips" id="block-types"></div>
+      ${needsStart ? `<label class="field">Week 1 begint op<input type="date" name="start" value="${nextMonday()}" required /></label>` : ''}
+      <label class="field">In de agenda zetten
+        <select name="from">
+          <option value="week" selected>Vanaf deze week</option>
+          <option value="today">Vanaf vandaag</option>
+          <option value="all">Alles${firstDate ? `, vanaf ${shortDate(fromKey(firstDate))}` : ''}</option>
+        </select>
+      </label>
+      <div class="field">Eerste week in je agenda</div>
+      <div class="block-preview" id="block-preview"></div>
+      <details class="plan-rules"><summary>Krachtschema's</summary><ul id="block-schemas"></ul></details>
+      ${o.regels?.length ? `<details class="plan-rules"><summary>Regels</summary><ul>${o.regels.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>` : ''}
+      <div class="actions">
+        <button type="button" class="btn" id="cancel">Annuleren</button>
+        <button type="submit" class="btn primary">In agenda zetten</button>
+      </div>
+    </form>`,
+    (fd, form) => {
+      const old = state.blocks.find((b) => b.naam === String(o.naam || 'Trainingsblok'))
+      if (old && !confirm(`"${old.naam}" staat al in je agenda. Vervangen? De nog niet gedane trainingen van het oude blok worden weggehaald.`)) return false
+      if (old) removeBlock(old)
+      const { block, count } = importBlock(o, optsFrom(form))
+      save()
+      closeSheet()
+      const first = state.sessions.filter((s) => s.blockId === block.id).map((s) => s.date).sort()[0]
+      ui.tab = 'week'
+      ui.calMode = 'week'
+      if (first) ui.weekStart = startOfWeek(fromKey(first))
+      render()
+      if (first && agendaScrolls()) scrollToWeek(fromKey(first))
+      showToast(`📥 ${count} trainingen en ${block.templateIds.length} schema's geladen 💛`)
+    },
+  )
+  const form = sheet.querySelector('form')
+  const refresh = () => {
+    const plan = blockPlan(o, optsFrom(form))
+    const byType = {}
+    for (const s of plan.sessions) byType[s.typeId] = (byType[s.typeId] || 0) + 1
+    const typeName = (id) => {
+      const t = state.types.find((x) => x.id === id) || BLOCK_EXTRA_TYPES.find((x) => x.id === id) || { name: id.replace(/^blok-/, ''), emoji: '⭐' }
+      return `${t.emoji} ${t.name}`
+    }
+    sheet.querySelector('#block-summary').innerHTML =
+      `<strong>${plan.sessions.length} trainingen</strong> in ${new Set(plan.sessions.map((s) => s.blockWeek)).size} weken · ${plan.schemas.length} schema's` +
+      (plan.skipped ? `<br><span class="muted">${plan.skipped} trainingen van vóór die datum worden overgeslagen</span>` : '')
+    sheet.querySelector('#block-types').innerHTML = Object.entries(byType)
+      .sort((x, y) => y[1] - x[1])
+      .map(([id, n]) => `<span class="chip">${esc(typeName(id))} × ${n}</span>`)
+      .join('')
+    const firstWeek = plan.sessions[0]?.blockWeek
+    const rows = plan.sessions.filter((s) => s.blockWeek === firstWeek)
+    sheet.querySelector('#block-preview').innerHTML = rows.length
+      ? rows
+          .map((s) => {
+            const d = fromKey(s.date)
+            const sc = plan.schemas.find((x) => x.key === s.schemaKey)
+            return `<div class="bp-row"><span class="bp-day">${DAYS_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}</span><span>${esc(typeName(s.typeId))}</span><span class="muted">${esc(s.note)}${sc && !s.note.toLowerCase().includes(sc.prefix) ? ` · ${esc(sc.name)}` : ''}</span></div>`
+          })
+          .join('')
+      : '<p class="muted">Niets meer om in te plannen vanaf die datum.</p>'
+    sheet.querySelector('#block-schemas').innerHTML = plan.schemas
+      .map((sc) => `<li><strong>${esc(sc.name)}</strong> · ${sc.exercises.length} oefeningen${sc.duration ? ` · ${sc.duration} min` : ''}</li>`)
+      .join('')
+  }
+  refresh()
+  form.addEventListener('change', refresh)
+  sheet.querySelector('#cancel').onclick = closeSheet
+}
+
+// Nog niet gedane trainingen van het blok weghalen (gedane blijven als
+// geschiedenis), en de schema's van het blok als niets ze meer gebruikt.
+function removeBlock(block) {
+  const open = (s) => s.blockId === block.id && !s.done && !s.log && !s.runLog
+  const removed = state.sessions.filter(open)
+  state.sessions = state.sessions.filter((s) => !open(s))
+  const inUse = new Set(state.sessions.map((s) => s.templateId))
+  const removedTpls = state.templates.filter((t) => t.blockId === block.id && !inUse.has(t.id))
+  state.templates = state.templates.filter((t) => !removedTpls.includes(t))
+  state.blocks = state.blocks.filter((b) => b.id !== block.id)
+  return { removed, removedTpls }
+}
+
+function askRemoveBlock(id) {
+  const block = blockById(id)
+  if (!block) return
+  const count = state.sessions.filter((s) => s.blockId === block.id && !s.done && !s.log && !s.runLog).length
+  if (!confirm(`"${block.naam}" uit je agenda halen? Dat zijn ${count} trainingen. Wat je al gedaan hebt, blijft staan.`)) return
+  const { removed, removedTpls } = removeBlock(block)
+  save()
+  closeSheet()
+  render()
+  showToast(`🗑️ ${removed.length} trainingen van het blok weggehaald`, () => {
+    state.blocks.push(block)
+    state.sessions.push(...removed)
+    state.templates.push(...removedTpls)
+    save()
+    render()
+  })
+}
+
+function renderBlockCards() {
+  const cards = state.blocks.map((b) => {
+    const sessions = state.sessions.filter((s) => s.blockId === b.id)
+    const done = sessions.filter((s) => s.done).length
+    const now = blockWeekAt(startOfWeek(new Date()))
+    const race = b.race && raceText(b.race)
+    return `
+      <section class="card block-card">
+        <h2>📋 ${esc(b.naam)}</h2>
+        ${b.periode ? `<p class="muted">${esc(b.periode)}</p>` : ''}
+        ${race ? `<div class="race-box">🏁 <strong>${esc(race.line)}</strong><br>${esc(race.when)}${b.race.voorspeld ? ` · voorspeld ${esc(b.race.voorspeld)}` : ''}${b.race.doel ? `<br><span class="muted">${esc(b.race.doel)}</span>` : ''}</div>` : ''}
+        ${now?.block === b ? `<p>Deze week: <strong>${esc(blockWeekText(now.week))}</strong></p>` : ''}
+        <div class="progress"><div style="width:${sessions.length ? Math.round((done / sessions.length) * 100) : 0}%"></div></div>
+        <p class="muted">${done} van ${sessions.length} trainingen gedaan 💛</p>
+        <p class="muted">Trainingen uit dit blok herken je aan de blauwgroene streep en het weeklabel, zoals <span class="block-badge">${esc(now?.block === b ? now.week.code : b.weeks[0]?.code || 'W1')}</span>.</p>
+        ${b.regels.length ? `<details class="plan-rules"><summary>Regels</summary><ul>${b.regels.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>` : ''}
+        <details class="plan-rules"><summary>Weken</summary>
+          <table class="types">${b.weeks.map((w) => `<tr><td><strong>${esc(w.code)}</strong> ${esc(w.periode)}</td><td>${w.km ? `${fmtNum(w.km)} km` : ''}</td><td>${w.hm ? `${w.hm} hm` : ''}</td></tr>`).join('')}</table>
+        </details>
+        <button class="btn danger block" data-action="block-remove" data-id="${b.id}">Uit agenda halen</button>
+      </section>`
+  })
+  return cards.join('')
+}
+
 // ---------- Elke week herhalen ----------
 // Een herhaling is een regel { id, every, last, tpl }: vanaf de laatst
 // ingeplande datum (`last`) vult de app steeds nieuwe trainingen aan tot een
@@ -2647,7 +3137,7 @@ function deleteSession(session) {
 
 function exerciseRow(e = { id: uid(), name: '', sets: 3, reps: '10', weight: '', unit: 'reps', superset: false }) {
   return `
-    <div class="ex-edit ${e.superset ? 'ss' : ''}" data-id="${e.id}">
+    <div class="ex-edit ${e.superset ? 'ss' : ''}" data-id="${e.id}" data-section="${esc(e.section || '')}">
       <div class="ex-edit-top">
         <span class="drag-handle" aria-label="Slepen om te verplaatsen">⠿</span>
         <input name="name" value="${esc(e.name)}" placeholder="Oefening" aria-label="Oefening" />
@@ -2666,6 +3156,7 @@ function exerciseRow(e = { id: uid(), name: '', sets: 3, reps: '10', weight: '',
         </label>
         <label>Kg<input name="weight" value="${esc(e.weight)}" inputmode="decimal" placeholder="–" /></label>
       </div>
+      <input class="ex-info" name="info" value="${esc(e.info || '')}" placeholder="Toelichting (optioneel), bijv. RIR 2" aria-label="Toelichting" />
       <label class="ss-toggle"><input type="checkbox" name="superset" ${e.superset ? 'checked' : ''} /> 🔗 Superset met vorige oefening</label>
     </div>`
 }
@@ -2681,6 +3172,8 @@ function readExerciseRows(root) {
       weight: v('weight'),
       unit: v('unit'),
       superset: row.querySelector('[name="superset"]').checked,
+      info: v('info'),
+      section: row.dataset.section || '',
     }
   })
   if (rows[0]) rows[0].superset = false
@@ -2696,6 +3189,7 @@ function openTemplateSheet(tpl) {
     <form method="dialog">
       <h2>${isNew ? 'Nieuw schema' : 'Schema bewerken'}</h2>
       <label class="field">Naam<input name="tplName" value="${esc(t.name)}" placeholder="Bijv. Full body A" required /></label>
+      <label class="field">Notitie<textarea name="tplNote" rows="2" placeholder="Bijv. max 2 sets per oefening">${esc(t.note || '')}</textarea></label>
       <div id="ex-rows">${rows}</div>
       <button type="button" class="linkbtn" id="add-ex">+ Oefening toevoegen</button>
       <div class="actions">
@@ -2708,8 +3202,9 @@ function openTemplateSheet(tpl) {
       const exercises = readExerciseRows(form).filter((e) => e.name)
       if (exercises[0]) exercises[0].superset = false
       const name = fd.get('tplName').trim()
-      if (isNew) state.templates.push({ id: uid(), name, exercises })
-      else Object.assign(tpl, { name, exercises })
+      const note = String(fd.get('tplNote') || '').trim()
+      if (isNew) state.templates.push({ id: uid(), name, note, exercises })
+      else Object.assign(tpl, { name, note, exercises })
       save()
       render()
     },
@@ -3071,6 +3566,8 @@ const actions = {
     render()
   },
   'plan-new': () => openPlanSheet(),
+  'block-load': () => openBlockLoadSheet(),
+  'block-remove': (el) => askRemoveBlock(el.dataset.id),
   'icu-sync': () => icuSync(),
   'icu-disconnect': () => icuDisconnect(),
   'icu-setup': () => {
@@ -3193,6 +3690,8 @@ view.addEventListener('change', async (e) => {
   if (e.target.id !== 'import-file' || !e.target.files[0]) return
   try {
     const parsed = JSON.parse(await e.target.files[0].text())
+    e.target.value = ''
+    if (isBlockJson(parsed)) return openBlockImportSheet(parsed)
     if (!isValidState(parsed)) throw new Error('ongeldig')
     if (!confirm('Huidige gegevens vervangen door deze back-up?')) return
     state = normalize(parsed)
