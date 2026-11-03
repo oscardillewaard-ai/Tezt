@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '24' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '25' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -346,6 +346,7 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 25, items: ['"Wandelen + klimmen" uit je trainingsblok staan nu als twee losse trainingen: 🥾 wandelen en 🧗 klimmen 💛'] },
   {
     v: 24,
     items: [
@@ -2811,6 +2812,18 @@ function blockSchemas(o) {
 
 const capFirst = (v) => (v ? v.charAt(0).toUpperCase() + v.slice(1) : v)
 
+// Activiteit bij een los woord uit de tekst ("wandelen", "klimmen 2 uur" ...).
+const ACTIVITY_WORDS = [
+  [/^wandel/, 'wandelen'],
+  [/^klim/, 'klimmen'],
+  [/^boulder/, 'boulderen'],
+  [/^fiets/, 'fietsen'],
+  [/^zwem/, 'zwemmen'],
+  [/^(hardlopen|lopen|run)\b/, 'hardlopen'],
+  [/^yoga/, 'yoga'],
+]
+const activityOf = (part) => ACTIVITY_WORDS.find(([re]) => re.test(String(part).trim().toLowerCase()))?.[1]
+
 // Losse routine in de tekst van een dag, zoals "heupblok", "enkelbalans" of
 // "enkelroutine": die wordt een eigen training.
 const isRoutineSeg = (seg) => /^(heup|enkel|balans|knie|kuit|core|mobiliteit)[\p{L}-]*$/iu.test(seg)
@@ -2924,6 +2937,14 @@ function blockPlan(o, opts) {
       const text = String(day.sessie || '').trim()
       const lower = text.toLowerCase()
       const segs = text.split(/\s+·\s+/).map((x) => x.trim()).filter(Boolean)
+      // "wandelen + klimmen": twee activiteiten op één dag worden twee trainingen.
+      const comboSeg = ['gym', 'kracht', 'thuis', 'routine'].includes(typeId)
+        ? undefined
+        : segs.find((seg) => {
+            const parts = seg.split(/\s*\+\s*/)
+            return parts.length > 1 && parts.every((x) => activityOf(x))
+          })
+      const comboParts = comboSeg ? comboSeg.split(/\s*\+\s*/).map((x) => x.trim()) : []
       const named = schemas.filter((sc) => sc.prefix && lower.includes(sc.prefix))
       const dayBound = schemas.filter((sc) => sc.day === String(day.dag || '').toLowerCase() && !allText.includes(sc.prefix))
       const strengthDay = ['gym', 'kracht', 'thuis'].includes(typeId)
@@ -2933,7 +2954,7 @@ function blockPlan(o, opts) {
       // Het deel van de tekst dat het schema van de hoofdtraining noemt ("Gym A — licht") is de naam.
       const titleSeg = (mainSchema && segs.find((seg) => names(seg, mainSchema))) || ''
       // Wat een eigen training wordt, hoort niet meer in de tekst van de hoofdtraining.
-      const own = (seg) => seg === titleSeg || extraSchemas.some((sc) => names(seg, sc)) || isRoutineSeg(seg)
+      const own = (seg) => seg === titleSeg || seg === comboSeg || extraSchemas.some((sc) => names(seg, sc)) || isRoutineSeg(seg)
       const rest = segs.filter((seg) => !own(seg))
       const routines = segs.filter(isRoutineSeg)
       const mainIsRoutine = typeId === 'routine'
@@ -2979,9 +3000,28 @@ function blockPlan(o, opts) {
         const schemaKey = routineKey(seg)
         return { typeId: 'routine', title: capFirst(seg), date, time: '', note: schemaKey ? '' : r.info, blockWeek: code, schemaKey, duration: r.minutes }
       }
+      // Bij "wandelen + klimmen" is de hoofdtraining het deel dat bij de soort hoort (klim -> klimmen).
+      const mainPart = comboParts.find((x) => activityOf(x) === typeId) || comboParts[0]
+      if (comboSeg) {
+        main.typeId = activityOf(mainPart)
+        main.title = capFirst(mainPart)
+        main.note = [...rest, day.omvang].filter(Boolean).join(' · ')
+      }
+      const fromPart = (part) => ({
+        typeId: activityOf(part),
+        title: capFirst(part),
+        date,
+        time: '',
+        note: '',
+        blockWeek: code,
+        duration: Number(part.match(/(\d+)\s*min/)?.[1]) || '',
+      })
+      const mainAt = comboParts.indexOf(mainPart)
       const group = [
         ...(strengthDay ? [] : dayBound.map((sc) => fromSchema(sc))), // warming-up vóór de training
+        ...comboParts.slice(0, Math.max(0, mainAt)).map(fromPart), // bijv. wandelen vóór het klimmen
         main,
+        ...comboParts.slice(mainAt + 1).map(fromPart),
         ...extraSchemas.map((sc) => fromSchema(sc, segs.find((seg) => names(seg, sc)))), // bijv. thuis heupsessie na de run
         ...(mainIsRoutine ? routines.slice(1) : routines).map(fromRoutine), // heupblok, enkelbalans ...
       ]
@@ -3034,10 +3074,18 @@ function importBlock(o, opts) {
     tplId[sc.key] = tpl.id
   }
   let count = 0
+  const usedKeep = new Set()
   for (const s of plan.sessions) {
     // Al gedaan uit een eerdere versie van dit blok: niet nog een keer inplannen.
-    const dup = opts.keep?.find((k) => k.date === s.date && k.typeId === s.typeId && (!k.title || k.title === s.title))
+    const dup = opts.keep?.find(
+      (k) =>
+        !usedKeep.has(k) &&
+        k.date === s.date &&
+        k.typeId === s.typeId &&
+        (!k.title || !s.title || k.title.toLowerCase().includes(s.title.toLowerCase())),
+    )
     if (dup) {
+      usedKeep.add(dup)
       dup.title ||= s.title
       continue
     }
