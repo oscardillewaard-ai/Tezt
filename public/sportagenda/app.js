@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '22' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '23' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -346,6 +346,10 @@ function cheer() {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 23,
+    items: ['Tik op een run, wandeling of klimtraining en je ziet eerst een rustig overzicht met ✓ Afvinken, net als bij gym 💛'],
+  },
   {
     v: 22,
     items: [
@@ -1641,6 +1645,93 @@ function openWorkoutSheet(s) {
     () => {},
   )
   sheet.querySelector('#start').onclick = () => startWorkout(s)
+  sheet.querySelector('#edit').onclick = () => {
+    closeSheet()
+    openSessionSheet(s)
+  }
+  sheet.querySelector('#cancel').onclick = closeSheet
+}
+
+// "easy vlak · enkelbalans · 5 km" -> tekst "easy vlak · enkelbalans" en het getal 5 km.
+function splitNote(note) {
+  const text = []
+  const stats = []
+  for (const part of String(note || '').split(/\s+·\s+/).map((p) => p.trim()).filter(Boolean)) {
+    const m = part.match(/^(\d+(?:[.,]\d+)?)\s*(km|hm|m|min)$/i)
+    if (m) stats.push({ value: m[1], unit: m[2].toLowerCase() })
+    else text.push(part)
+  }
+  return { text: text.join(' · '), stats }
+}
+
+// Overzicht van een training zonder schema of intervallen (een run, wandeling,
+// klimtraining, wedstrijd ...): net als bij gym eerst rustig zien wat het is,
+// met één grote knop om af te vinken. Het formulier zit onder "Bewerken".
+function openSessionDetail(s) {
+  const t = typeById(s.typeId)
+  const d = fromKey(s.date)
+  const when = [`${DAYS[(d.getDay() + 6) % 7]} ${shortDate(d)}`, s.time].filter(Boolean).join(' · ')
+  const { text, stats } = splitNote(s.note)
+  if (s.duration && !s.done && !stats.some((x) => x.unit === 'min')) stats.push({ value: String(s.duration), unit: 'min' })
+  const block = s.blockId && blockById(s.blockId)
+  const bw = block && blockWeekAt(startOfWeek(d))
+  const race = block?.race?.datum === s.date ? block.race : null
+  const badges =
+    (s.planId ? ' <span class="plan-badge">5K</span>' : '') + (s.blockWeek ? ` <span class="block-badge">${esc(s.blockWeek)}</span>` : '')
+  const doneLine = [
+    '✓ Gedaan',
+    s.duration ? fmtMinutes(Number(s.duration)) : '',
+    s.distance ? `${fmtNum(Math.round(s.distance / 100) / 10)} km` : '',
+    s.icuId ? '⌚ van je horloge' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const pain = tracksShin(s.typeId)
+    ? Number.isInteger(s.shin)
+      ? `<button type="button" class="btn block" id="pain">🦵 ${painLabel(s)} <span class="shin-badge ${shinClass(s.shin)}">${s.shin}/10</span> · aanpassen</button>`
+      : `<button type="button" class="btn block" id="pain">🦵 ${painLabel(s)} invullen</button>`
+    : ''
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>${esc(t.emoji)} ${esc(t.name)}${badges}</h2>
+      <p class="muted">${esc(when)}${seriesOf(s) ? ' · 🔁 elke week' : ''}</p>
+      ${
+        race
+          ? `<div class="race-box">🏁 <strong>${esc(raceText(race).line)}</strong><br>${esc(raceText(race).when)}${race.voorspeld ? ` · voorspeld ${esc(race.voorspeld)}` : ''}${race.doel ? `<br><span class="muted">${esc(race.doel)}</span>` : ''}</div>`
+          : ''
+      }
+      ${text ? `<p class="detail-what">${esc(text)}</p>` : ''}
+      ${stats.length ? `<div class="detail-stats">${stats.map((x) => `<div><strong>${esc(x.value)}</strong><span>${esc(x.unit)}</span></div>`).join('')}</div>` : ''}
+      ${bw && bw.block === block ? `<p class="block-week">📋 Deze week: ${esc(blockWeekText(bw.week))}</p>` : ''}
+      ${
+        s.done
+          ? `<p class="detail-done">${esc(doneLine)}</p>${pain}<button type="button" class="linkbtn" id="untick">↩︎ Toch niet gedaan</button>`
+          : '<button type="button" class="btn primary block" id="tick">✓ Afvinken</button>'
+      }
+      ${planRemoveButton(s)}
+      <div class="actions">
+        <button type="button" class="btn" id="edit">Bewerken</button>
+        <button type="button" class="btn" id="cancel">Sluiten</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  sheet.querySelector('#tick')?.addEventListener('click', () => {
+    s.done = true
+    save()
+    closeSheet()
+    render()
+    if (tracksShin(s.typeId)) openShinSheet(s)
+    cheer()
+  })
+  sheet.querySelector('#untick')?.addEventListener('click', () => {
+    s.done = false
+    save()
+    render()
+    openSessionDetail(s)
+  })
+  sheet.querySelector('#pain')?.addEventListener('click', () => openShinSheet(s))
   sheet.querySelector('#edit').onclick = () => {
     closeSheet()
     openSessionSheet(s)
@@ -3583,7 +3674,7 @@ const actions = {
     const s = state.sessions.find((x) => x.id === el.dataset.id)
     if (s.run && isRunType(s.typeId)) openRunSheet(s)
     else if (isWorkoutSession(s)) openWorkoutSheet(s)
-    else openSessionSheet(s)
+    else openSessionDetail(s)
   },
   ...workoutActions,
   ...runActions,

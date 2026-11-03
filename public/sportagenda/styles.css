@@ -2134,3 +2134,53 @@ body.in-run main {
 .ex-edit .ex-info {
   margin-top: 6px;
 }
+
+/* Overzicht van een training zonder schema */
+.detail-what {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 6px 0 12px;
+}
+
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-stats div {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 6px;
+  text-align: center;
+}
+
+.detail-stats strong {
+  display: block;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-stats span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.detail-done {
+  background: var(--done-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 600;
+}
+
+#untick {
+  display: block;
+  margin: 8px auto 0;
+}
+
+#pain {
+  margin-bottom: 4px;
+}
