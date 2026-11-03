@@ -40,10 +40,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-        // public/sportagenda/ is a separate PWA with its own service worker;
-        // keep Bergtrainer's worker from precaching it or hijacking its pages.
-        globIgnores: ['sportagenda/**'],
-        navigateFallbackDenylist: [/\/sportagenda\//],
+        // public/sportagenda/ and public/parken/ are separate PWAs with their
+        // own service workers; keep Bergtrainer's worker from precaching them
+        // or hijacking their pages.
+        globIgnores: ['sportagenda/**', 'parken/**'],
+        navigateFallbackDenylist: [/\/sportagenda\//, /\/parken\//],
       },
     }),
   ],

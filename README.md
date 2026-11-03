@@ -107,3 +107,40 @@ toe (CORS), dan kan `proxy/intervals-cors-worker.js` als Cloudflare Worker
 worden neergezet en als tussenstation worden ingevuld.
 
 Iconen opnieuw genereren: `node scripts/gen-sportagenda-icons.mjs`.
+
+## Parkenjacht (losse app)
+
+In `public/parken/` staat Parkenjacht, een derde losstaande PWA zonder
+build-stap: een interactieve kaart van de Nederlandse nationale parken om af
+te vinken welke je al bezocht hebt, met datum en notitie per bezoek. De
+parkenlijst staat in `public/parken/parks.js` (21 parken per januari 2026
+plus Rijker de Hollandse Duinen, aangewezen in april 2026). Een nieuw park
+krijgt een nieuwe `id`; bestaande id's nooit hergebruiken, want die zitten in
+opgeslagen voortgang en deellinks.
+
+Na deploy staat hij op `https://<user>.github.io/Tezt/parken/`. Dezelfde
+afspraken als bij Tarapp: geen trek-omlaag-om-te-verversen, blijvende opslag
+aanvragen (`navigator.storage.persist`), network-first service worker, updates
+komen vanzelf binnen (niet terwijl er een venster openstaat) en tonen eenmalig
+"Wat is er nieuw?". Gegevens staan in `localStorage` (sleutel `parken.v1`);
+onder ⚙️ staan back-up exporteren/importeren en "Nu bijwerken".
+
+Samen synchroniseren: via een eigen Cloudflare Worker
+(`proxy/parken-sync-worker.js`, gratis, met een KV-opslag; stappen staan
+bovenin dat bestand). Onder ⚙️ start je een groep; de app maakt een lange,
+willekeurige groepscode en een koppel-link voor de andere telefoon(s).
+Gekoppelde telefoons sturen elke wijziging direct en halen elke 10 seconden
+(zolang de app open is, en bij terugkomen of weer online) de stand op. Per park
+wint de jongste wijziging, ook bij uitvinken (`tomb` in de opslag). Het adres
+van de worker kan vast in `DEFAULT_SYNC_URL` in `app.js`; de koppeling zelf
+staat onder sleutel `parken.sync`, buiten de back-up.
+
+Zonder sync kan het ook eenmalig: "Deel voortgang" maakt een link met de
+voortgang in het `#`-deel (gaat niet naar een server); wie hem opent, voegt hem
+samen met de eigen voortgang.
+
+De kaart gebruikt Leaflet (meegeleverd in `public/parken/vendor/`, BSD-2) met
+tegels van OpenStreetMap; die laadt de browser zelf en worden niet in de
+service worker opgeslagen. Bij een release `APP_VERSION` in `app.js` en
+`CACHE` in `sw.js` ophogen en bovenaan `CHANGELOG` een regel toevoegen.
+Iconen: `node scripts/gen-parken-icons.mjs`.
