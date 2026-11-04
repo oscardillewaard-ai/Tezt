@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '28' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '29' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -211,6 +211,7 @@ const ui = {
   scrollFrom: -2, // doorlopende agenda: weken t.o.v. deze week
   scrollTo: 10,
   month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  morePage: null, // open pagina onder Meer ('thema', 'horloge', ...) of null voor het overzicht
 }
 
 const view = document.getElementById('view')
@@ -423,6 +424,13 @@ function afterTick(s, big = false) {
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
   {
+    v: 29,
+    items: [
+      'Meer is opgeruimd: alles in overzichtelijke groepjes, en je ziet meteen wat je gekozen hebt 💛',
+      'Tik op een rij voor de details, met ‹ Meer ga je terug',
+    ],
+  },
+  {
     v: 28,
     items: [
       'Kies hoe je agenda eruitziet: tik op het knopje naast Week en Maand 💛',
@@ -552,8 +560,9 @@ function openChangelog(sinceVersion = 0) {
   sheet.querySelector('#cl-theme')?.addEventListener('click', () => {
     closeSheet()
     ui.tab = 'meer'
+    ui.morePage = 'thema'
     render()
-    document.getElementById('theme-card')?.scrollIntoView({ block: 'start' })
+    window.scrollTo(0, 0)
   })
 }
 
@@ -581,7 +590,6 @@ function renderThemeCard() {
   const cur = themeId()
   return `
     <section class="card" id="theme-card">
-      <h2>Thema</h2>
       <div class="theme-list" role="radiogroup" aria-label="Thema">
         ${THEMES.map(
           (t) => `
@@ -694,7 +702,7 @@ function renderWeek() {
 }
 
 // ---------- Doorlopende agenda ----------
-// Instelling onder Meer: alle weken onder elkaar, verder laden bij het scrollen.
+// Weergave Doorlopend (knopje naast Week/Maand of Meer → Weergave): alle weken onder elkaar, verder laden bij het scrollen.
 
 // ---------- Weergaven van de agenda ----------
 // Klein: twee weken, één regel per dag. Compact: de week op één scherm.
@@ -1233,10 +1241,75 @@ function renderSchemas() {
 
 // ---------- Meer ----------
 
+// Meer is een overzicht in groepjes, zoals de instellingen op je telefoon. Een rij
+// opent een eigen pagina (ui.morePage) met een terugknop, of doet meteen iets.
+const MORE_PAGES = {
+  thema: { title: 'Thema', render: () => renderThemeCard() },
+  weergave: {
+    title: 'Weergave',
+    render: () => `
+      <section class="card">
+        ${viewOptions()}
+        <p class="muted">Bij Klein, Compact en Schermvullend swipe je naar links of rechts voor de volgende of vorige week. Je kiest dit ook met het knopje naast Week en Maand.</p>
+      </section>`,
+  },
+  activiteiten: { title: 'Activiteiten', render: () => renderTypesCard() },
+  horloge: { title: 'Horloge', render: () => renderIcuCard() },
+  gegevens: { title: 'Je gegevens', render: () => renderDataCard() },
+  installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
+}
+
 function renderMore() {
+  const page = MORE_PAGES[ui.morePage]
+  if (page) {
+    title.textContent = page.title
+    return `
+      <button type="button" class="linkbtn more-back" data-action="more-back">‹ Meer</button>
+      ${page.render()}`
+  }
+  ui.morePage = null
   title.textContent = 'Meer'
-  const visible = state.types.filter((t) => !t.hidden)
-  const types = visible
+  const row = ({ page, action = 'more-page', icon, color, label, sub = '', value = '', warn = false }) => `
+    <button type="button" class="pref-row" data-action="${action}" ${page ? `data-page="${page}"` : ''}>
+      <span class="pref-ico" style="background:${color}">${svgIcon(icon)}</span>
+      <span class="pref-label">${label}${sub ? `<small>${sub}</small>` : ''}</span>
+      <span class="pref-value ${warn ? 'warn' : ''}">${esc(value)}</span>
+      <span class="pref-chev" aria-hidden="true">›</span>
+    </button>`
+  const nTypes = state.types.filter((t) => !t.hidden).length
+  return `
+    <h3 class="pref-head">Uiterlijk</h3>
+    <div class="pref-list card">
+      ${row({ page: 'thema', icon: 'palet', color: '#f59e0b', label: 'Thema', value: THEMES.find((t) => t.id === themeId()).name })}
+      ${row({ page: 'weergave', icon: 'weergave', color: '#0ea5e9', label: 'Weergave van de agenda', value: AGENDA_VIEWS.find((v) => v.id === agendaView()).name })}
+    </div>
+    <h3 class="pref-head">Trainen</h3>
+    <div class="pref-list card">
+      ${row({ page: 'activiteiten', icon: 'hardlopen', color: '#ea580c', label: 'Activiteiten', value: String(nTypes) })}
+      ${row({ page: 'horloge', icon: 'horloge', color: '#10b981', label: 'Horloge (Zepp)', value: icu ? 'Gekoppeld' : 'Niet gekoppeld' })}
+      <label class="pref-row">
+        <span class="pref-ico" style="background:#8b5cf6">${svgIcon('stem')}</span>
+        <span class="pref-label">Gesproken aanwijzingen<small>Bij intervaltraining</small></span>
+        <input type="checkbox" class="switch" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} aria-label="Gesproken aanwijzingen bij intervaltraining" />
+      </label>
+    </div>
+    <h3 class="pref-head">Je gegevens</h3>
+    <div class="pref-list card">
+      ${row({ page: 'gegevens', icon: 'doos', color: '#3b82f6', label: 'Back-up en herstellen', sub: 'Alles staat alleen op deze telefoon', value: ui.persisted === false ? 'Maak er een' : '', warn: ui.persisted === false })}
+    </div>
+    <h3 class="pref-head">App</h3>
+    <div class="pref-list card">
+      ${row({ action: 'show-changelog', icon: 'ster', color: '#eab308', label: 'Wat is er nieuw', value: `Versie ${APP_VERSION}` })}
+      ${row({ page: 'installeren', icon: 'telefoon', color: '#0f766e', label: 'Op je beginscherm zetten', value: isStandalone() ? 'Gedaan' : '' })}
+      ${row({ action: 'force-update', icon: 'herhaal', color: '#64748b', label: 'App bijwerken' })}
+      ${row({ action: 'show-welcome', icon: 'hartje', color: '#ec4899', label: 'Welkomstscherm tonen' })}
+    </div>
+    <p class="muted pref-foot">Tarapp ${APP_VERSION} · met liefde gemaakt voor Tara 💛</p>`
+}
+
+function renderTypesCard() {
+  const types = state.types
+    .filter((t) => !t.hidden)
     .map(
       (t) => `
       <div class="list-item">
@@ -1247,10 +1320,7 @@ function renderMore() {
     )
     .join('')
   return `
-    ${renderThemeCard()}
-    ${renderIcuCard()}
     <section class="card">
-      <h2>Activiteiten</h2>
       ${types}
       <form class="inline-form" id="type-form">
         <input name="emoji" placeholder="🤸" maxlength="4" aria-label="Emoji" />
@@ -1258,49 +1328,44 @@ function renderMore() {
         <button class="btn primary" type="submit">Toevoegen</button>
       </form>
     </section>
-    <section class="card">
-      <h2>Agenda</h2>
-      ${viewOptions()}
-      <p class="muted">Bij Klein, Compact en Schermvullend swipe je naar links of rechts voor de volgende of vorige week.</p>
-      <label class="ss-toggle"><input type="checkbox" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} /> 🎧 Gesproken aanwijzingen bij intervaltraining</label>
-    </section>
+    <p class="muted">Verwijder je een activiteit die al in je agenda staat, dan houden die trainingen gewoon hun naam.</p>`
+}
+
+function renderDataCard() {
+  const storage =
+    ui.persisted === true
+      ? '<p class="muted">✅ Je telefoon ruimt deze gegevens niet zomaar op.</p>'
+      : ui.persisted === false
+        ? '<p class="muted">⚠️ Je telefoon kan deze gegevens opruimen als hij vol raakt. Zet Tarapp op je beginscherm en maak af en toe een back-up.</p>'
+        : ''
+  return `
     <section class="card">
       <h2>Back-up</h2>
-      <p class="muted">Je gegevens staan alleen op dit toestel. Maak af en toe een back-up, of gebruik dit om over te zetten naar een ander toestel.</p>
-      ${
-        ui.persisted === true
-          ? '<p class="muted">✅ Opslag is als blijvend gemarkeerd.</p>'
-          : ui.persisted === false
-            ? '<p class="muted">⚠️ Opslag is niet als blijvend gemarkeerd. Installeer de app op je beginscherm en maak regelmatig een back-up.</p>'
-            : ''
-      }
+      <p class="muted">Je trainingen staan alleen op deze telefoon. Met een back-up zet je ze veilig, of over naar een andere telefoon.</p>
+      ${storage}
       <div class="actions">
-        <button class="btn" data-action="export">Exporteren</button>
-        <button class="btn" data-action="import">Importeren</button>
+        <button class="btn" data-action="export">Back-up maken</button>
+        <button class="btn" data-action="import">Terugzetten</button>
       </div>
       <input type="file" id="import-file" accept="application/json,.json" hidden />
     </section>
     <section class="card">
-      <h2>App bijwerken</h2>
-      <p class="muted">Updates worden automatisch binnengehaald als je de app opent. Lukt dat niet, tik dan hieronder. Je gegevens blijven bewaard.</p>
-      <button class="btn block" data-action="force-update">Nu bijwerken</button>
-      <p></p>
-      <button class="btn block" data-action="show-welcome">Welkomstscherm tonen</button>
-      <p></p>
-      <button class="btn block" data-action="show-changelog">✨ Wat is er nieuw?</button>
-      <p class="muted">Versie ${APP_VERSION}</p>
-    </section>
+      <h2>Alles wissen</h2>
+      <p class="muted">Haalt alle trainingen, schema's en activiteiten van deze telefoon. Maak eerst een back-up als je twijfelt.</p>
+      <button class="btn danger block" data-action="reset">Alles wissen</button>
+    </section>`
+}
+
+function renderInstallCard() {
+  return `
     <section class="card">
-      <h2>Installeren op iPhone</h2>
+      ${isStandalone() ? '<p>✅ Tarapp staat al op je beginscherm.</p>' : ''}
       <ol class="steps">
-        <li>Open deze pagina in <strong>Safari</strong>.</li>
+        <li>Open Tarapp in <strong>Safari</strong>.</li>
         <li>Tik op het deel-icoon (vierkant met pijl omhoog).</li>
         <li>Kies <strong>Zet op beginscherm</strong> en tik op <strong>Voeg toe</strong>.</li>
       </ol>
-      <p class="muted">Daarna start Tarapp vanaf je beginscherm, zonder browserbalk, en werkt ook offline.</p>
-    </section>
-    <section class="card">
-      <button class="btn danger block" data-action="reset">Alles wissen</button>
+      <p class="muted">Daarna start Tarapp vanaf je beginscherm, zonder browserbalk, en werkt het ook offline.</p>
     </section>`
 }
 
@@ -4270,6 +4335,7 @@ const actions = {
   'icu-disconnect': () => icuDisconnect(),
   'icu-setup': () => {
     ui.tab = 'meer'
+    ui.morePage = 'horloge'
     render()
     window.scrollTo(0, 0)
   },
@@ -4294,6 +4360,16 @@ const actions = {
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'view-menu': () => openViewSheet(),
+  'more-page': (el) => {
+    ui.morePage = el.dataset.page
+    render()
+    window.scrollTo(0, 0)
+  },
+  'more-back': () => {
+    ui.morePage = null
+    render()
+    window.scrollTo(0, 0)
+  },
   'set-view': (el) => setView(el.dataset.view),
   'set-theme': (el) => {
     state.settings ||= {}
@@ -4345,6 +4421,7 @@ const actions = {
   reset: () => {
     if (!confirm('Alle trainingen, schema\'s en activiteiten wissen? Dit kan niet ongedaan worden gemaakt.')) return
     state = defaultState()
+    ui.morePage = null
     save()
     render()
   },
@@ -4434,6 +4511,7 @@ document.querySelector('.tabbar').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-tab]')
   if (!btn) return
   ui.tab = btn.dataset.tab
+  ui.morePage = null
   render()
   if (ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()) scrollToWeek(new Date())
   else window.scrollTo(0, 0)

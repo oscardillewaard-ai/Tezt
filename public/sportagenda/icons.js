@@ -38,6 +38,13 @@ const ICON_PATHS = {
 
   // Klein spul
   vink: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  // Instellingen
+  palet:
+    '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2.1a4.4 4.4 0 0 0 4.4-4.4C21 6.6 17 3.5 12 3.5z"/><g fill="currentColor" stroke="none"><circle cx="7.6" cy="11" r="1.3"/><circle cx="10.6" cy="7.3" r="1.3"/><circle cx="15" cy="7.6" r="1.3"/></g>',
+  stem: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  doos: '<path d="M4.5 8.5h15v10.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M3 4.5h18v4H3z"/><path d="M12 11.5v6M9.5 15l2.5 2.5 2.5-2.5"/>',
+  ster: '<path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z"/><path d="M18 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
+  telefoon: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
   // Weergave van de agenda: een scherm met regels.
   weergave: '<rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5"/>',
   herhaal:
