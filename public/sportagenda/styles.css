@@ -2650,35 +2650,42 @@ h2.with-ico .tico {
   margin-top: 3px;
 }
 
-/* Klein: één regel per dag, trainingen naast elkaar, twee weken onder elkaar. */
-#view .v-klein .wday {
+/* Klein: één regel per dag, trainingen naast elkaar, twee weken onder elkaar.
+   Dezelfde regels gebruikt Schermvullend als het anders niet zou passen (fit-s). */
+#view .v-klein .wday,
+#view .v-vullend.fit-s .wday {
   min-height: 34px;
   padding: 2px 0 2px 6px;
   grid-template-columns: 34px 1fr 34px;
   gap: 4px;
 }
 
-#view .v-klein .wday-label {
+#view .v-klein .wday-label,
+#view .v-vullend.fit-s .wday-label {
   line-height: 1;
 }
 
-#view .v-klein .wday-label span {
+#view .v-klein .wday-label span,
+#view .v-vullend.fit-s .wday-label span {
   font-size: 0.56rem;
 }
 
-#view .v-klein .wday-label strong {
+#view .v-klein .wday-label strong,
+#view .v-vullend.fit-s .wday-label strong {
   width: 21px;
   height: 21px;
   font-size: 0.84rem;
   border-width: 1.5px;
 }
 
-#view .v-klein .wday-items {
+#view .v-klein .wday-items,
+#view .v-vullend.fit-s .wday-items {
   flex-direction: row;
   gap: 3px;
 }
 
-#view .v-klein .wday .session {
+#view .v-klein .wday .session,
+#view .v-vullend.fit-s .wday .session {
   flex: 1 1 0;
   min-width: 0;
   padding: 2px 6px 2px 3px;
@@ -2686,12 +2693,14 @@ h2.with-ico .tico {
   border-radius: 8px;
 }
 
-#view .v-klein .wday .session .check {
+#view .v-klein .wday .session .check,
+#view .v-vullend.fit-s .wday .session .check {
   width: 20px;
   height: 20px;
 }
 
-#view .v-klein .wday .s-title {
+#view .v-klein .wday .s-title,
+#view .v-vullend.fit-s .wday .s-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2699,20 +2708,26 @@ h2.with-ico .tico {
 }
 
 #view .v-klein .s-meta,
+#view .v-vullend.fit-s .s-meta,
 #view .v-klein .s-title .plan-badge,
+#view .v-vullend.fit-s .s-title .plan-badge,
 #view .v-klein .s-title .block-badge,
-#view .v-klein .s-title .shin-badge {
+#view .v-vullend.fit-s .s-title .block-badge,
+#view .v-klein .s-title .shin-badge,
+#view .v-vullend.fit-s .s-title .shin-badge {
   display: none;
 }
 
-#view .v-klein .wday .day-add {
+#view .v-klein .wday .day-add,
+#view .v-vullend.fit-s .wday .day-add {
   width: 34px;
   height: auto;
   align-self: stretch;
   font-size: 1.15rem;
 }
 
-#view .v-klein .wday .rest {
+#view .v-klein .wday .rest,
+#view .v-vullend.fit-s .wday .rest {
   font-size: 0.74rem;
 }
 

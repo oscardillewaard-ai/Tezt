@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '29' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '30' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -423,6 +423,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 30, items: ['Schermvullend past nu altijd precies op je scherm: niets meer om te scrollen 💛'] },
   {
     v: 29,
     items: [
@@ -772,24 +773,33 @@ function openViewSheet() {
   })
 }
 
-// Schermvullend: de week vult de ruimte tot net boven de tabbalk. Eerst met twee
-// regels per training (fit-2), dan één regel met grote vinkjes (fit-1), anders zo
-// compact als de gewone week; wat overblijft, verdelen de dagen onder elkaar.
+// Schermvullend: de week vult precies de ruimte tot net boven de tabbalk, zonder
+// scrollen. Eerst met twee regels per training (fit-2), dan één regel met grote
+// vinkjes (fit-1), dan zo compact als de gewone week (fit-0) en als laatste
+// redmiddel smal zoals Klein (fit-s). Wat overblijft, verdelen de dagen.
+const FIT_LEVELS = ['fit-2', 'fit-1', 'fit-0', 'fit-s']
 function fitAgenda() {
+  view.style.paddingBottom = ''
   const box = view.querySelector('.v-vullend')
   const wd = box?.querySelector(':scope > .wdays')
   if (!wd) return
-  wd.style.minHeight = ''
   const tab = document.querySelector('.tabbar').getBoundingClientRect().height
-  const room = Math.floor(window.innerHeight - tab - (wd.getBoundingClientRect().top + window.scrollY) - 10)
-  for (const level of ['fit-2', 'fit-1', '']) {
-    box.classList.remove('fit-2', 'fit-1')
-    if (level) box.classList.add(level)
-    if (!level || wd.offsetHeight <= room) break
+  // Geen extra ruimte onder de week: dan is de pagina nooit hoger dan het scherm.
+  view.style.paddingBottom = `${Math.ceil(tab + 2)}px`
+  wd.style.minHeight = ''
+  const room = Math.floor(window.innerHeight - tab - 8 - (wd.getBoundingClientRect().top + window.scrollY))
+  for (const level of FIT_LEVELS) {
+    box.classList.remove(...FIT_LEVELS)
+    box.classList.add(level)
+    // Past de gewone compacte week net, dan mag die tot vlak boven de tabbalk lopen.
+    if (wd.offsetHeight <= room + (level === 'fit-0' ? 6 : 0) || level === 'fit-s') break
   }
   if (room > wd.offsetHeight) wd.style.minHeight = `${room}px`
 }
 window.addEventListener('resize', fitAgenda)
+// Letters van een thema komen soms pas na het tekenen binnen; dan opnieuw passen.
+document.fonts?.ready.then(fitAgenda)
+document.fonts?.addEventListener?.('loadingdone', fitAgenda)
 
 function renderWeekScroll() {
   title.textContent = 'Tarapp'
