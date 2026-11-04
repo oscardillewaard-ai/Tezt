@@ -2568,3 +2568,241 @@ h2.with-ico .tico {
 .cl-theme {
   margin-bottom: 8px;
 }
+
+/* ---------- Weergaven van de agenda ---------- */
+#top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topbar .segmented.view-switch {
+  width: auto;
+  grid-template-columns: auto;
+}
+
+.topbar .segmented.view-switch button {
+  display: grid;
+  place-items: center;
+  padding: 3px 7px;
+}
+
+/* Even hoog als Week/Maand, zodat de bovenbalk niet hoger wordt. */
+.view-switch .ico {
+  width: 18px;
+  height: 18px;
+}
+
+/* Plaatjes in de keuzelijst: een schermpje met regels. */
+.view-opt {
+  grid-template-columns: 46px 1fr 24px;
+}
+
+.view-pic {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 40px;
+  height: 52px;
+  margin: 0 auto;
+  padding: 5px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.view-pic i {
+  flex: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.35;
+}
+
+.view-pic i:nth-child(3) {
+  background: var(--accent-text);
+  opacity: 0.9;
+}
+
+.pic-klein {
+  gap: 1px;
+}
+
+.pic-klein i {
+  height: 2px;
+}
+
+.pic-klein i:nth-child(8) {
+  margin-top: 2px;
+}
+
+.pic-vullend i {
+  flex: 1;
+}
+
+.pic-doorlopend {
+  -webkit-mask-image: linear-gradient(#000 60%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+
+.pic-doorlopend i:nth-child(8) {
+  margin-top: 3px;
+}
+
+/* Klein: één regel per dag, trainingen naast elkaar, twee weken onder elkaar. */
+#view .v-klein .wday {
+  min-height: 34px;
+  padding: 2px 0 2px 6px;
+  grid-template-columns: 34px 1fr 34px;
+  gap: 4px;
+}
+
+#view .v-klein .wday-label {
+  line-height: 1;
+}
+
+#view .v-klein .wday-label span {
+  font-size: 0.56rem;
+}
+
+#view .v-klein .wday-label strong {
+  width: 21px;
+  height: 21px;
+  font-size: 0.84rem;
+  border-width: 1.5px;
+}
+
+#view .v-klein .wday-items {
+  flex-direction: row;
+  gap: 3px;
+}
+
+#view .v-klein .wday .session {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 2px 6px 2px 3px;
+  gap: 5px;
+  border-radius: 8px;
+}
+
+#view .v-klein .wday .session .check {
+  width: 20px;
+  height: 20px;
+}
+
+#view .v-klein .wday .s-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+}
+
+#view .v-klein .s-meta,
+#view .v-klein .s-title .plan-badge,
+#view .v-klein .s-title .block-badge,
+#view .v-klein .s-title .shin-badge {
+  display: none;
+}
+
+#view .v-klein .wday .day-add {
+  width: 34px;
+  height: auto;
+  align-self: stretch;
+  font-size: 1.15rem;
+}
+
+#view .v-klein .wday .rest {
+  font-size: 0.74rem;
+}
+
+#view .v-klein .wk-head {
+  margin: 12px 2px 4px;
+}
+
+/* Schermvullend: de week rekt uit tot de tabbalk. fit-1 en fit-2 zet fitAgenda()
+   als er ruimte is voor grotere vinkjes (fit-1) of twee regels per training (fit-2). */
+#view .v-vullend > .wdays {
+  display: flex;
+  flex-direction: column;
+}
+
+#view .v-vullend .wday {
+  flex: 1 0 auto;
+}
+
+#view .v-vullend .wday .day-add {
+  height: auto;
+  align-self: stretch;
+}
+
+#view .v-vullend.fit-1 .wday,
+#view .v-vullend.fit-2 .wday {
+  padding: 5px 0 5px 8px;
+  grid-template-columns: 46px 1fr 40px;
+}
+
+#view .v-vullend.fit-1 .wday-label span,
+#view .v-vullend.fit-2 .wday-label span {
+  font-size: 0.7rem;
+}
+
+#view .v-vullend.fit-1 .wday-label strong,
+#view .v-vullend.fit-2 .wday-label strong {
+  width: 32px;
+  height: 32px;
+  font-size: 1.22rem;
+}
+
+#view .v-vullend.fit-1 .wday-items,
+#view .v-vullend.fit-2 .wday-items {
+  gap: 4px;
+}
+
+#view .v-vullend.fit-1 .wday .session,
+#view .v-vullend.fit-2 .wday .session {
+  padding: 5px 10px 5px 6px;
+  gap: 10px;
+  border-radius: 12px;
+}
+
+#view .v-vullend.fit-1 .wday .session .check,
+#view .v-vullend.fit-2 .wday .session .check {
+  width: 28px;
+  height: 28px;
+}
+
+#view .v-vullend.fit-2 .wday {
+  min-height: 56px;
+}
+
+#view .v-vullend.fit-2 .wday .session {
+  padding: 7px 10px 7px 6px;
+}
+
+#view .v-vullend.fit-2 .wday .session .check {
+  width: 30px;
+  height: 30px;
+}
+
+#view .v-vullend.fit-2 .wday .s-body {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+#view .v-vullend.fit-2 .wday .s-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1rem;
+}
+
+#view .v-vullend.fit-2 .wday .s-meta {
+  flex: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  font-size: 0.82rem;
+}

@@ -38,6 +38,8 @@ const ICON_PATHS = {
 
   // Klein spul
   vink: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  // Weergave van de agenda: een scherm met regels.
+  weergave: '<rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5"/>',
   herhaal:
     '<path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19"/><path d="M16 3l3 3-3 3"/><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5"/><path d="M8 21l-3-3 3-3"/>',
   horloge: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3"/><path d="M12 9.5V12l1.6 1.2"/>',

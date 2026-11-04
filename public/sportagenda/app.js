@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '27' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '28' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -296,6 +296,7 @@ function render() {
   view.innerHTML = renderers[ui.tab]()
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
+  fitAgenda()
 }
 
 // ---------- Complimentjes voor Tara ----------
@@ -421,6 +422,14 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 28,
+    items: [
+      'Kies hoe je agenda eruitziet: tik op het knopje naast Week en Maand 💛',
+      'Klein: twee weken onder elkaar. Compact: je week op één scherm. Schermvullend: de week vult je hele scherm, met tijd, afstand en notities',
+      'Doorlopend scrollen staat er nu ook tussen',
+    ],
+  },
   {
     v: 27,
     items: [
@@ -600,7 +609,11 @@ function showChangesSinceLastVisit() {
 // ---------- Week ----------
 
 function calToggle() {
-  return `
+  const viewBtn =
+    ui.calMode === 'week'
+      ? `<div class="segmented view-switch"><button type="button" data-action="view-menu" aria-label="Weergave van de agenda kiezen" title="Weergave">${svgIcon('weergave')}</button></div>`
+      : ''
+  return `${viewBtn}
     <div class="segmented">
       <button class="${ui.calMode === 'week' ? 'on' : ''}" data-action="cal-mode" data-mode="week">Week</button>
       <button class="${ui.calMode === 'maand' ? 'on' : ''}" data-action="cal-mode" data-mode="maand">Maand</button>
@@ -642,8 +655,22 @@ function renderWeek() {
   title.textContent = 'Tarapp'
 
   const days = weekDaysHtml(ws, list)
+  const mode = agendaView()
+  let next = ''
+  if (mode === 'klein') {
+    const ns = addDays(ws, 7)
+    const ne = addDays(ns, 6)
+    const nl = sessionsBetween(toKey(ns), toKey(ne))
+    next = `
+    <div class="wk-head">
+      <strong>Week ${isoWeek(ns)}</strong>
+      <span class="muted">${shortDate(ns)} – ${shortDate(ne)}</span>
+      <span class="wk-count">${nl.length ? `${nl.filter((s) => s.done).length}/${nl.length}` : ''}</span>
+    </div>
+    <div class="wdays">${weekDaysHtml(ns, nl)}</div>`
+  }
 
-  return `
+  return `<div class="agenda v-${mode}">
     <div class="weeknav compact">
       <button class="iconbtn" data-action="prev-week" aria-label="Vorige week">‹</button>
       <div class="label">
@@ -662,13 +689,99 @@ function renderWeek() {
       <span><strong>${done.length}/${list.length}</strong> gedaan · ${fmtMinutes(doneMin)}</span>
       <div class="progress"><div style="width:${pct}%"></div></div>
     </div>
-    <div class="wdays">${days}</div>`
+    <div class="wdays">${days}</div>${next}
+  </div>`
 }
 
 // ---------- Doorlopende agenda ----------
 // Instelling onder Meer: alle weken onder elkaar, verder laden bij het scrollen.
 
-const agendaScrolls = () => !!state.settings?.agendaScroll
+// ---------- Weergaven van de agenda ----------
+// Klein: twee weken, één regel per dag. Compact: de week op één scherm.
+// Schermvullend: de week rekt uit tot de tabbalk, met meer per training.
+// Doorlopend: alle weken onder elkaar (vroeger de instelling agendaScroll).
+
+const AGENDA_VIEWS = [
+  { id: 'klein', name: 'Klein', about: 'Twee weken onder elkaar, alleen de namen', bars: 14 },
+  { id: 'compact', name: 'Compact', about: 'Je hele week op één scherm', bars: 7 },
+  { id: 'vullend', name: 'Schermvullend', about: 'De week vult je scherm, met tijd, afstand en notities', bars: 7 },
+  { id: 'doorlopend', name: 'Doorlopend', about: 'Alle weken onder elkaar: scrollen in plaats van swipen', bars: 11 },
+]
+
+function agendaView() {
+  const v = state.settings?.agendaView
+  if (AGENDA_VIEWS.some((x) => x.id === v)) return v
+  return state.settings?.agendaScroll ? 'doorlopend' : 'compact'
+}
+const agendaScrolls = () => agendaView() === 'doorlopend'
+
+function viewOptions() {
+  const cur = agendaView()
+  return `
+    <div class="theme-list" role="radiogroup" aria-label="Weergave van de agenda">
+      ${AGENDA_VIEWS.map(
+        (v) => `
+        <button type="button" class="theme-opt view-opt ${v.id === cur ? 'on' : ''}" role="radio" aria-checked="${v.id === cur}" data-action="set-view" data-view="${v.id}">
+          <span class="view-pic pic-${v.id}" aria-hidden="true">${'<i></i>'.repeat(v.bars)}</span>
+          <span class="theme-text"><strong>${esc(v.name)}</strong><span class="muted">${esc(v.about)}</span></span>
+          <span class="theme-check" aria-hidden="true">${CHECK_ICON}</span>
+        </button>`,
+      ).join('')}
+    </div>`
+}
+
+function setView(id) {
+  state.settings ||= {}
+  state.settings.agendaView = id
+  delete state.settings.agendaScroll
+  save()
+  render()
+  if (ui.tab === 'week') {
+    if (id === 'doorlopend') scrollToWeek(ui.weekStart)
+    else window.scrollTo(0, 0)
+  }
+  showToast(`Weergave: ${AGENDA_VIEWS.find((v) => v.id === id).name}`)
+}
+
+function openViewSheet() {
+  openSheet(
+    `
+    <form method="dialog">
+      <h2>Weergave van je agenda</h2>
+      ${viewOptions()}
+      <div class="actions">
+        <button type="button" class="btn" id="cancel">Sluiten</button>
+      </div>
+    </form>`,
+    () => {},
+  )
+  sheet.querySelector('#cancel').onclick = closeSheet
+  sheet.querySelectorAll('[data-view]').forEach((b) => {
+    b.onclick = () => {
+      closeSheet()
+      setView(b.dataset.view)
+    }
+  })
+}
+
+// Schermvullend: de week vult de ruimte tot net boven de tabbalk. Eerst met twee
+// regels per training (fit-2), dan één regel met grote vinkjes (fit-1), anders zo
+// compact als de gewone week; wat overblijft, verdelen de dagen onder elkaar.
+function fitAgenda() {
+  const box = view.querySelector('.v-vullend')
+  const wd = box?.querySelector(':scope > .wdays')
+  if (!wd) return
+  wd.style.minHeight = ''
+  const tab = document.querySelector('.tabbar').getBoundingClientRect().height
+  const room = Math.floor(window.innerHeight - tab - (wd.getBoundingClientRect().top + window.scrollY) - 10)
+  for (const level of ['fit-2', 'fit-1', '']) {
+    box.classList.remove('fit-2', 'fit-1')
+    if (level) box.classList.add(level)
+    if (!level || wd.offsetHeight <= room) break
+  }
+  if (room > wd.offsetHeight) wd.style.minHeight = `${room}px`
+}
+window.addEventListener('resize', fitAgenda)
 
 function renderWeekScroll() {
   title.textContent = 'Tarapp'
@@ -1147,8 +1260,8 @@ function renderMore() {
     </section>
     <section class="card">
       <h2>Agenda</h2>
-      <label class="ss-toggle"><input type="checkbox" data-setting="agendaScroll" ${agendaScrolls() ? 'checked' : ''} /> 📜 Doorlopend scrollen door de weken</label>
-      <p class="muted">Uit: één week per scherm. Swipe naar links of rechts voor de volgende of vorige week.</p>
+      ${viewOptions()}
+      <p class="muted">Bij Klein, Compact en Schermvullend swipe je naar links of rechts voor de volgende of vorige week.</p>
       <label class="ss-toggle"><input type="checkbox" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} /> 🎧 Gesproken aanwijzingen bij intervaltraining</label>
     </section>
     <section class="card">
@@ -4180,6 +4293,8 @@ const actions = {
     if (s.done) afterTick(s)
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
+  'view-menu': () => openViewSheet(),
+  'set-view': (el) => setView(el.dataset.view),
   'set-theme': (el) => {
     state.settings ||= {}
     state.settings.theme = el.dataset.theme
