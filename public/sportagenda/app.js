@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '26' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '27' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -422,6 +422,15 @@ function afterTick(s, big = false) {
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
   {
+    v: 27,
+    items: [
+      '🎨 Kies je eigen thema onder Meer, met landschappen die speciaal voor jou getekend zijn 💛',
+      'Bergen: de zon tussen besneeuwde toppen. Bos: een dennenbos bij zonsondergang. Trail: een stafkaart met een gele route door je week',
+      'Zonnebloem: een zonnebloemveld onder een zomerlucht, en vandaag staat in een zonnebloem 🌻',
+      'Klassiek blijft er gewoon bij, voor het vertrouwde zwart en geel',
+    ],
+  },
+  {
     v: 26,
     items: [
       'Eigen icoontjes voor al je sporten, elk in een eigen kleurtje, en ze zien er op elke telefoon hetzelfde uit 🎨',
@@ -526,10 +535,55 @@ function openChangelog(sinceVersion = 0) {
           )
           .join('')}
       </div>
+      ${entries.some((e) => e.v === 27) ? '<button type="button" class="btn block cl-theme" id="cl-theme">🎨 Kies je thema</button>' : ''}
       <button type="submit" class="btn primary block">Dankjewel! 💛</button>
     </form>`,
     () => {},
   )
+  sheet.querySelector('#cl-theme')?.addEventListener('click', () => {
+    closeSheet()
+    ui.tab = 'meer'
+    render()
+    document.getElementById('theme-card')?.scrollIntoView({ block: 'start' })
+  })
+}
+
+// ---------- Thema's ----------
+// Klassiek is styles.css zelf; de andere thema's staan in themes.css onder
+// html[data-thema="..."]. index.html zet het thema al vóór het tekenen.
+
+const THEMES = [
+  { id: 'klassiek', name: 'Klassiek', about: 'Zwart en geel, licht of donker zoals je telefoon', color: '#1c1917' },
+  { id: 'bergen', name: 'Bergen', about: 'De zon tussen besneeuwde toppen', color: '#a9c9e6' },
+  { id: 'bos', name: 'Bos', about: 'Een dennenbos bij zonsondergang', color: '#173226' },
+  { id: 'trail', name: 'Trail', about: 'Een stafkaart met een gele route', color: '#1f3328' },
+  { id: 'zonnebloem', name: 'Zonnebloem', about: 'Een zonnebloemveld onder een zomerlucht', color: '#7fc0ec' },
+]
+const themeId = () => (THEMES.some((t) => t.id === state.settings?.theme) ? state.settings.theme : 'klassiek')
+
+function applyTheme() {
+  const t = THEMES.find((x) => x.id === themeId())
+  if (t.id === 'klassiek') delete document.documentElement.dataset.thema
+  else document.documentElement.dataset.thema = t.id
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.color)
+}
+
+function renderThemeCard() {
+  const cur = themeId()
+  return `
+    <section class="card" id="theme-card">
+      <h2>Thema</h2>
+      <div class="theme-list" role="radiogroup" aria-label="Thema">
+        ${THEMES.map(
+          (t) => `
+          <button type="button" class="theme-opt ${t.id === cur ? 'on' : ''}" role="radio" aria-checked="${t.id === cur}" data-action="set-theme" data-theme="${t.id}">
+            <span class="theme-swatch sw-${t.id}"><b>Tarapp</b></span>
+            <span class="theme-text"><strong>${esc(t.name)}</strong><span class="muted">${esc(t.about)}</span></span>
+            <span class="theme-check" aria-hidden="true">${CHECK_ICON}</span>
+          </button>`,
+        ).join('')}
+      </div>
+    </section>`
 }
 
 // Eenmalig na een update laten zien wat er nieuw is.
@@ -1080,6 +1134,7 @@ function renderMore() {
     )
     .join('')
   return `
+    ${renderThemeCard()}
     ${renderIcuCard()}
     <section class="card">
       <h2>Activiteiten</h2>
@@ -4125,6 +4180,14 @@ const actions = {
     if (s.done) afterTick(s)
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
+  'set-theme': (el) => {
+    state.settings ||= {}
+    state.settings.theme = el.dataset.theme
+    save()
+    applyTheme()
+    render()
+    showToast(`Thema ${THEMES.find((t) => t.id === themeId()).name} 💛`)
+  },
   'delete-type': (el) => {
     const t = typeById(el.dataset.id)
     if (state.types.filter((x) => !x.hidden).length <= 1) return alert('Je hebt minstens één activiteit nodig.')
@@ -4285,6 +4348,7 @@ if (unfinishedRun) ui.run = unfinishedRun.id
 
 // Icoontjes in de vaste HTML (tabbalk).
 document.querySelectorAll('[data-icon]').forEach((el) => (el.innerHTML = svgIcon(el.dataset.icon)))
+applyTheme()
 
 render()
 showChangesSinceLastVisit()

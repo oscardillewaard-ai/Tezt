@@ -13,6 +13,14 @@
     <link rel="icon" type="image/png" href="icons/icon-192.png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <script>
+      // Het gekozen thema meteen zetten, zodat je bij het openen geen flits van een ander thema ziet.
+      try {
+        var thema = (JSON.parse(localStorage.getItem('sportagenda.v1') || '{}').settings || {}).theme
+        if (thema && thema !== 'klassiek') document.documentElement.setAttribute('data-thema', thema)
+      } catch (e) {}
+    </script>
     <title>Tarapp</title>
   </head>
   <body>

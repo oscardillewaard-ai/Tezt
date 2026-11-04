@@ -1,0 +1,259 @@
+/* Thema's van Tarapp. Het gekozen thema staat als data-thema op <html>; zonder
+   thema (Klassiek) geldt alleen styles.css. Landschappen staan in themes/, de
+   lettertypes in fonts/ (SIL Open Font License, zie fonts/OFL-*.txt). Gemaakt met
+   tools/tarapp-themes/build_app_themes.py: pas dat script aan, niet dit bestand. */
+
+@font-face { font-family: 'Josefin Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/josefin-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Josefin Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('fonts/josefin-sans-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fraunces'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/fraunces-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fraunces'; font-style: italic; font-weight: 600; font-display: swap; src: url('fonts/fraunces-latin-600-italic.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 700; font-display: swap; src: url('fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/fredoka-latin-600-normal.woff2') format('woff2'); }
+
+/* ---------- Bergen: de zon tussen besneeuwde toppen, mist in het dal ---------- */
+html[data-thema="bergen"] { --bg: #edf2f6; --card: #ffffff; --text: #1c2b39; --muted: #5e7184; --line: #d9e2ea; --accent: #ffc83d; --accent-ink: #1c2b39; --accent-text: #8a5f00; --accent-soft: #fff4d1; --done: #2f855a; --done-soft: #e3f2e9; --danger: #c2413a; --plan: #5a55d6; --block: #2b7a8c; --bar: #1c2b39; --bar-text: #ffffff; --day-line: #e1e8ee; --day-alt: #f6f9fb; --c-hardlopen: #ea580c; --c-wedstrijd: #1c2b39; --c-wandelen: #4d7c0f; --c-klimmen: #0284c7; --c-boulderen: #92400e; --c-gym: #7c3aed; --c-kracht: #c026d3; --c-thuis: #a16207; --c-routine: #e11d48; --c-yoga: #db2777; --c-warming: #dc2626; --c-fietsen: #2563eb; --c-zwemmen: #0891b2; --head: 'Josefin Sans', 'Avenir Next', 'Segoe UI', sans-serif; --soft-shadow: 0 1px 2px rgb(28 43 57 / 0.06), 0 8px 24px rgb(28 43 57 / 0.07); color-scheme: light; }
+html[data-thema="bergen"], html[data-thema="bergen"] body { background: var(--bg); color: var(--text); }
+html[data-thema="bergen"] .weeknav.compact .label { line-height: 1.15; }
+html[data-thema="bergen"] .wday { min-height: 44px; }
+html[data-thema="bergen"] .wday-label { line-height: 1; }
+html[data-thema="bergen"] .wday-label strong { width: 26px; height: 26px; }
+html[data-thema="bergen"] .wday .day-add { height: auto; align-self: stretch; }
+html[data-thema="bergen"] .topbar { min-height: 62px; align-items: flex-start; padding-bottom: 20px; }
+html[data-thema="bergen"] .compliment { padding-block: 2px; }
+html[data-thema="bergen"] .weeknav.compact { margin-bottom: 6px; }
+html[data-thema="bergen"] .topbar { background: url('themes/bergen.svg') center bottom / cover no-repeat, #a9c9e6; color: var(--text); }
+html[data-thema="bergen"] .topbar h1 { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; font-size: 1.22rem; color: var(--text); padding-top: 4px; }
+html[data-thema="bergen"] .topbar .segmented { background: rgb(255 255 255 / 0.7); border: 1px solid rgb(255 255 255 / 0.9); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+html[data-thema="bergen"] .topbar .segmented button { color: var(--text); }
+html[data-thema="bergen"] .topbar .segmented button.on { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="bergen"] .segmented { background: #e3eaf0; }
+html[data-thema="bergen"] .segmented button.on { background: #fff; color: var(--text); }
+html[data-thema="bergen"] .weeknav.compact .iconbtn, html[data-thema="bergen"] .iconbtn { background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--text); }
+html[data-thema="bergen"] .weeknav .label strong { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 1.02rem; }
+html[data-thema="bergen"] .compliment { background: #fff7dc; border: 1px solid #ffe6a3; color: #4f3a00; border-radius: 12px; }
+html[data-thema="bergen"] .block-week { color: var(--block); }
+html[data-thema="bergen"] .progress { background: #dbe4ec; }
+html[data-thema="bergen"] .progress > div { background: var(--done); }
+html[data-thema="bergen"] .wdays { background: #fff; border: 0; border-radius: 18px; box-shadow: var(--soft-shadow); }
+html[data-thema="bergen"] .wday { border-bottom: 1px solid var(--day-line); }
+html[data-thema="bergen"] .wday:nth-child(even) { background: var(--day-alt); }
+html[data-thema="bergen"] .wday.today { background: linear-gradient(90deg, #fff1c4, #fff9ea 55%, #ffffff); }
+html[data-thema="bergen"] .wday-label span { font-family: var(--head); font-weight: 600; letter-spacing: 0.14em; font-size: 0.62rem; color: var(--muted); }
+html[data-thema="bergen"] .wday-label strong { font-family: var(--head); font-weight: 700; font-size: 1.12rem; padding-top: 2px; }
+html[data-thema="bergen"] .wday.today .wday-label span { color: var(--accent-text); }
+html[data-thema="bergen"] .wday.today .wday-label strong { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 3px rgb(255 200 61 / 0.3); }
+html[data-thema="bergen"] .session { background: #fff; border: 1px solid #dde5ec; border-radius: 12px; }
+html[data-thema="bergen"] .session.done { background: var(--done-soft); border-color: transparent; }
+html[data-thema="bergen"] .check { border-color: #a3b3c2; }
+html[data-thema="bergen"] .session.done .check, html[data-thema="bergen"] .set-row.done .check { background: var(--done); border-color: var(--done); }
+html[data-thema="bergen"] .wday .day-add { color: #8a9bab; }
+html[data-thema="bergen"] .cal-day { border-color: var(--line); border-radius: 10px; }
+html[data-thema="bergen"] .cal-day.today { border-color: var(--accent); background: var(--accent-soft); }
+html[data-thema="bergen"] .cal-day.today .cal-num { color: var(--accent-ink); }
+html[data-thema="bergen"] .tabbar { background: url('themes/bergen-ridge.svg') center bottom / 400px 24px repeat-x, #ffffff; border-top: 1px solid #e1e8ee; }
+html[data-thema="bergen"] .tabbar button { color: var(--muted); }
+html[data-thema="bergen"] .tabbar button.active { color: var(--text); }
+html[data-thema="bergen"] .tabbar button.active span { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="bergen"] .card { border: 0; border-radius: 18px; box-shadow: var(--soft-shadow); }
+html[data-thema="bergen"] .card h2 { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.95rem; }
+html[data-thema="bergen"] .tot { background: var(--bg); }
+html[data-thema="bergen"] .tot strong, html[data-thema="bergen"] .stat-grid strong { font-family: var(--head); font-weight: 700; }
+html[data-thema="bergen"] .bar .col { background: #dbe4ec; }
+html[data-thema="bergen"] .btn { border: 1px solid var(--line); border-radius: 12px; }
+html[data-thema="bergen"] .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgb(255 200 61 / 0.35); }
+html[data-thema="bergen"] .linkbtn { color: var(--accent-text); }
+html[data-thema="bergen"] dialog { background: #fff; border-radius: 22px 22px 0 0; }
+html[data-thema="bergen"] dialog::before { content: ''; display: block; height: 62px; background: url('themes/bergen-sheet.svg') center bottom / cover no-repeat; }
+html[data-thema="bergen"] dialog h2 { font-family: var(--head); font-weight: 700; font-size: 1.4rem; letter-spacing: 0.01em; }
+html[data-thema="bergen"] .detail-stats div { background: var(--bg); border: 0; border-radius: 14px; }
+html[data-thema="bergen"] .detail-stats strong { font-family: var(--head); font-weight: 700; font-size: 1.9rem; }
+html[data-thema="bergen"] .detail-done { background: var(--done-soft); }
+html[data-thema="bergen"] .toast { background: var(--text); }
+
+/* ---------- Bos: een dennenbos bij zonsondergang ---------- */
+html[data-thema="bos"] { --bg: #13241a; --card: #1a3023; --text: #f1ead7; --muted: #a7b6a0; --line: #2a4434; --accent: #f2c14e; --accent-ink: #13241a; --accent-text: #f2c14e; --accent-soft: rgb(242 193 78 / 0.13); --done: #93d36f; --done-soft: rgb(147 211 111 / 0.13); --danger: #ff7b6b; --plan: #b3a7ff; --block: #74d4c4; --bar: #0f1d15; --bar-text: #f1ead7; --day-line: #263f30; --day-alt: #172b1f; --c-hardlopen: #fb9a50; --c-wedstrijd: #f1ead7; --c-wandelen: #b5e06a; --c-klimmen: #5cc8f5; --c-boulderen: #dcae7c; --c-gym: #b6a1ff; --c-kracht: #f08ff0; --c-thuis: #f2c14e; --c-routine: #ff8296; --c-yoga: #ff94c6; --c-warming: #ff7b6b; --c-fietsen: #79aaff; --c-zwemmen: #4fdbe6; --head: 'Fraunces', Georgia, 'Times New Roman', serif; color-scheme: dark; }
+html[data-thema="bos"], html[data-thema="bos"] body { background: var(--bg); color: var(--text); }
+html[data-thema="bos"] .weeknav.compact .label { line-height: 1.15; }
+html[data-thema="bos"] .wday { min-height: 44px; }
+html[data-thema="bos"] .wday-label { line-height: 1; }
+html[data-thema="bos"] .wday-label strong { width: 26px; height: 26px; }
+html[data-thema="bos"] .wday .day-add { height: auto; align-self: stretch; }
+html[data-thema="bos"] .topbar { min-height: 62px; align-items: flex-start; padding-bottom: 20px; }
+html[data-thema="bos"] .compliment { padding-block: 2px; }
+html[data-thema="bos"] .weeknav.compact { margin-bottom: 6px; }
+html[data-thema="bos"] .topbar { background: url('themes/bos.svg') center bottom / cover no-repeat, #173226; color: var(--text); }
+html[data-thema="bos"] .topbar h1 { font-family: var(--head); font-style: italic; font-weight: 600; font-size: 1.6rem; color: #f6efd9; text-shadow: 0 1px 10px rgb(0 0 0 / 0.35); }
+html[data-thema="bos"] .topbar .segmented { background: rgb(10 22 15 / 0.55); border: 1px solid rgb(241 234 215 / 0.14); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+html[data-thema="bos"] .topbar .segmented button { color: rgb(241 234 215 / 0.8); }
+html[data-thema="bos"] .topbar .segmented button.on { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="bos"] .segmented { background: #20392a; }
+html[data-thema="bos"] .segmented button.on { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="bos"] .weeknav.compact .iconbtn, html[data-thema="bos"] .iconbtn { background: var(--card); border: 1px solid var(--line); border-radius: 12px; color: var(--text); }
+html[data-thema="bos"] .weeknav .label strong { font-family: var(--head); font-weight: 600; font-size: 1.08rem; }
+html[data-thema="bos"] .compliment { background: rgb(242 193 78 / 0.12); color: #f6dc95; border: 1px solid rgb(242 193 78 / 0.25); border-radius: 12px; font-family: var(--head); font-style: italic; font-weight: 600; }
+html[data-thema="bos"] .block-week { color: var(--block); }
+html[data-thema="bos"] .progress { background: #284332; }
+html[data-thema="bos"] .progress > div { background: var(--done); }
+html[data-thema="bos"] .wdays { background: var(--card); border: 1px solid #284332; border-radius: 18px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.25); }
+html[data-thema="bos"] .wday { border-bottom: 1px solid var(--day-line); }
+html[data-thema="bos"] .wday:nth-child(even) { background: var(--day-alt); }
+html[data-thema="bos"] .wday.today { background: linear-gradient(90deg, rgb(242 193 78 / 0.17), rgb(242 193 78 / 0.02) 70%); }
+html[data-thema="bos"] .wday-label span { color: var(--muted); letter-spacing: 0.12em; font-size: 0.62rem; }
+html[data-thema="bos"] .wday-label strong { font-family: var(--head); font-weight: 600; font-size: 1.15rem; }
+html[data-thema="bos"] .wday.today .wday-label span { color: var(--accent); }
+html[data-thema="bos"] .wday.today .wday-label strong { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 14px rgb(242 193 78 / 0.45); }
+html[data-thema="bos"] .session { background: #20392a; border: 1px solid #2f4c3a; border-radius: 12px; }
+html[data-thema="bos"] .session.done { background: var(--done-soft); border-color: rgb(147 211 111 / 0.28); }
+html[data-thema="bos"] .check { border-color: #71907a; color: #13241a; }
+html[data-thema="bos"] .session.done .check, html[data-thema="bos"] .set-row.done .check { background: var(--done); border-color: var(--done); }
+html[data-thema="bos"] .session.done .s-title { text-decoration-color: rgb(241 234 215 / 0.5); }
+html[data-thema="bos"] .wday .day-add { color: #7d927f; }
+html[data-thema="bos"] .cal-day { background: var(--card); border-color: var(--line); }
+html[data-thema="bos"] .cal-day.today { border-color: var(--accent); box-shadow: 0 0 10px rgb(242 193 78 / 0.35); }
+html[data-thema="bos"] .tabbar { background: url('themes/bos-pines.svg') center bottom / 400px 26px repeat-x, #0f1d15; border-top: 1px solid #22392b; }
+html[data-thema="bos"] .tabbar button { color: var(--muted); }
+html[data-thema="bos"] .tabbar button.active { color: var(--text); }
+html[data-thema="bos"] .tabbar button.active span { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="bos"] .card { background: var(--card); border: 1px solid #284332; border-radius: 18px; }
+html[data-thema="bos"] .card h2 { font-family: var(--head); font-weight: 600; font-size: 1.15rem; }
+html[data-thema="bos"] .tot { background: #13241a; border: 1px solid #284332; }
+html[data-thema="bos"] .tot strong, html[data-thema="bos"] .stat-grid strong { font-family: var(--head); font-weight: 600; color: #f6dc95; }
+html[data-thema="bos"] .bar .col { background: #284332; }
+html[data-thema="bos"] .btn { background: #20392a; border: 1px solid #2f4c3a; border-radius: 12px; color: var(--text); }
+html[data-thema="bos"] .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+html[data-thema="bos"] .linkbtn { color: var(--accent); }
+html[data-thema="bos"] dialog { background: #172b1f; color: var(--text); border-radius: 22px 22px 0 0; }
+html[data-thema="bos"] dialog::before { content: ''; display: block; height: 62px; background: url('themes/bos-sheet.svg') center bottom / cover no-repeat; }
+html[data-thema="bos"] dialog h2 { font-family: var(--head); font-weight: 600; font-size: 1.5rem; }
+html[data-thema="bos"] .detail-stats div { background: #13241a; border: 1px solid #284332; border-radius: 14px; }
+html[data-thema="bos"] .detail-stats strong { font-family: var(--head); font-weight: 600; font-size: 2rem; color: #f6dc95; }
+html[data-thema="bos"] .detail-done { background: var(--done-soft); color: var(--done); }
+html[data-thema="bos"] .toast { background: #20392a; border: 1px solid #2f4c3a; }
+
+/* ---------- Trail: een stafkaart met een gele route door je week ---------- */
+html[data-thema="trail"] { --bg: #eef0e4; --card: #fbfbf6; --text: #20271e; --muted: #646b5a; --line: #d5d9c6; --accent: #ffcb05; --accent-ink: #20271e; --accent-text: #7d6400; --accent-soft: #fff3bf; --done: #3b8a3e; --done-soft: #e3efd9; --danger: #c0392b; --plan: #5b54d1; --block: #2f7f86; --bar: #1f3328; --bar-text: #f3f1e4; --day-line: #dde1cf; --day-alt: #f4f5ec; --c-hardlopen: #ea580c; --c-wedstrijd: #1c2b39; --c-wandelen: #4d7c0f; --c-klimmen: #0284c7; --c-boulderen: #92400e; --c-gym: #7c3aed; --c-kracht: #c026d3; --c-thuis: #a16207; --c-routine: #e11d48; --c-yoga: #db2777; --c-warming: #dc2626; --c-fietsen: #2563eb; --c-zwemmen: #0891b2; --head: 'Barlow Condensed', 'Arial Narrow', sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace; --route: #ffcb05; color-scheme: light; }
+html[data-thema="trail"] .weeknav.compact .label { line-height: 1.15; }
+html[data-thema="trail"] .wday { min-height: 44px; }
+html[data-thema="trail"] .wday-label { line-height: 1; }
+html[data-thema="trail"] .wday-label strong { width: 26px; height: 26px; }
+html[data-thema="trail"] .wday .day-add { height: auto; align-self: stretch; }
+html[data-thema="trail"] { background: var(--bg); }
+html[data-thema="trail"] body { background: url('themes/contours.svg') 0 0 / 360px 240px repeat, var(--bg); color: var(--text); }
+html[data-thema="trail"] .topbar { background: url('themes/trail.svg') center / cover no-repeat, #1f3328; color: var(--bar-text); }
+html[data-thema="trail"] .topbar h1 { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 1.5rem; color: var(--route); }
+html[data-thema="trail"] .topbar .segmented { background: rgb(255 255 255 / 0.1); }
+html[data-thema="trail"] .topbar .segmented button { color: #dfe3cf; font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.85rem; }
+html[data-thema="trail"] .topbar .segmented button.on { background: var(--route); color: var(--accent-ink); }
+html[data-thema="trail"] .segmented { background: #e3e6d6; }
+html[data-thema="trail"] .segmented button.on { background: #fff; color: var(--text); }
+html[data-thema="trail"] .weeknav.compact .iconbtn, html[data-thema="trail"] .iconbtn { background: var(--card); border: 1px solid #c9cdb8; border-radius: 10px; color: var(--text); }
+html[data-thema="trail"] .weeknav .label strong { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 1.18rem; }
+html[data-thema="trail"] .weeknav .label .muted { font-family: var(--mono); font-size: 0.78rem; }
+html[data-thema="trail"] .compliment { background: var(--card); border: 1px solid #e0e3d3; border-left: 4px solid var(--route); border-radius: 8px; }
+html[data-thema="trail"] .block-week { color: var(--block); }
+html[data-thema="trail"] .progress { background: #dde1cf; }
+html[data-thema="trail"] .progress > div { background: var(--done); }
+html[data-thema="trail"] .wdays { background: var(--card); border: 1px solid #cfd4bf; border-radius: 14px; box-shadow: 0 1px 0 rgb(32 39 30 / 0.05); }
+html[data-thema="trail"] .wday { border-bottom: 1px solid var(--day-line); }
+html[data-thema="trail"] .wday:nth-child(even) { background: var(--day-alt); }
+html[data-thema="trail"] .wday.today { background: #fff7d2; }
+html[data-thema="trail"] .wday-label { position: relative; align-self: stretch; justify-content: center; gap: 1px; }
+html[data-thema="trail"] .wday-label::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; margin-left: -1.5px; background: repeating-linear-gradient(to bottom, var(--route) 0 6px, transparent 6px 11px); }
+html[data-thema="trail"] .wday-label span { position: relative; font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.64rem; color: var(--muted); background: var(--card); padding: 0 3px; border-radius: 3px; }
+html[data-thema="trail"] .wday-label strong { position: relative; width: 26px; height: 26px; background: var(--card); border: 2px solid var(--text); font-family: var(--head); font-weight: 700; font-size: 1.02rem; }
+html[data-thema="trail"] .wday.today .wday-label span { color: var(--accent-text); }
+html[data-thema="trail"] .wday.today .wday-label strong { background: var(--route); border-color: var(--text); color: var(--accent-ink); box-shadow: 0 0 0 3px rgb(255 203 5 / 0.35); }
+html[data-thema="trail"] .session { background: #fff; border: 1px solid #d7dbc9; border-radius: 9px; }
+html[data-thema="trail"] .session.done { background: var(--done-soft); border-color: transparent; }
+html[data-thema="trail"] .check { border-color: #8c937f; }
+html[data-thema="trail"] .session.done .check, html[data-thema="trail"] .set-row.done .check { background: var(--done); border-color: var(--done); }
+html[data-thema="trail"] .s-meta { font-family: var(--mono); font-size: 0.72rem; }
+html[data-thema="trail"] .wday .day-add { color: #7c836f; }
+html[data-thema="trail"] .cal-day { background: var(--card); border-color: #d5d9c6; border-radius: 8px; }
+html[data-thema="trail"] .cal-day.today { background: var(--accent-soft); border-color: var(--text); }
+html[data-thema="trail"] .cal-dow { font-family: var(--head); font-weight: 700; letter-spacing: 0.08em; }
+html[data-thema="trail"] .tabbar { background: linear-gradient(90deg, var(--route) 55%, transparent 0) top left / 14px 2.5px repeat-x, #1f3328; border-top: 0; }
+html[data-thema="trail"] .tabbar button { color: #c9cfb6; font-family: var(--head); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.7rem; }
+html[data-thema="trail"] .tabbar button.active { color: #ffffff; }
+html[data-thema="trail"] .tabbar button.active span { background: var(--route); color: var(--accent-ink); }
+html[data-thema="trail"] .card { background: var(--card); border: 1px solid #d5d9c6; border-radius: 14px; }
+html[data-thema="trail"] .card h2 { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 1.15rem; }
+html[data-thema="trail"] .tot { background: #f2f4ea; border: 1px solid #e0e3d3; }
+html[data-thema="trail"] .tot strong, html[data-thema="trail"] .stat-grid strong { font-family: var(--head); font-weight: 700; font-size: 1.7rem; }
+html[data-thema="trail"] .tot-label { font-family: var(--mono); font-size: 0.68rem; }
+html[data-thema="trail"] .bar .col { background: #dde1cf; }
+html[data-thema="trail"] .btn { border: 1px solid #c9cdb8; border-radius: 10px; font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 1.02rem; }
+html[data-thema="trail"] .btn.primary { background: var(--route); border-color: var(--route); color: var(--accent-ink); }
+html[data-thema="trail"] .linkbtn { color: var(--accent-text); }
+html[data-thema="trail"] dialog { background: var(--card); border-radius: 18px 18px 0 0; }
+html[data-thema="trail"] dialog::before { content: ''; display: block; height: 56px; background: url('themes/trail.svg') center / cover no-repeat, #1f3328; }
+html[data-thema="trail"] dialog h2 { font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; font-size: 1.7rem; }
+html[data-thema="trail"] .detail-stats div { background: #f2f4ea; border: 1px solid #e0e3d3; border-radius: 12px; }
+html[data-thema="trail"] .detail-stats strong { font-family: var(--head); font-weight: 700; font-size: 2.3rem; }
+html[data-thema="trail"] .detail-stats span { font-family: var(--mono); }
+html[data-thema="trail"] .detail-done { background: var(--done-soft); }
+html[data-thema="trail"] .toast { background: #1f3328; }
+
+/* ---------- Zonnebloem: een zonnebloemveld onder een zomerlucht ---------- */
+html[data-thema="zonnebloem"] { --bg: #fffbef; --card: #ffffff; --text: #3d2814; --muted: #7a6248; --line: #efe3c3; --accent: #ffc928; --accent-ink: #3d2814; --accent-text: #8f5d00; --accent-soft: #fff1bf; --done: #4f8a2c; --done-soft: #e8f3dc; --danger: #c2410c; --plan: #5b54d1; --block: #2f7f86; --bar: #3d2814; --bar-text: #fff8e6; --day-line: #f1e7cc; --day-alt: #fffaea; --c-hardlopen: #ea580c; --c-wedstrijd: #1c2b39; --c-wandelen: #4d7c0f; --c-klimmen: #0284c7; --c-boulderen: #92400e; --c-gym: #7c3aed; --c-kracht: #c026d3; --c-thuis: #a16207; --c-routine: #e11d48; --c-yoga: #db2777; --c-warming: #dc2626; --c-fietsen: #2563eb; --c-zwemmen: #0891b2; --c-wedstrijd: #3d2814; --head: 'Fredoka', 'Nunito', 'Arial Rounded MT Bold', sans-serif; color-scheme: light; }
+html[data-thema="zonnebloem"], html[data-thema="zonnebloem"] body { background: var(--bg); color: var(--text); }
+html[data-thema="zonnebloem"] .weeknav.compact .label { line-height: 1.15; }
+html[data-thema="zonnebloem"] .wday { min-height: 44px; }
+html[data-thema="zonnebloem"] .wday-label { line-height: 1; }
+html[data-thema="zonnebloem"] .wday-label strong { width: 26px; height: 26px; }
+html[data-thema="zonnebloem"] .wday .day-add { height: auto; align-self: stretch; }
+html[data-thema="zonnebloem"] .topbar { min-height: 62px; align-items: flex-start; padding-bottom: 20px; }
+html[data-thema="zonnebloem"] .compliment { padding-block: 2px; }
+html[data-thema="zonnebloem"] .weeknav.compact { margin-bottom: 6px; }
+html[data-thema="zonnebloem"] .topbar { background: url('themes/zonnebloem.svg') center bottom / cover no-repeat, #7fc0ec; color: var(--text); }
+html[data-thema="zonnebloem"] .topbar h1 { font-family: var(--head); font-weight: 600; font-size: 1.55rem; color: #4a2f14; letter-spacing: 0.01em; }
+html[data-thema="zonnebloem"] .topbar .segmented { background: rgb(255 255 255 / 0.75); border: 1px solid rgb(255 255 255 / 0.9); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+html[data-thema="zonnebloem"] .topbar .segmented button { color: var(--text); font-family: var(--head); font-weight: 600; }
+html[data-thema="zonnebloem"] .topbar .segmented button.on { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="zonnebloem"] .segmented { background: #f6ecd0; }
+html[data-thema="zonnebloem"] .segmented button.on { background: #fff; color: var(--text); }
+html[data-thema="zonnebloem"] .weeknav.compact .iconbtn, html[data-thema="zonnebloem"] .iconbtn { background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--text); }
+html[data-thema="zonnebloem"] .weeknav .label strong { font-family: var(--head); font-weight: 600; font-size: 1.08rem; }
+html[data-thema="zonnebloem"] .compliment { background: #fff1bf; border: 1px solid #ffe28a; color: #4a2f14; border-radius: 14px; }
+html[data-thema="zonnebloem"] .block-week { color: var(--block); }
+html[data-thema="zonnebloem"] .progress { background: #f1e7cc; }
+html[data-thema="zonnebloem"] .progress > div { background: var(--done); }
+html[data-thema="zonnebloem"] .wdays { background: #fff; border: 1px solid #f1e7cc; border-radius: 18px; box-shadow: 0 6px 20px rgb(122 82 20 / 0.08); }
+html[data-thema="zonnebloem"] .wday { border-bottom: 1px solid var(--day-line); }
+html[data-thema="zonnebloem"] .wday:nth-child(even) { background: var(--day-alt); }
+html[data-thema="zonnebloem"] .wday.today { background: linear-gradient(90deg, #fff0b8, #fff9e6 60%, #ffffff); }
+html[data-thema="zonnebloem"] .wday-label span { position: relative; z-index: 1; font-family: var(--head); font-weight: 600; letter-spacing: 0.08em; font-size: 0.64rem; color: var(--muted); }
+html[data-thema="zonnebloem"] .wday-label strong { font-family: var(--head); font-weight: 600; font-size: 1.12rem; }
+html[data-thema="zonnebloem"] .wday.today .wday-label span { color: var(--accent-text); }
+/* Vandaag staat het dagnummer op het hart van een zonnebloem. */
+html[data-thema="zonnebloem"] .wday.today .wday-label strong { position: relative; z-index: 0; background: none; color: #fff6d8; font-size: 0.92rem; }
+html[data-thema="zonnebloem"] .wday.today .wday-label strong::before { content: ''; position: absolute; inset: -4px; z-index: -1; background: url('themes/zonnebloem-dag.svg') center / contain no-repeat; }
+html[data-thema="zonnebloem"] .session { background: #fff; border: 1px solid #f0e4c4; border-radius: 12px; }
+html[data-thema="zonnebloem"] .session.done { background: var(--done-soft); border-color: transparent; }
+html[data-thema="zonnebloem"] .check { border-color: #c9b48a; }
+html[data-thema="zonnebloem"] .session.done .check, html[data-thema="zonnebloem"] .set-row.done .check { background: var(--done); border-color: var(--done); }
+html[data-thema="zonnebloem"] .wday .day-add { color: #b39a6b; }
+html[data-thema="zonnebloem"] .cal-day { border-color: var(--line); border-radius: 10px; }
+html[data-thema="zonnebloem"] .cal-day.today { background: var(--accent-soft); border-color: var(--accent); }
+html[data-thema="zonnebloem"] .cal-day.today .cal-num { color: var(--accent-ink); }
+html[data-thema="zonnebloem"] .tabbar { background: #ffffff; border-top: 1px solid #f1e7cc; }
+html[data-thema="zonnebloem"] .tabbar button { color: var(--muted); font-family: var(--head); font-weight: 600; }
+html[data-thema="zonnebloem"] .tabbar button.active { color: var(--text); }
+html[data-thema="zonnebloem"] .tabbar button.active span { background: var(--accent); color: var(--accent-ink); }
+html[data-thema="zonnebloem"] .card { border: 1px solid #f1e7cc; border-radius: 18px; box-shadow: 0 6px 20px rgb(122 82 20 / 0.06); }
+html[data-thema="zonnebloem"] .card h2 { font-family: var(--head); font-weight: 600; font-size: 1.2rem; }
+html[data-thema="zonnebloem"] .tot { background: #fff8e1; }
+html[data-thema="zonnebloem"] .tot strong, html[data-thema="zonnebloem"] .stat-grid strong { font-family: var(--head); font-weight: 600; }
+html[data-thema="zonnebloem"] .bar .col { background: #f1e7cc; }
+html[data-thema="zonnebloem"] .btn { border: 1px solid var(--line); border-radius: 14px; font-family: var(--head); font-weight: 600; }
+html[data-thema="zonnebloem"] .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgb(255 201 40 / 0.4); }
+html[data-thema="zonnebloem"] .linkbtn { color: var(--accent-text); }
+html[data-thema="zonnebloem"] dialog { background: #fff; border-radius: 22px 22px 0 0; }
+html[data-thema="zonnebloem"] dialog::before { content: ''; display: block; height: 58px; background: url('themes/zonnebloem-sheet.svg') center bottom / cover no-repeat; }
+html[data-thema="zonnebloem"] dialog h2 { font-family: var(--head); font-weight: 600; font-size: 1.45rem; }
+html[data-thema="zonnebloem"] .detail-stats div { background: #fff8e1; border: 0; border-radius: 14px; }
+html[data-thema="zonnebloem"] .detail-stats strong { font-family: var(--head); font-weight: 600; font-size: 1.9rem; }
+html[data-thema="zonnebloem"] .detail-done { background: var(--done-soft); }
+html[data-thema="zonnebloem"] .toast { background: var(--text); }

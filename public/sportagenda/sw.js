@@ -1,10 +1,11 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v26'
+const CACHE = 'sportagenda-v27'
 const SHELL = [
   './',
   'index.html',
   'styles.css',
+  'themes.css',
   'app.js',
   'plan5k.js',
   'icons.js',

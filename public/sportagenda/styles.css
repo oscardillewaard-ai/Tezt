@@ -2483,3 +2483,88 @@ h2.with-ico .tico {
   width: 18px;
   height: 18px;
 }
+
+/* Themakeuze onder Meer: elk thema met een stukje van zijn eigen bovenbalk. */
+.theme-list {
+  display: grid;
+  gap: 8px;
+}
+
+.theme-opt {
+  display: grid;
+  grid-template-columns: 78px 1fr 24px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px 7px 7px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: inherit;
+  text-align: left;
+}
+
+.theme-opt.on {
+  border-color: var(--accent-text);
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: flex-start;
+  height: 46px;
+  padding: 5px 7px;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.1;
+}
+
+.theme-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.theme-text strong {
+  font-size: 0.98rem;
+}
+
+.theme-text .muted {
+  font-size: 0.8rem;
+}
+
+.theme-check {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  visibility: hidden;
+}
+
+.theme-check .ico {
+  width: 15px;
+  height: 15px;
+  stroke-width: 3;
+}
+
+.theme-opt.on .theme-check {
+  visibility: visible;
+}
+
+.sw-klassiek { background: #1c1917; }
+.sw-klassiek b { color: #facc15; font-weight: 700; }
+.sw-bergen { background: url('themes/bergen.svg') center bottom / cover no-repeat, #a9c9e6; }
+.sw-bergen b { font-family: 'Josefin Sans', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.62rem; color: #1c2b39; }
+.sw-bos { background: url('themes/bos.svg') center bottom / cover no-repeat, #173226; }
+.sw-bos b { font-family: 'Fraunces', serif; font-style: italic; font-weight: 600; color: #f6efd9; }
+.sw-trail { background: url('themes/trail.svg') center / cover no-repeat, #1f3328; }
+.sw-trail b { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #ffcb05; }
+.sw-zonnebloem { background: url('themes/zonnebloem.svg') center bottom / cover no-repeat, #7fc0ec; }
+.sw-zonnebloem b { font-family: 'Fredoka', sans-serif; font-weight: 600; color: #4a2f14; }
+
+.cl-theme {
+  margin-bottom: 8px;
+}
