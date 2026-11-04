@@ -15,6 +15,22 @@
   --block: #0d9488; /* blauwgroen van geladen trainingsblokken */
   --bar: #1c1917;
   --bar-text: #fafaf9;
+  /* Kleur per activiteit (icoontjes) */
+  --c-hardlopen: #ea580c;
+  --c-wedstrijd: #1c1917;
+  --c-wandelen: #4d7c0f;
+  --c-klimmen: #0284c7;
+  --c-boulderen: #92400e;
+  --c-gym: #7c3aed;
+  --c-kracht: #c026d3;
+  --c-thuis: #a16207;
+  --c-routine: #e11d48;
+  --c-yoga: #db2777;
+  --c-warming: #dc2626;
+  --c-fietsen: #2563eb;
+  --c-zwemmen: #0891b2;
+  --day-line: #d6d3d1; /* scheiding tussen de dagen in de week */
+  --day-alt: #f7f5f2; /* elke tweede dag iets getint */
   color-scheme: light dark;
 }
 
@@ -31,6 +47,21 @@
     --block: #2dd4bf;
     --done-soft: #052e16;
     --bar: #0c0a09;
+    --c-hardlopen: #fb923c;
+    --c-wedstrijd: #f5f5f4;
+    --c-wandelen: #a3e635;
+    --c-klimmen: #38bdf8;
+    --c-boulderen: #d4a373;
+    --c-gym: #a78bfa;
+    --c-kracht: #e879f9;
+    --c-thuis: #facc15;
+    --c-routine: #fb7185;
+    --c-yoga: #f472b6;
+    --c-warming: #f87171;
+    --c-fietsen: #60a5fa;
+    --c-zwemmen: #22d3ee;
+    --day-line: #3a3431;
+    --day-alt: #231f1d;
   }
 }
 
@@ -118,19 +149,27 @@ main {
 }
 
 .tabbar button span {
-  font-size: 1.3rem;
-  filter: grayscale(1);
-  opacity: 0.7;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 25px;
+  border-radius: 13px;
+  transition: background-color 0.2s;
+}
+
+.tabbar button span .ico {
+  width: 22px;
+  height: 22px;
 }
 
 .tabbar button.active {
-  color: var(--accent-text);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
 }
 
 .tabbar button.active span {
-  filter: none;
-  opacity: 1;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .fab {
@@ -522,7 +561,7 @@ dialog h2 {
   pointer-events: none;
 }
 
-.type-grid span {
+.type-grid label > span {
   display: block;
   text-align: center;
   padding: 8px 4px;
@@ -531,10 +570,9 @@ dialog h2 {
   font-size: 0.82rem;
 }
 
-.type-grid span b {
-  display: block;
-  font-size: 1.4rem;
-  font-weight: 400;
+.type-grid .tico.big {
+  display: flex;
+  margin: 0 auto 3px;
 }
 
 .type-grid input:checked + span {
@@ -1064,7 +1102,12 @@ body.in-workout main {
   gap: 6px;
   min-height: 46px;
   padding: 3px 0 3px 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--day-line);
+}
+
+/* Om en om een getinte dag: dan zie je in één oogopslag welke trainingen bij welke dag horen. */
+.wday:nth-child(even) {
+  background: var(--day-alt);
 }
 
 .wday:last-child {
@@ -1085,12 +1128,22 @@ body.in-workout main {
 }
 
 .wday-label strong {
-  font-size: 1.05rem;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  font-size: 1.02rem;
 }
 
-.wday.today .wday-label strong,
 .wday.today .wday-label span {
   color: var(--accent-text);
+}
+
+/* Vandaag: het dagnummer in een geel rondje. */
+.wday.today .wday-label strong {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .wday.today {
@@ -2183,4 +2236,250 @@ body.in-run main {
 
 #pain {
   margin-bottom: 4px;
+}
+
+/* Eigen icoontjes (icons.js) */
+.ico {
+  display: block;
+  flex: none;
+}
+
+.tico {
+  display: inline-flex;
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  margin-right: 0.3em;
+  vertical-align: -0.24em;
+  color: var(--tc, var(--muted));
+}
+
+.tico .ico {
+  width: 100%;
+  height: 100%;
+}
+
+.tico.emo {
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.tico.big {
+  width: 26px;
+  height: 26px;
+  margin-right: 0;
+  vertical-align: middle;
+}
+
+.tico.big.emo {
+  font-size: 1.3rem;
+}
+
+.t-hardlopen { --tc: var(--c-hardlopen); }
+.t-wedstrijd { --tc: var(--c-wedstrijd); }
+.t-wandelen { --tc: var(--c-wandelen); }
+.t-klimmen { --tc: var(--c-klimmen); }
+.t-boulderen { --tc: var(--c-boulderen); }
+.t-gym { --tc: var(--c-gym); }
+.t-kracht { --tc: var(--c-kracht); }
+.t-thuis { --tc: var(--c-thuis); }
+.t-routine { --tc: var(--c-routine); }
+.t-yoga { --tc: var(--c-yoga); }
+.t-warming { --tc: var(--c-warming); }
+.t-fietsen { --tc: var(--c-fietsen); }
+.t-zwemmen { --tc: var(--c-zwemmen); }
+
+/* Gedaan: icoon iets rustiger, het groene vinkje voert het woord. */
+.session.done .tico {
+  opacity: 0.75;
+}
+
+/* Vinkje als lijntekening, zodat het overal hetzelfde is. */
+.check .ico {
+  width: 68%;
+  height: 68%;
+  stroke-width: 3.2;
+}
+
+/* Kleine icoontjes vooraan een regel (herhalen, horloge). */
+.ico.mini {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.3em;
+  vertical-align: -0.18em;
+}
+
+.cal-mark {
+  display: inline-flex;
+  padding: 1px;
+}
+
+.cal-mark .tico {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+h2.with-ico .tico {
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 0.35em;
+}
+
+.list-item > .tico.big {
+  width: 30px;
+  height: 30px;
+}
+
+.welcome-list li > span {
+  color: var(--accent);
+}
+
+.welcome-list li > span .ico {
+  width: 24px;
+  height: 24px;
+}
+
+.t-done { --tc: var(--done); }
+
+/* Afvinken: vinkje ploppen, ring eromheen en de regel licht even goudgeel op. */
+@keyframes tick-pop {
+  0% { transform: scale(0.55); }
+  55% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+@keyframes tick-ring {
+  from { box-shadow: 0 0 0 0 rgb(22 163 74 / 0.6); }
+  to { box-shadow: 0 0 0 13px rgb(22 163 74 / 0); }
+}
+
+@keyframes tick-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes row-glow {
+  from { background-color: var(--accent); }
+  to { background-color: var(--done-soft); }
+}
+
+.just-done .check {
+  animation: tick-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1), tick-ring 0.7s ease-out;
+}
+
+.just-done .check .ico path {
+  stroke-dasharray: 24;
+  animation: tick-draw 0.35s 0.08s ease-out both;
+}
+
+.session.just-done {
+  animation: row-glow 0.9s ease-out;
+}
+
+.spark {
+  position: fixed;
+  z-index: 70;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  pointer-events: none;
+}
+
+.spark.heart {
+  width: 13px;
+  height: 13px;
+  background: none;
+}
+
+.spark.heart .ico {
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .just-done .check,
+  .just-done .check .ico path,
+  .session.just-done {
+    animation: none;
+  }
+}
+
+/* Aanmoediging met een leuk getal eronder */
+.toast small {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Jouw totalen */
+.tot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tot {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg);
+  min-width: 0;
+}
+
+.tot-ico {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--tc, var(--muted));
+  background: color-mix(in srgb, var(--tc, var(--muted)) 14%, transparent);
+}
+
+.tot-ico .ico {
+  width: 22px;
+  height: 22px;
+}
+
+.tot strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tot-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.tot em {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tot-note {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+}
+
+.wp-day .tico {
+  margin: 0;
+  width: 18px;
+  height: 18px;
 }

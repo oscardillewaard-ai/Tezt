@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '25' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '26' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -162,6 +162,13 @@ const esc = (s) =>
   )
 
 const typeById = (id) => state.types.find((t) => t.id === id) || { id, name: 'Onbekend', emoji: '❔' }
+// Eigen icoon van de activiteit (icons.js), in de kleur van die activiteit.
+// Zelf toegevoegde activiteiten houden hun emoji.
+const typeIcon = (t, cls = '') =>
+  TYPE_ICONS.includes(t.id)
+    ? `<span class="tico t-${t.id} ${cls}">${svgIcon(t.id)}</span>`
+    : `<span class="tico emo ${cls}">${esc(t.emoji || '⭐')}</span>`
+const CHECK_ICON = svgIcon('vink')
 const templateById = (id) => state.templates.find((t) => t.id === id)
 // Bij hardlopen houden we scheenpijn bij (0 = geen, 10 = ergst denkbaar).
 const tracksShin = (typeId) => typeId === 'hardlopen'
@@ -230,10 +237,10 @@ function renderWelcome() {
       <h1>Hoi Tara! 💛</h1>
       <p class="tagline">Welkom in Tarapp, jouw eigen sportagenda.<br />${esc(dailyCompliment())}</p>
       <ul class="welcome-list">
-        <li><span>📅</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
-        <li><span>🏋️</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
-        <li><span>📊</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
-        <li><span>🔒</span><div><strong>Alleen op jouw telefoon</strong>Geen account nodig. Alles blijft op je telefoon, tenzij je zelf je horloge koppelt. Maak af en toe een back-up via Meer.</div></li>
+        <li><span>${svgIcon('agenda')}</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
+        <li><span>${svgIcon('gym')}</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
+        <li><span>${svgIcon('overzicht')}</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
+        <li><span>${svgIcon('slot')}</span><div><strong>Alleen op jouw telefoon</strong>Geen account nodig. Alles blijft op je telefoon, tenzij je zelf je horloge koppelt. Maak af en toe een back-up via Meer.</div></li>
       </ul>
       ${install}
       <button class="btn primary block" data-action="welcome-done">Aan de slag</button>
@@ -338,14 +345,91 @@ function dailyCompliment() {
   return COMPLIMENTS[dayNr % COMPLIMENTS.length]
 }
 
-function cheer() {
-  showToast(CHEERS[Math.floor(Math.random() * CHEERS.length)])
+// Aanmoediging, met op een tweede regel eventueel een leuk getal (km, kg ...).
+function cheer(extra = '') {
+  const text = CHEERS[Math.floor(Math.random() * CHEERS.length)]
+  showToast(extra ? `${text}\n${extra}` : text)
+}
+
+// ---------- Afvinken: een klein feestje ----------
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+const SPARK_COLORS = ['var(--accent)', 'var(--done)', '#f472b6', '#fb923c', '#60a5fa', '#a78bfa']
+
+// Confetti en hartjes vanuit het vinkje.
+function burst(el, { count = 14, spread = 54 } = {}) {
+  if (!el?.animate || reduceMotion()) return
+  const r = el.getBoundingClientRect()
+  if (!r.width) return
+  const cx = r.left + r.width / 2
+  const cy = r.top + r.height / 2
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span')
+    const heart = i % 3 === 0
+    p.className = heart ? 'spark heart' : 'spark'
+    if (heart) p.innerHTML = svgIcon('hartje')
+    p.style.left = `${cx}px`
+    p.style.top = `${cy}px`
+    p.style.color = SPARK_COLORS[i % SPARK_COLORS.length]
+    document.body.append(p)
+    const a = (i / count) * Math.PI * 2 + Math.random() * 0.6
+    const d = spread * (0.55 + Math.random() * 0.6)
+    const dx = Math.cos(a) * d
+    const dy = Math.sin(a) * d - spread * 0.2
+    const turn = Math.round(Math.random() * 90 - 45)
+    p.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(0.3)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${dx * 0.75}px), calc(-50% + ${dy * 0.75}px)) scale(1.1)`, opacity: 1, offset: 0.5 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy + 16}px)) scale(0.6) rotate(${turn}deg)`, opacity: 0 },
+      ],
+      { duration: 650 + Math.random() * 300, easing: 'cubic-bezier(.15,.7,.35,1)' },
+    ).onfinish = () => p.remove()
+  }
+}
+
+// Vinkje laten ploppen, de regel laten oplichten, confetti, en op Android een tikje.
+function celebrate(check, big = false) {
+  if (!check) return
+  const row = check.closest('.session, .set-row')
+  row?.classList.add('just-done')
+  try {
+    navigator.vibrate?.(big ? [14, 60, 22] : 14)
+  } catch {
+    // Niet ondersteund (zoals op de iPhone): dan alleen het plaatje.
+  }
+  const small = row?.classList.contains('set-row')
+  burst(check, big ? { count: 26, spread: 96 } : small ? { count: 9, spread: 34 } : {})
+}
+
+const checkOf = (id) => view.querySelector(`.check[data-id="${id}"]`)
+
+// Na het afvinken van een training: feestje, bij een run de pijnvraag, en een
+// aanmoediging met een leuk getal. Het venster pas na het feestje, anders zie je het niet.
+function afterTick(s, big = false) {
+  celebrate(checkOf(s.id), big)
+  const next = () => {
+    if (!s.done) return
+    if (tracksShin(s.typeId) && !sheet.open) openShinSheet(s)
+    cheer(tickFact(s))
+  }
+  if (tracksShin(s.typeId) && !reduceMotion()) setTimeout(next, 700)
+  else next()
 }
 
 // ---------- Wat is er nieuw ----------
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 26,
+    items: [
+      'Eigen icoontjes voor al je sporten, elk in een eigen kleurtje, en ze zien er op elke telefoon hetzelfde uit 🎨',
+      'De dagen in je week zijn nu om en om getint, en vandaag staat in een geel rondje 💛',
+      'Afvinken is nu een klein feestje: confetti en hartjes voor de allerleukste 🎉💖',
+      'Nieuw in Overzicht: jouw totalen. Hoeveel km je gelopen hebt, hoeveel hoogtemeters en hoeveel kilo je hebt verplaatst (in piano\'s en olifanten 🐘)',
+    ],
+  },
   { v: 25, items: ['"Wandelen + klimmen" uit je trainingsblok staan nu als twee losse trainingen: 🥾 wandelen en 🧗 klimmen 💛'] },
   {
     v: 24,
@@ -655,7 +739,7 @@ function renderMonth() {
     const inMonth = d.getMonth() === m.getMonth()
     const day = sortSessions(state.sessions.filter((s) => s.date === k))
     const marks = day
-      .map((s) => `<span class="cal-mark ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''}">${esc(typeById(s.typeId).emoji)}</span>`)
+      .map((s) => `<span class="cal-mark ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''}">${typeIcon(typeById(s.typeId))}</span>`)
       .join('')
     cells += `
       <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
@@ -685,19 +769,19 @@ function sessionRow(s) {
   const t = typeById(s.typeId)
   const tpl = s.templateId && templateById(s.templateId)
   const busy = (s.log && !s.log.endedAt) || (s.runLog && !s.runLog.endedAt)
-  const inProgress = [busy ? '▶ bezig' : '', seriesOf(s) ? '🔁' : ''].filter(Boolean).join(' ')
+  // Herhalen en horloge als klein icoon vooraan de regel.
+  const flags = (seriesOf(s) ? svgIcon('herhaal', 'mini') : '') + (s.icuId ? svgIcon('horloge', 'mini') : '')
   const shin = Number.isInteger(s.shin)
     ? ` <span class="shin-badge ${shinClass(s.shin)}" title="${painLabel(s)} ${s.shin}/10">🦵${s.shin}</span>`
     : ''
   // Bij plan- en bloktrainingen zegt de notitie meer dan de schemanaam.
   const meta = [
-    inProgress,
+    busy ? '▶ bezig' : '',
     s.time,
     s.run?.label,
     // Geen "45 min" als de naam dat al zegt ("Wandelen 45 min").
     s.duration && !(s.title || '').includes(`${s.duration} min`) ? fmtMinutes(Number(s.duration)) : '',
     s.distance ? `${fmtNum(Math.round(s.distance / 100) / 10)} km` : '',
-    s.icuId ? '⌚' : '',
     tpl && !s.planId && !(s.blockId && `${s.title || ''} ${s.note || ''}`.toLowerCase().includes(tplPrefix(tpl))) ? tpl.name : '',
     s.note,
   ]
@@ -706,12 +790,144 @@ function sessionRow(s) {
     .join(' · ')
   return `
     <div class="session ${s.done ? 'done' : ''} ${s.planId ? 'plan' : ''} ${s.blockId ? 'block' : ''}">
-      <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? '✓' : ''}</button>
+      <button class="check" data-action="toggle" data-id="${s.id}" aria-label="${s.done ? 'Markeer als niet gedaan' : 'Afvinken'}">${s.done ? CHECK_ICON : ''}</button>
       <button class="s-body" data-action="edit" data-id="${s.id}">
-        <span class="s-title">${esc(t.emoji)} ${esc(s.title || t.name)}${s.planId ? ' <span class="plan-badge">5K</span>' : ''}${s.blockWeek ? ` <span class="block-badge">${esc(s.blockWeek)}</span>` : ''}${shin}</span>
-        ${meta ? `<span class="s-meta">${meta}</span>` : ''}
+        <span class="s-title">${typeIcon(t)}${esc(s.title || t.name)}${s.planId ? ' <span class="plan-badge">5K</span>' : ''}${s.blockWeek ? ` <span class="block-badge">${esc(s.blockWeek)}</span>` : ''}${shin}</span>
+        ${meta || flags ? `<span class="s-meta">${flags}${meta}</span>` : ''}
       </button>
     </div>`
+}
+
+// ---------- Totalen ----------
+// Alles wat Tara bij elkaar gedaan heeft: km, hoogtemeters en opgetilde kilo's.
+// Afstand en hoogtemeters komen van het horloge of uit de agenda ("13 km · 60 hm");
+// het zijn dus de geplande getallen als het horloge niet gekoppeld is.
+
+const RUN_TYPES = ['hardlopen', 'wedstrijd']
+const numberBefore = (s, unit) => {
+  const m = `${s.note || ''} ${s.title || ''}`.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${unit}\\b`, 'i'))
+  return m ? parseNum(m[1]) : 0
+}
+const sessionKm = (s) => (s.distance ? s.distance / 1000 : numberBefore(s, 'km'))
+const sessionHm = (s) => numberBefore(s, 'hm')
+
+// kg × herhalingen van elke afgevinkte set (sets op tijd tellen niet mee).
+function sessionKg(s) {
+  let kg = 0
+  for (const e of s.log?.exercises || []) {
+    if (e.unit === 'sec') continue
+    for (const x of e.sets) if (x.done) kg += (parseNum(x.kg) || 0) * (parseInt(x.reps) || 0)
+  }
+  return kg
+}
+
+function totals() {
+  const t = { n: 0, min: 0, runs: 0, runKm: 0, walkKm: 0, hm: 0, kg: 0, since: '' }
+  for (const s of state.sessions) {
+    if (!s.done) continue
+    t.n++
+    t.min += Number(s.duration) || 0
+    if (!t.since || s.date < t.since) t.since = s.date
+    if (RUN_TYPES.includes(s.typeId)) {
+      t.runs++
+      t.runKm += sessionKm(s)
+    } else if (s.typeId === 'wandelen') t.walkKm += sessionKm(s)
+    t.hm += sessionHm(s)
+    t.kg += sessionKg(s)
+  }
+  return t
+}
+
+const nl = (n, dec = 0) => n.toLocaleString('nl-NL', { maximumFractionDigits: dec })
+const fmtKm = (km) => nl(km, km < 100 ? 1 : 0)
+const times = (x) => nl(x, x < 10 ? 1 : 0)
+const many = (x, one, more) => (times(x) === '1' ? `1 ${one}` : `${times(x)} ${more}`)
+
+// Leuke vergelijkingen. Marathon 42,195 km, atletiekbaan 400 m, Domtoren 112 m,
+// Eiffeltoren 330 m, Mount Everest 8849 m; gewichten zijn ronde schattingen.
+const KG_FUN = [
+  { kg: 150000, one: 'blauwe vinvis', more: 'blauwe vinvissen' },
+  { kg: 5000, one: 'olifant', more: 'olifanten' },
+  { kg: 900, one: 'Fiat 500', more: "Fiat 500's" },
+  { kg: 300, one: 'piano', more: "piano's" },
+]
+function kmFun(km) {
+  if (km >= 42.195) return times(km / 42.195) === '1' ? 'een hele marathon' : `${times(km / 42.195)}× een marathon`
+  return `${nl(km / 0.4)} rondjes atletiekbaan`
+}
+function hmFun(hm) {
+  if (hm >= 8849) return `${times(hm / 8849)}× de Mount Everest op`
+  if (hm >= 330) return `${times(hm / 330)}× de Eiffeltoren op`
+  if (hm >= 112) return `${times(hm / 112)}× de Domtoren op`
+  return `${nl((hm / 112) * 100)}% van de Domtoren`
+}
+function kgFun(kg) {
+  const f = KG_FUN.find((x) => kg >= x.kg)
+  return f ? many(kg / f.kg, f.one, f.more) : `${nl((kg / 300) * 100)}% van een piano`
+}
+
+// Eén leuk getal voor in de aanmoediging na het afvinken.
+function tickFact(s) {
+  const t = totals()
+  if (RUN_TYPES.includes(s.typeId)) {
+    const km = sessionKm(s)
+    const hm = sessionHm(s)
+    return km
+      ? `+${fmtKm(km)} km${hm ? ` en ${nl(hm)} hm` : ''} · al ${fmtKm(t.runKm)} km gelopen: ${kmFun(t.runKm)} 🏃‍♀️`
+      : `Je ${t.runs}e run in Tarapp 🏃‍♀️`
+  }
+  const kg = sessionKg(s)
+  if (kg) return `${nl(kg)} kg verplaatst · samen al ${nl(t.kg)} kg: ${kgFun(t.kg)} 💪`
+  const hm = sessionHm(s)
+  if (hm) return `+${nl(hm)} hm · al ${nl(t.hm)} hm: ${hmFun(t.hm)} ⛰️`
+  return `Training nummer ${t.n} ✓`
+}
+
+function renderTotals() {
+  const t = totals()
+  if (!t.n) {
+    return `
+    <section class="card totals">
+      <h2>Jouw totalen 💛</h2>
+      <p class="muted">Vink je eerste training af, dan tellen we hier je kilometers, hoogtemeters en kilo's bij elkaar.</p>
+    </section>`
+  }
+  const tile = (icon, cls, value, dec, label, fun) => `
+    <div class="tot">
+      <span class="tot-ico ${cls}">${svgIcon(icon)}</span>
+      <strong data-count="${Math.round(value * 10 ** dec) / 10 ** dec}" data-dec="${dec}">${nl(value, dec)}</strong>
+      <span class="tot-label">${label}</span>
+      <em>${fun}</em>
+    </div>`
+  const hours = fmtMinutes(t.min)
+  return `
+    <section class="card totals">
+      <h2>Jouw totalen 💛</h2>
+      <div class="tot-grid">
+        ${tile('hardlopen', 't-hardlopen', t.runKm, t.runKm < 100 ? 1 : 0, 'km gelopen', t.runKm ? kmFun(t.runKm) : `${t.runs} ${t.runs === 1 ? 'run' : 'runs'}`)}
+        ${tile('klimmen', 't-klimmen', t.hm, 0, 'hoogtemeters', t.hm ? hmFun(t.hm) : 'nog vlak 🙂')}
+        ${tile('gym', 't-gym', t.kg, 0, 'kg verplaatst', t.kg ? kgFun(t.kg) : 'vink je sets af bij gym')}
+        ${tile('vink', 't-done', t.n, 0, t.n === 1 ? 'training' : 'trainingen', t.min ? `${hours} sporten` : 'goed bezig!')}
+      </div>
+      <p class="muted tot-note">Sinds ${shortDate(fromKey(t.since))}${t.walkKm ? ` · en ${fmtKm(t.walkKm)} km gewandeld` : ''} · km en hm van je horloge of uit je agenda · piano ≈ 300 kg, Fiat 500 ≈ 900 kg, olifant ≈ 5 ton</p>
+    </section>`
+}
+
+// Getallen even laten optellen als je het overzicht opent.
+function countUp(root) {
+  if (reduceMotion()) return
+  root.querySelectorAll('[data-count]').forEach((el) => {
+    const end = Number(el.dataset.count)
+    const dec = Number(el.dataset.dec || 0)
+    if (!end) return
+    const t0 = performance.now()
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / 900)
+      el.textContent = nl(end * (1 - (1 - k) ** 3), dec)
+      if (k < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  })
 }
 
 // ---------- Overzicht ----------
@@ -766,11 +982,12 @@ function renderOverview() {
     .sort((a, b) => b[1].n - a[1].n)
     .map(([id, p]) => {
       const t = typeById(id)
-      return `<tr><td>${esc(t.emoji)} ${esc(t.name)}</td><td>${p.n}×</td><td>${fmtMinutes(p.min)}</td></tr>`
+      return `<tr><td>${typeIcon(t)}${esc(t.name)}</td><td>${p.n}×</td><td>${fmtMinutes(p.min)}</td></tr>`
     })
     .join('')
 
   return `
+    ${renderTotals()}
     <section class="card">
       <div class="stat-grid">
         <div><strong>${streak}</strong><span class="muted">weken op rij</span></div>
@@ -856,7 +1073,7 @@ function renderMore() {
     .map(
       (t) => `
       <div class="list-item">
-        <span style="font-size:1.4rem">${esc(t.emoji)}</span>
+        ${typeIcon(t, 'big')}
         <span class="grow">${esc(t.name)}</span>
         <button class="btn danger" data-action="delete-type" data-id="${t.id}" aria-label="${esc(t.name)} verwijderen">✕</button>
       </div>`,
@@ -959,7 +1176,7 @@ function openSessionSheet(session, date) {
       (t) => `
       <label>
         <input type="radio" name="typeId" value="${t.id}" ${t.id === s.typeId ? 'checked' : ''} required />
-        <span><b>${esc(t.emoji)}</b>${esc(t.name)}</span>
+        <span>${typeIcon(t, 'big')}${esc(t.name)}</span>
       </label>`,
     )
     .join('')
@@ -1307,7 +1524,7 @@ function renderWorkout(s) {
   const log = s.log
   const tpl = s.templateId && templateById(s.templateId)
   const t = typeById(s.typeId)
-  title.textContent = tpl ? tpl.name : `${t.emoji} ${t.name}`
+  title.textContent = tpl ? tpl.name : t.name
   const doneSets = log.exercises.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0)
   const allSets = log.exercises.reduce((n, e) => n + e.sets.length, 0)
 
@@ -1347,7 +1564,7 @@ function renderWorkout(s) {
             <span class="muted prev-cell">${isSec && !st.done ? `<button type="button" class="mini play" data-action="wo-hold" aria-label="Aftellen voor set ${j + 1}">▶</button>` : ''}${prev[j] ? esc(fmtSet(prev[j], ex.unit)) : isSec && !st.done ? '' : '–'}</span>
             <input data-field="kg" inputmode="decimal" enterkeyhint="next" value="${esc(st.kg)}" placeholder="${esc(phKg)}" aria-label="Set ${j + 1} gewicht in kg" />
             <input data-field="reps" inputmode="numeric" enterkeyhint="done" value="${esc(st.reps)}" placeholder="${esc(phReps)}" aria-label="Set ${j + 1} ${isSec ? 'seconden' : 'herhalingen'}" />
-            <button type="button" class="check" data-action="wo-set" aria-label="Set ${j + 1} afvinken">${st.done ? '✓' : ''}</button>
+            <button type="button" class="check" data-action="wo-set" aria-label="Set ${j + 1} afvinken">${st.done ? CHECK_ICON : ''}</button>
           </div>
           ${st.note ? `<div class="set-note">💬 ${esc(st.note)}</div>` : ''}
           ${prev[j]?.note ? `<div class="set-note prev">Vorige keer: ${esc(prev[j].note)}</div>` : ''}`
@@ -1451,6 +1668,7 @@ function completeSet(i, j) {
   save()
   render()
   renderRestBar()
+  celebrate(view.querySelector(`.set-row[data-ex="${i}"][data-set="${j}"] .check`))
   if (nextInSuperset !== null) {
     const k = Math.min(j, exs[nextInSuperset].sets.length - 1)
     view
@@ -1604,7 +1822,7 @@ const workoutActions = {
     ui.restEnd = null
     ui.active = null
     render()
-    if (justFinished) cheer()
+    if (justFinished) afterTick(s, true)
   },
   'wo-discard': () => {
     const s = state.sessions.find((x) => x.id === ui.active)
@@ -1654,7 +1872,7 @@ function openWorkoutSheet(s) {
   openSheet(
     `
     <form method="dialog">
-      <h2>${esc(t.emoji)} ${s.title ? esc(s.title) : `${esc(t.name)}${tpl ? ' · ' + esc(tpl.name) : ''}`}</h2>
+      <h2 class="with-ico">${typeIcon(t)}${s.title ? esc(s.title) : `${esc(t.name)}${tpl ? ' · ' + esc(tpl.name) : ''}`}</h2>
       <p class="muted">${s.title && tpl ? `${esc(tpl.name)} · ` : ''}${esc(when)}${s.note ? '<br>' + esc(s.note) : ''}</p>
       ${summary}
       <p></p>
@@ -1717,7 +1935,7 @@ function openSessionDetail(s) {
   openSheet(
     `
     <form method="dialog">
-      <h2>${esc(t.emoji)} ${esc(s.title || t.name)}${badges}</h2>
+      <h2 class="with-ico">${typeIcon(t)}${esc(s.title || t.name)}${badges}</h2>
       <p class="muted">${s.title ? `${esc(t.name)} · ` : ''}${esc(when)}${seriesOf(s) ? ' · 🔁 elke week' : ''}</p>
       ${
         race
@@ -1745,8 +1963,7 @@ function openSessionDetail(s) {
     save()
     closeSheet()
     render()
-    if (tracksShin(s.typeId)) openShinSheet(s)
-    cheer()
+    afterTick(s)
   })
   sheet.querySelector('#untick')?.addEventListener('click', () => {
     s.done = false
@@ -2027,8 +2244,7 @@ function finishRun(s) {
   speak('Klaar! Goed gedaan, Tara.')
   save()
   render()
-  openShinSheet(s)
-  cheer()
+  afterTick(s, true)
 }
 
 const runActions = {
@@ -2238,11 +2454,11 @@ function weekPreview(r, opts) {
   const d = rhythmDays(r, opts)
   return DAY_ABBR.map((name, i) => {
     const [kind, icon] = d.run.includes(i)
-      ? ['run', '🏃']
+      ? ['run', typeIcon({ id: 'hardlopen' })]
       : d.strength.includes(i)
-        ? ['strength', '💪']
+        ? ['strength', typeIcon({ id: 'kracht' })]
         : d.cross.includes(i)
-          ? ['cross', '🚴']
+          ? ['cross', typeIcon({ id: 'fietsen' })]
           : ['rest', '·']
     return `<span class="wp-day wp-${kind}"><b>${name}</b>${icon}</span>`
   }).join('')
@@ -3256,16 +3472,14 @@ function openBlockImportSheet(o) {
     const plan = blockPlan(o, optsFrom(form))
     const byType = {}
     for (const s of plan.sessions) byType[s.typeId] = (byType[s.typeId] || 0) + 1
-    const typeName = (id) => {
-      const t = state.types.find((x) => x.id === id) || BLOCK_EXTRA_TYPES.find((x) => x.id === id) || { name: id.replace(/^blok-/, ''), emoji: '⭐' }
-      return `${t.emoji} ${t.name}`
-    }
+    const typeOf = (id) =>
+      state.types.find((x) => x.id === id) || BLOCK_EXTRA_TYPES.find((x) => x.id === id) || { id, name: capFirst(id.replace(/^blok-/, '')), emoji: '⭐' }
     sheet.querySelector('#block-summary').innerHTML =
       `<strong>${plan.sessions.length} trainingen</strong> in ${new Set(plan.sessions.map((s) => s.blockWeek)).size} weken · ${plan.schemas.length} schema's` +
       (plan.skipped ? `<br><span class="muted">${plan.skipped} trainingen van vóór die datum worden overgeslagen</span>` : '')
     sheet.querySelector('#block-types').innerHTML = Object.entries(byType)
       .sort((x, y) => y[1] - x[1])
-      .map(([id, n]) => `<span class="chip">${esc(typeName(id))} × ${n}</span>`)
+      .map(([id, n]) => `<span class="chip">${typeIcon(typeOf(id))}${esc(typeOf(id).name)} × ${n}</span>`)
       .join('')
     const firstWeek = plan.sessions[0]?.blockWeek
     const rows = plan.sessions.filter((s) => s.blockWeek === firstWeek)
@@ -3274,8 +3488,8 @@ function openBlockImportSheet(o) {
           .map((s) => {
             const d = fromKey(s.date)
             const sc = plan.schemas.find((x) => x.key === s.schemaKey)
-            const emoji = typeName(s.typeId).split(' ')[0]
-            return `<div class="bp-row"><span class="bp-day">${DAYS_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}</span><span>${emoji} ${esc(s.title || typeName(s.typeId))}</span><span class="muted">${esc([s.note, sc && sc.name !== s.title ? sc.name : ''].filter(Boolean).join(' · '))}</span></div>`
+            const t = typeOf(s.typeId)
+            return `<div class="bp-row"><span class="bp-day">${DAYS_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()}</span><span>${typeIcon(t)}${esc(s.title || t.name)}</span><span class="muted">${esc([s.note, sc && sc.name !== s.title ? sc.name : ''].filter(Boolean).join(' · '))}</span></div>`
           })
           .join('')
       : '<p class="muted">Niets meer om in te plannen vanaf die datum.</p>'
@@ -3755,7 +3969,8 @@ function showToast(text, undo) {
   document.querySelectorAll('.toast').forEach((t) => t.remove())
   const t = document.createElement('div')
   t.className = 'toast'
-  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button type="button">Ongedaan maken</button>' : ''}`
+  const [main, ...more] = String(text).split('\n')
+  t.innerHTML = `<span>${esc(main)}${more.length ? `<small>${more.map(esc).join('<br>')}</small>` : ''}</span>${undo ? '<button type="button">Ongedaan maken</button>' : ''}`
   if (undo)
     t.querySelector('button').onclick = () => {
       t.remove()
@@ -3764,7 +3979,7 @@ function showToast(text, undo) {
   // In een open venster moet de melding in dat venster staan om zichtbaar te zijn.
   ;(sheet.open ? sheet : document.body).append(t)
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => t.remove(), 5000)
+  toastTimer = setTimeout(() => t.remove(), more.length ? 6500 : 5000)
 }
 
 // Element onder de vinger, met het sleep-spook zelf genegeerd (pointer-events: none).
@@ -3809,7 +4024,7 @@ makeDraggable(view, {
     save()
     render()
     const t = typeById(removed.typeId)
-    showToast(`${t.emoji} ${t.name} verwijderd`, () => {
+    showToast(`${removed.title || t.name} verwijderd`, () => {
       state.sessions.splice(i, 0, removed)
       save()
       render()
@@ -3907,8 +4122,7 @@ const actions = {
     s.done = !s.done
     save()
     render()
-    if (s.done && tracksShin(s.typeId)) openShinSheet(s)
-    if (s.done) cheer()
+    if (s.done) afterTick(s)
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'delete-type': (el) => {
@@ -4045,6 +4259,7 @@ document.querySelector('.tabbar').addEventListener('click', (e) => {
   render()
   if (ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()) scrollToWeek(new Date())
   else window.scrollTo(0, 0)
+  if (ui.tab === 'overzicht') countUp(view)
 })
 
 fab.addEventListener('click', () => {
@@ -4067,6 +4282,9 @@ const unfinished = state.sessions.find((s) => s.log && !s.log.endedAt && Date.no
 if (unfinished) ui.active = unfinished.id
 const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt && Date.now() - s.runLog.startedAt < 3 * 3600e3)
 if (unfinishedRun) ui.run = unfinishedRun.id
+
+// Icoontjes in de vaste HTML (tabbalk).
+document.querySelectorAll('[data-icon]').forEach((el) => (el.innerHTML = svgIcon(el.dataset.icon)))
 
 render()
 showChangesSinceLastVisit()
