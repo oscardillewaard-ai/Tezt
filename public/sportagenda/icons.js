@@ -45,6 +45,8 @@ const ICON_PATHS = {
   doos: '<path d="M4.5 8.5h15v10.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M3 4.5h18v4H3z"/><path d="M12 11.5v6M9.5 15l2.5 2.5 2.5-2.5"/>',
   ster: '<path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z"/><path d="M18 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
   telefoon: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  smiley:
+    '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c.9 1.4 2.1 2.1 3.5 2.1s2.6-.7 3.5-2.1"/><g fill="currentColor" stroke="none"><circle cx="9.2" cy="10" r="1.1"/><circle cx="14.8" cy="10" r="1.1"/></g>',
   // Weergave van de agenda: een scherm met regels.
   weergave: '<rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5"/>',
   herhaal:

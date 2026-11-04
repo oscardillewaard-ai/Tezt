@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '30' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '31' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -164,10 +164,22 @@ const esc = (s) =>
 const typeById = (id) => state.types.find((t) => t.id === id) || { id, name: 'Onbekend', emoji: '❔' }
 // Eigen icoon van de activiteit (icons.js), in de kleur van die activiteit.
 // Zelf toegevoegde activiteiten houden hun emoji.
+// Onder Meer kun je in plaats daarvan emoji kiezen (settings.emoji).
+const useEmoji = () => !!state.settings?.emoji
 const typeIcon = (t, cls = '') =>
-  TYPE_ICONS.includes(t.id)
+  TYPE_ICONS.includes(t.id) && !useEmoji()
     ? `<span class="tico t-${t.id} ${cls}">${svgIcon(t.id)}</span>`
     : `<span class="tico emo ${cls}">${esc(t.emoji || '⭐')}</span>`
+// Overige plaatjes met een emoji als tegenhanger (tabbalk, totalen, welkomstscherm).
+const ICON_EMOJI = {
+  agenda: '📅', overzicht: '📊', schemas: '🏋️', meer: '⚙️', gym: '🏋️', slot: '🔒',
+  hardlopen: '🏃', klimmen: '⛰️', vink: '✅', herhaal: '🔁', horloge: '⌚',
+}
+const iconOrEmoji = (name, cls = '') =>
+  useEmoji() && ICON_EMOJI[name] ? `<span class="emo-ico ${cls}">${ICON_EMOJI[name]}</span>` : svgIcon(name, cls)
+function renderTabIcons() {
+  document.querySelectorAll('[data-icon]').forEach((el) => (el.innerHTML = iconOrEmoji(el.dataset.icon)))
+}
 const CHECK_ICON = svgIcon('vink')
 const templateById = (id) => state.templates.find((t) => t.id === id)
 // Bij hardlopen houden we scheenpijn bij (0 = geen, 10 = ergst denkbaar).
@@ -238,10 +250,10 @@ function renderWelcome() {
       <h1>Hoi Tara! 💛</h1>
       <p class="tagline">Welkom in Tarapp, jouw eigen sportagenda.<br />${esc(dailyCompliment())}</p>
       <ul class="welcome-list">
-        <li><span>${svgIcon('agenda')}</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
-        <li><span>${svgIcon('gym')}</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
-        <li><span>${svgIcon('overzicht')}</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
-        <li><span>${svgIcon('slot')}</span><div><strong>Alleen op jouw telefoon</strong>Geen account nodig. Alles blijft op je telefoon, tenzij je zelf je horloge koppelt. Maak af en toe een back-up via Meer.</div></li>
+        <li><span>${iconOrEmoji('agenda')}</span><div><strong>Agenda</strong>Plan gym, klimmen, wandelen en meer, per week of per maand.</div></li>
+        <li><span>${iconOrEmoji('gym')}</span><div><strong>Gymtraining</strong>Log kg en herhalingen per set, met supersets, rusttimer en aftelklok.</div></li>
+        <li><span>${iconOrEmoji('overzicht')}</span><div><strong>Overzicht</strong>Je weken op rij, minuten per activiteit en scheenpijn na het hardlopen.</div></li>
+        <li><span>${iconOrEmoji('slot')}</span><div><strong>Alleen op jouw telefoon</strong>Geen account nodig. Alles blijft op je telefoon, tenzij je zelf je horloge koppelt. Maak af en toe een back-up via Meer.</div></li>
       </ul>
       ${install}
       <button class="btn primary block" data-action="welcome-done">Aan de slag</button>
@@ -423,6 +435,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 31, items: ['Liever emoji? Onder Meer → Uiterlijk zet je "Emoji in plaats van icoontjes" aan 😊🏃🧗'] },
   { v: 30, items: ['Schermvullend past nu altijd precies op je scherm: niets meer om te scrollen 💛'] },
   {
     v: 29,
@@ -955,7 +968,7 @@ function sessionRow(s) {
   const tpl = s.templateId && templateById(s.templateId)
   const busy = (s.log && !s.log.endedAt) || (s.runLog && !s.runLog.endedAt)
   // Herhalen en horloge als klein icoon vooraan de regel.
-  const flags = (seriesOf(s) ? svgIcon('herhaal', 'mini') : '') + (s.icuId ? svgIcon('horloge', 'mini') : '')
+  const flags = (seriesOf(s) ? iconOrEmoji('herhaal', 'mini') : '') + (s.icuId ? iconOrEmoji('horloge', 'mini') : '')
   const shin = Number.isInteger(s.shin)
     ? ` <span class="shin-badge ${shinClass(s.shin)}" title="${painLabel(s)} ${s.shin}/10">🦵${s.shin}</span>`
     : ''
@@ -1079,7 +1092,7 @@ function renderTotals() {
   }
   const tile = (icon, cls, value, dec, label, fun) => `
     <div class="tot">
-      <span class="tot-ico ${cls}">${svgIcon(icon)}</span>
+      <span class="tot-ico ${cls}">${iconOrEmoji(icon)}</span>
       <strong data-count="${Math.round(value * 10 ** dec) / 10 ** dec}" data-dec="${dec}">${nl(value, dec)}</strong>
       <span class="tot-label">${label}</span>
       <em>${fun}</em>
@@ -1292,6 +1305,11 @@ function renderMore() {
     <div class="pref-list card">
       ${row({ page: 'thema', icon: 'palet', color: '#f59e0b', label: 'Thema', value: THEMES.find((t) => t.id === themeId()).name })}
       ${row({ page: 'weergave', icon: 'weergave', color: '#0ea5e9', label: 'Weergave van de agenda', value: AGENDA_VIEWS.find((v) => v.id === agendaView()).name })}
+      <label class="pref-row">
+        <span class="pref-ico" style="background:#f97316">${svgIcon('smiley')}</span>
+        <span class="pref-label">Emoji in plaats van icoontjes<small>Zoals 🏃 🧗 🥾 bij je trainingen</small></span>
+        <input type="checkbox" class="switch" data-setting="emoji" ${useEmoji() ? 'checked' : ''} aria-label="Emoji in plaats van icoontjes" />
+      </label>
     </div>
     <h3 class="pref-head">Trainen</h3>
     <div class="pref-list card">
@@ -4478,6 +4496,11 @@ view.addEventListener('change', (e) => {
   state.settings ||= {}
   state.settings[key] = e.target.checked
   save()
+  if (key === 'emoji') {
+    renderTabIcons()
+    render()
+    showToast(e.target.checked ? 'Emoji staan aan 😊' : 'Eigen icoontjes staan aan 🎨')
+  }
 })
 
 view.addEventListener('change', async (e) => {
@@ -4550,7 +4573,7 @@ const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt &
 if (unfinishedRun) ui.run = unfinishedRun.id
 
 // Icoontjes in de vaste HTML (tabbalk).
-document.querySelectorAll('[data-icon]').forEach((el) => (el.innerHTML = svgIcon(el.dataset.icon)))
+renderTabIcons()
 applyTheme()
 
 render()

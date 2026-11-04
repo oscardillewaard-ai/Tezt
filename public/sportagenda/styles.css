@@ -2971,3 +2971,27 @@ h2.with-ico .tico {
     transition: none;
   }
 }
+
+/* Emoji-stand: emoji op de plek van de eigen icoontjes */
+.emo-ico {
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.tabbar .emo-ico {
+  font-size: 1.15rem;
+}
+
+.tot-ico .emo-ico {
+  font-size: 1.2rem;
+}
+
+.welcome-list li > span .emo-ico {
+  font-size: 1.4rem;
+}
+
+.emo-ico.mini {
+  margin-right: 0.25em;
+  font-size: 0.9em;
+}
