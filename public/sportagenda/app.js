@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '32' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '33' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -441,6 +441,13 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 33,
+    items: [
+      '⌚ Je horloge krijgt nu door welke stap opwarmen, wandelen en afkoelen is, in plaats van overal "Training" 💛',
+      'Trainingen die al op je horloge stonden, worden vanzelf bijgewerkt zodra je Tarapp opent',
+    ],
+  },
   {
     v: 32,
     items: [
@@ -3213,25 +3220,31 @@ function icuDuration(min) {
   return s ? (m ? `${m}m${s}s` : `${s}s`) : `${m}m`
 }
 
-// Training in het tekstformaat van de Intervals.icu workout builder; de tekst
-// vóór de duur is de aanwijzing die het horloge laat zien.
+// Training in het tekstformaat van de Intervals.icu workout builder. De tekst
+// vóór de duur is de aanwijzing; intensity= zegt welk soort stap het is. Zonder
+// die toevoeging toont Zepp elke stap als "Training": opwarmen, wandelen tussen
+// het lopen (herstel) en afkoelen krijgen daarom hun eigen soort.
 function icuWorkoutText(run) {
-  const step = (t, min) => `- ${t === 'run' ? 'Lopen' : 'Wandelen'} ${icuDuration(min)}`
+  const step = (t, min, kind = '') => `- ${t === 'run' ? 'Lopen' : 'Wandelen'} ${icuDuration(min)}${kind ? ` intensity=${kind}` : ''}`
+  const between = (t) => (t === 'walk' ? 'recovery' : '')
   const lines = []
-  if (run.warmup) lines.push('Warmup', step('walk', run.warmup), '')
+  if (run.warmup) lines.push('Warmup', step('walk', run.warmup, 'warmup'), '')
   const sr = simpleRun(run)
   if (sr && sr.reps > 1) {
     lines.push(`${sr.reps}x`, step('run', sr.run))
-    if (sr.walk) lines.push(step('walk', sr.walk))
+    if (sr.walk) lines.push(step('walk', sr.walk, 'recovery'))
   } else {
-    for (const x of run.steps) lines.push(step(x.t, x.min))
+    for (const x of run.steps) lines.push(step(x.t, x.min, between(x.t)))
   }
   lines.push('')
-  if (run.cooldown) lines.push('Cooldown', step('walk', run.cooldown))
+  if (run.cooldown) lines.push('Cooldown', step('walk', run.cooldown, 'cooldown'))
   return lines.join('\n').trim()
 }
 
-const icuHash = (s) => JSON.stringify([s.date, s.run.label, s.run.steps, s.run.warmup, s.run.cooldown])
+// Verandert de tekst die we sturen, verhoog dan ICU_FORMAT: dan gaan alle al
+// verstuurde trainingen bij de volgende synchronisatie één keer opnieuw.
+const ICU_FORMAT = 2
+const icuHash = (s) => JSON.stringify([ICU_FORMAT, s.date, s.run.label, s.run.steps, s.run.warmup, s.run.cooldown])
 
 function icuEvent(s) {
   const label = s.run.label.replaceAll('×', 'x')
