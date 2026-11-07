@@ -153,7 +153,7 @@ THEMES["bos"] = f"""
   --bg: #13241a; --card: #1a3023; --text: #f1ead7; --muted: #a7b6a0; --line: #2a4434;
   --accent: #f2c14e; --accent-ink: #13241a; --accent-text: #f2c14e; --accent-soft: rgb(242 193 78 / 0.13);
   --done: #93d36f; --done-soft: rgb(147 211 111 / 0.13); --danger: #ff7b6b; --plan: #b3a7ff; --block: #74d4c4;
-  --bar: #0f1d15; --bar-text: #f1ead7; --day-line: #263f30; --day-alt: #172b1f;
+  --bar: #0f1d15; --bar-text: #f1ead7; --day-line: #263f30; --day-alt: #172b1f; --period: #ff8296;
 {DARK_TYPES}
   --head: 'Fraunces', Georgia, 'Times New Roman', serif;
   color-scheme: dark;

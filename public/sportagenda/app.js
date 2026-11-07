@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '31' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '32' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -60,6 +60,7 @@ function defaultState() {
     series: [],
     plans: [],
     blocks: [],
+    body: { weights: {}, period: [] },
   }
 }
 
@@ -78,6 +79,9 @@ function normalize(s) {
   s.series ||= []
   s.plans ||= []
   s.blocks ||= []
+  s.body ||= {}
+  s.body.weights ||= {}
+  s.body.period ||= []
   const secMatch = (v) => /^\s*(\d+)\s*s(ec)?\s*$/i.exec(v ?? '')
   for (const t of s.templates) {
     for (const e of t.exercises) {
@@ -174,6 +178,7 @@ const typeIcon = (t, cls = '') =>
 const ICON_EMOJI = {
   agenda: '📅', overzicht: '📊', schemas: '🏋️', meer: '⚙️', gym: '🏋️', slot: '🔒',
   hardlopen: '🏃', klimmen: '⛰️', vink: '✅', herhaal: '🔁', horloge: '⌚',
+  druppel: '🩸', weegschaal: '⚖️',
 }
 const iconOrEmoji = (name, cls = '') =>
   useEmoji() && ICON_EMOJI[name] ? `<span class="emo-ico ${cls}">${ICON_EMOJI[name]}</span>` : svgIcon(name, cls)
@@ -310,6 +315,7 @@ function render() {
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
   fitAgenda()
+  wireWeightChart()
 }
 
 // ---------- Complimentjes voor Tara ----------
@@ -435,6 +441,13 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 32,
+    items: [
+      '⚖️ Houd je gewicht bij: tik in de agenda op een datum en vul het in. In Overzicht zie je het verloop 💛',
+      '🩸 Ongesteld? Tik op de datum en zet het aan. In de agenda staat dan een druppeltje, en in Overzicht zie je op welke dag van je cyclus je bent',
+    ],
+  },
   { v: 31, items: ['Liever emoji? Onder Meer → Uiterlijk zet je "Emoji in plaats van icoontjes" aan 😊🏃🧗'] },
   { v: 30, items: ['Schermvullend past nu altijd precies op je scherm: niets meer om te scrollen 💛'] },
   {
@@ -654,7 +667,7 @@ function weekDaysHtml(ws, list) {
     const daySessions = sortSessions(list.filter((s) => s.date === k))
     days += `
       <div class="wday ${k === tKey ? 'today' : ''}" data-drop-date="${k}">
-        <div class="wday-label"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}</strong></div>
+        <button type="button" class="wday-label" data-action="day-sheet" data-date="${k}" aria-label="${DAYS[i]} ${d.getDate()} ${MONTHS[d.getMonth()]}: gewicht of ongesteld invullen${isPeriod(k) ? ' (ongesteld)' : ''}"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}${isPeriod(k) ? `<i class="period-dot" aria-hidden="true">${iconOrEmoji('druppel')}</i>` : ''}</strong></button>
         <div class="wday-items">
           ${daySessions.length ? daySessions.map(sessionRow).join('') : '<span class="rest">rust</span>'}
         </div>
@@ -941,7 +954,7 @@ function renderMonth() {
       .join('')
     cells += `
       <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
-        <span class="cal-num">${d.getDate()}</span>
+        <span class="cal-num">${d.getDate()}${isPeriod(k) ? '<i class="cal-period" aria-label="ongesteld"></i>' : ''}</span>
         <span class="cal-marks">${marks}</span>
       </button>`
   }
@@ -994,6 +1007,263 @@ function sessionRow(s) {
         ${meta || flags ? `<span class="s-meta">${flags}${meta}</span>` : ''}
       </button>
     </div>`
+}
+
+// ---------- Lichaam: gewicht en cyclus ----------
+// Tik in de agenda op een datum: dan vul je je gewicht in of zet je "ongesteld" aan.
+// Staat in state.body (alleen op deze telefoon, gaat mee in de back-up).
+
+const bodyData = () => (state.body ||= { weights: {}, period: [] })
+const weightEntries = () =>
+  Object.entries(bodyData().weights)
+    .filter(([, v]) => Number.isFinite(v))
+    .sort((a, b) => a[0].localeCompare(b[0]))
+const isPeriod = (k) => bodyData().period.includes(k)
+const fmtKg = (v) => v.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+function setPeriod(k, on) {
+  const days = new Set(bodyData().period)
+  if (on) days.add(k)
+  else days.delete(k)
+  bodyData().period = [...days].sort()
+}
+
+function setWeight(k, kg) {
+  if (kg == null) delete bodyData().weights[k]
+  else bodyData().weights[k] = Math.round(kg * 10) / 10
+}
+
+// Een cyclus begint op een ongesteld-dag waarvan de dag ervoor dat niet was.
+function cycleInfo(today = todayKey()) {
+  const days = bodyData().period.filter((k) => k <= today)
+  if (!days.length) return null
+  const set = new Set(days)
+  const starts = days.filter((k) => !set.has(toKey(addDays(fromKey(k), -1))))
+  const last = starts[starts.length - 1]
+  const gaps = starts.slice(1).map((k, i) => daysBetween(starts[i], k)).slice(-6)
+  return {
+    last,
+    day: daysBetween(last, today) + 1,
+    avg: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+  }
+}
+
+function openDaySheet(k) {
+  const d = fromKey(k)
+  const prev = weightEntries().filter(([x]) => x < k).pop()
+  const w = bodyData().weights[k]
+  openSheet(
+    `
+    <form method="dialog" class="day-sheet">
+      <h2>${DAYS[(d.getDay() + 6) % 7]} ${shortDate(d)}</h2>
+      <button type="button" class="period-toggle" id="period"></button>
+      <div class="field">Gewicht
+        <div class="weight-row">
+          <button type="button" class="iconbtn" data-step="-0.1" aria-label="0,1 kg minder">−</button>
+          <input id="weight" inputmode="decimal" enterkeyhint="done" autocomplete="off" value="${w != null ? fmtKg(w) : ''}" placeholder="${prev ? fmtKg(prev[1]) : 'bijv. 62,5'}" aria-label="Gewicht in kg" />
+          <span class="muted">kg</span>
+          <button type="button" class="iconbtn" data-step="0.1" aria-label="0,1 kg meer">+</button>
+        </div>
+      </div>
+      <p class="muted" id="weight-hint">${prev ? `Vorige meting: ${fmtKg(prev[1])} kg op ${shortDate(fromKey(prev[0]))}` : 'Je eerste meting 💛'}</p>
+      <div class="actions">
+        <button type="button" class="btn" id="day-add">+ Training</button>
+        <button type="submit" class="btn primary">Klaar</button>
+      </div>
+    </form>`,
+    () => {
+      if (saveWeight() === false) return false
+    },
+  )
+  const toggle = sheet.querySelector('#period')
+  const input = sheet.querySelector('#weight')
+  const hint = sheet.querySelector('#weight-hint')
+  const paint = () => {
+    const on = isPeriod(k)
+    toggle.classList.toggle('on', on)
+    toggle.setAttribute('aria-pressed', String(on))
+    toggle.innerHTML = `<span class="pt-ico">${iconOrEmoji('druppel')}</span><span class="pt-text"><strong>Ongesteld</strong><small>${on ? 'Staat aan voor deze dag' : 'Tik om aan te zetten'}</small></span><span class="theme-check" aria-hidden="true">${CHECK_ICON}</span>`
+  }
+  paint()
+  toggle.onclick = () => {
+    setPeriod(k, !isPeriod(k))
+    save()
+    render()
+    paint()
+  }
+  const saved = w
+  const prevText = hint.textContent
+  // Leeg = geen meting voor deze dag. Ongeldig: melden en niet bewaren.
+  function saveWeight() {
+    const raw = input.value.trim()
+    const v = raw ? parseNum(raw) : null
+    if (raw && !(v >= 20 && v <= 300)) {
+      hint.textContent = 'Vul je gewicht in kilo in, bijvoorbeeld 62,5.'
+      return false
+    }
+    setWeight(k, v)
+    hint.textContent = prevText
+    save()
+    render()
+    return true
+  }
+  input.addEventListener('change', saveWeight)
+  input.addEventListener('input', () => {
+    const v = parseNum(input.value)
+    if (!input.value.trim() || (v >= 20 && v <= 300)) hint.textContent = prevText
+  })
+  sheet.querySelectorAll('[data-step]').forEach((b) => {
+    b.onclick = () => {
+      const base = parseNum(input.value || input.placeholder)
+      const v = Math.round(((Number.isFinite(base) ? base : 60) + Number(b.dataset.step)) * 10) / 10
+      input.value = fmtKg(v)
+      saveWeight()
+    }
+  })
+  sheet.querySelector('form').addEventListener('submit', () => {
+    const now = bodyData().weights[k]
+    if (now != null && now !== saved) setTimeout(() => showToast(`${fmtKg(now)} kg bewaard 💛`), 0)
+  })
+  sheet.querySelector('#day-add').onclick = () => {
+    if (saveWeight() === false) return
+    closeSheet()
+    openSessionSheet(null, k)
+  }
+}
+
+// Gewicht van de laatste 90 dagen: één lijn, het laatste punt met waarde, tik voor een dag.
+function weightChart(entries) {
+  const lastKey = entries[entries.length - 1][0]
+  const from = toKey(addDays(fromKey(lastKey), -89))
+  const pts = entries.filter(([k]) => k >= from)
+  if (pts.length < 2) return ''
+  const W = 320
+  const H = 128
+  const L = 34
+  const R = 50
+  const T = 10
+  const B = 22
+  const vals = pts.map(([, v]) => v)
+  let lo = Math.floor(Math.min(...vals))
+  let hi = Math.ceil(Math.max(...vals))
+  if (hi - lo < 2) {
+    lo = Math.floor((lo + hi) / 2 - 1)
+    hi = lo + 2
+  }
+  const t0 = fromKey(pts[0][0]).getTime()
+  const span = Math.max(1, fromKey(lastKey).getTime() - t0)
+  const x = (k) => L + ((fromKey(k).getTime() - t0) / span) * (W - L - R)
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B)
+  const f1 = (n) => n.toFixed(1)
+  const line = pts.map(([k, v], i) => `${i ? 'L' : 'M'}${f1(x(k))},${f1(y(v))}`).join(' ')
+  const area = `${line} L${f1(x(lastKey))},${H - B} L${f1(x(pts[0][0]))},${H - B} Z`
+  const mid = (lo + hi) / 2
+  const ticks = Number.isInteger(mid) || hi - lo > 4 ? [lo, Math.round(mid), hi] : [lo, hi]
+  const end = pts[pts.length - 1]
+  const data = pts.map(([k, v]) => [k, v, f1(x(k)), f1(y(v))])
+  return `
+    <div class="wt-chart" data-pts='${JSON.stringify(data)}'>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gewicht van ${shortDate(fromKey(pts[0][0]))} tot ${shortDate(fromKey(lastKey))}: van ${fmtKg(vals[0])} naar ${fmtKg(end[1])} kilo">
+        ${ticks.map((v) => `<line class="wt-grid" x1="${L}" x2="${W - R + 8}" y1="${f1(y(v))}" y2="${f1(y(v))}"/><text class="wt-tick" x="${L - 6}" y="${f1(y(v) + 3.5)}" text-anchor="end">${v}</text>`).join('')}
+        <path class="wt-area" d="${area}"/>
+        <path class="wt-line" d="${line}"/>
+        <circle class="wt-end" cx="${f1(x(lastKey))}" cy="${f1(y(end[1]))}" r="4.5"/>
+        <text class="wt-label" x="${f1(x(lastKey) + 9)}" y="${f1(y(end[1]) + 4)}">${fmtKg(end[1])}</text>
+        <text class="wt-tick" x="${L}" y="${H - 5}">${shortDate(fromKey(pts[0][0]))}</text>
+        <text class="wt-tick" x="${W - R}" y="${H - 5}" text-anchor="end">${shortDate(fromKey(lastKey))}</text>
+        <line class="wt-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/>
+        <circle class="wt-hover" r="4.5" cx="0" cy="0" visibility="hidden"/>
+      </svg>
+      <div class="wt-tip" hidden><strong></strong><span></span></div>
+    </div>`
+}
+
+// Tik of veeg over de grafiek: de lijn springt naar de dichtstbijzijnde meting.
+function wireWeightChart() {
+  const box = view.querySelector('.wt-chart')
+  if (!box) return
+  const svg = box.querySelector('svg')
+  const pts = JSON.parse(box.dataset.pts)
+  const cross = svg.querySelector('.wt-cross')
+  const dot = svg.querySelector('.wt-hover')
+  const tip = box.querySelector('.wt-tip')
+  const show = (e) => {
+    const r = svg.getBoundingClientRect()
+    const vx = ((e.clientX - r.left) / r.width) * 320
+    let best = pts[0]
+    for (const p of pts) if (Math.abs(p[2] - vx) < Math.abs(best[2] - vx)) best = p
+    cross.setAttribute('x1', best[2])
+    cross.setAttribute('x2', best[2])
+    dot.setAttribute('cx', best[2])
+    dot.setAttribute('cy', best[3])
+    cross.setAttribute('visibility', 'visible')
+    dot.setAttribute('visibility', 'visible')
+    tip.querySelector('strong').textContent = `${fmtKg(best[1])} kg`
+    tip.querySelector('span').textContent = shortDate(fromKey(best[0]))
+    tip.hidden = false
+    const left = (best[2] / 320) * r.width
+    tip.style.left = `${Math.min(Math.max(left, 40), r.width - 40)}px`
+  }
+  const hide = () => {
+    cross.setAttribute('visibility', 'hidden')
+    dot.setAttribute('visibility', 'hidden')
+    tip.hidden = true
+  }
+  svg.addEventListener('pointerdown', show)
+  svg.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse' || e.buttons) show(e)
+  })
+  svg.addEventListener('pointerleave', hide)
+  svg.addEventListener('pointercancel', hide)
+}
+
+function renderBodyCard() {
+  const today = todayKey()
+  const ws = weightEntries()
+  const last = ws[ws.length - 1]
+  let delta = ''
+  if (last) {
+    // Verschil met de meting van ongeveer een maand eerder (minstens 25 dagen).
+    const ref = ws.filter(([k]) => daysBetween(k, last[0]) >= 25).pop()
+    if (ref) {
+      const dv = Math.round((last[1] - ref[1]) * 10) / 10
+      delta = `${dv > 0 ? '+' : dv < 0 ? '−' : '±'}${fmtKg(Math.abs(dv))} kg sinds ${shortDate(fromKey(ref[0]))}`
+    }
+  }
+  const cyc = cycleInfo(today)
+  const onToday = isPeriod(today)
+  const list = ws
+    .slice()
+    .reverse()
+    .map(([k, v], i, arr) => {
+      const before = arr[i + 1]
+      const dv = before ? Math.round((v - before[1]) * 10) / 10 : null
+      return `<button type="button" class="wt-row" data-action="day-sheet" data-date="${k}"><span>${shortDate(fromKey(k))}</span><strong>${fmtKg(v)} kg</strong><span class="muted">${dv == null ? '' : `${dv > 0 ? '+' : dv < 0 ? '−' : '±'}${fmtKg(Math.abs(dv))}`}</span></button>`
+    })
+    .join('')
+  return `
+    <section class="card body-card">
+      <h2>Lichaam</h2>
+      <div class="body-grid">
+        <button type="button" class="body-tile" data-action="day-sheet" data-date="${today}">
+          <span class="body-label">${iconOrEmoji('weegschaal')} Gewicht</span>
+          <strong>${last ? `${fmtKg(last[1])} kg` : '–'}</strong>
+          <span class="muted">${last ? delta || `gemeten op ${shortDate(fromKey(last[0]))}` : 'Tik om in te vullen'}</span>
+        </button>
+        <div class="body-tile cycle">
+          <span class="body-label">${iconOrEmoji('druppel')} Cyclus</span>
+          <strong>${cyc && cyc.day <= 60 ? `Dag ${cyc.day}` : '–'}</strong>
+          <span class="muted">${cyc ? `begonnen op ${shortDate(fromKey(cyc.last))}${cyc.avg ? ` · meestal ${cyc.avg} dagen` : ''}` : 'Nog niets ingevuld'}</span>
+        </div>
+      </div>
+      <label class="body-row">
+        <span class="body-label">${iconOrEmoji('druppel')} Vandaag ongesteld</span>
+        <input type="checkbox" class="switch period-switch" data-action="period-today" ${onToday ? 'checked' : ''} aria-label="Vandaag ongesteld" />
+      </label>
+      ${ws.length >= 2 ? weightChart(ws) : ''}
+      ${ws.length ? `<details class="wt-list"><summary>Alle metingen (${ws.length})</summary>${list}</details>` : ''}
+      <p class="muted body-note">Tik in de agenda op een datum om je gewicht in te vullen of aan te geven dat je ongesteld bent. Dit staat alleen op je telefoon.</p>
+    </section>`
 }
 
 // ---------- Totalen ----------
@@ -1186,6 +1456,7 @@ function renderOverview() {
 
   return `
     ${renderTotals()}
+    ${renderBodyCard()}
     <section class="card">
       <div class="stat-grid">
         <div><strong>${streak}</strong><span class="muted">weken op rij</span></div>
@@ -4388,6 +4659,14 @@ const actions = {
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'view-menu': () => openViewSheet(),
+  'day-sheet': (el) => openDaySheet(el.dataset.date),
+  'period-today': () => {
+    const k = todayKey()
+    setPeriod(k, !isPeriod(k))
+    save()
+    render()
+    showToast(isPeriod(k) ? 'Vandaag staat op ongesteld 🩸' : 'Ongesteld voor vandaag weggehaald')
+  },
   'more-page': (el) => {
     ui.morePage = el.dataset.page
     render()

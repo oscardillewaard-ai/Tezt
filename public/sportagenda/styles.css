@@ -29,6 +29,7 @@
   --c-warming: #dc2626;
   --c-fietsen: #2563eb;
   --c-zwemmen: #0891b2;
+  --period: #be123c; /* ongesteld: druppel en knoppen */
   --day-line: #d6d3d1; /* scheiding tussen de dagen in de week */
   --day-alt: #f7f5f2; /* elke tweede dag iets getint */
   color-scheme: light dark;
@@ -62,6 +63,7 @@
     --c-zwemmen: #22d3ee;
     --day-line: #3a3431;
     --day-alt: #231f1d;
+    --period: #fb7185;
   }
 }
 
@@ -2994,4 +2996,339 @@ h2.with-ico .tico {
 .emo-ico.mini {
   margin-right: 0.25em;
   font-size: 0.9em;
+}
+
+/* ---------- Lichaam: gewicht en ongesteld ---------- */
+/* De datum in de week is een knop naar het dagvenster. */
+button.wday-label {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  line-height: 1.1; /* zoals .wday-label: de knop mag de dag niet hoger maken */
+  cursor: pointer;
+}
+
+.wday-label strong {
+  position: relative;
+}
+
+.period-dot {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  color: var(--period);
+  filter: drop-shadow(0 0 1.5px var(--card));
+}
+
+.period-dot .ico {
+  width: 13px;
+  height: 13px;
+}
+
+.period-dot .emo-ico {
+  font-size: 10px;
+}
+
+.cal-period {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--period);
+  vertical-align: 2px;
+}
+
+/* Dagvenster */
+.period-toggle {
+  display: grid;
+  grid-template-columns: 40px 1fr 24px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.period-toggle .pt-ico {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--period);
+  background: color-mix(in srgb, var(--period) 12%, transparent);
+}
+
+.period-toggle .pt-ico .ico {
+  width: 22px;
+  height: 22px;
+}
+
+.period-toggle .pt-ico .emo-ico {
+  font-size: 1.3rem;
+}
+
+.pt-text {
+  display: grid;
+  gap: 1px;
+}
+
+.pt-text small {
+  color: var(--muted);
+}
+
+.period-toggle .theme-check {
+  background: var(--period);
+  color: #fff;
+}
+
+.period-toggle.on {
+  border-color: var(--period);
+  background: color-mix(in srgb, var(--period) 8%, var(--card));
+}
+
+.period-toggle.on .theme-check {
+  visibility: visible;
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.weight-row input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.weight-row .iconbtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 1.3rem;
+}
+
+/* Kaart Lichaam in Overzicht */
+.body-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.body-tile {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.body-tile {
+  cursor: pointer;
+}
+
+.body-tile strong {
+  font-size: 1.35rem;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.body-tile .muted {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.body-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.body-label .ico {
+  width: 15px;
+  height: 15px;
+  color: var(--accent-text);
+}
+
+.body-tile.cycle .body-label .ico {
+  color: var(--period);
+}
+
+.body-label .emo-ico {
+  font-size: 0.9rem;
+}
+
+.body-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.body-row .body-label {
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.body-row .body-label .ico {
+  width: 17px;
+  height: 17px;
+  color: var(--period);
+}
+
+.period-switch:checked {
+  background: var(--period);
+}
+
+/* Gewichtsgrafiek: één lijn van 2px, het laatste punt met waarde, rustige hulplijnen. */
+.wt-chart {
+  position: relative;
+  margin-top: 10px;
+}
+
+.wt-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+.wt-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.wt-tick {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-area {
+  fill: var(--accent-text);
+  fill-opacity: 0.1;
+}
+
+.wt-line {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wt-end,
+.wt-hover {
+  fill: var(--accent-text);
+  stroke: var(--card);
+  stroke-width: 2;
+}
+
+.wt-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.wt-tip[hidden] {
+  display: none;
+}
+
+.wt-tip {
+  position: absolute;
+  top: -4px;
+  transform: translate(-50%, -100%);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--card);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.wt-list {
+  margin-top: 8px;
+}
+
+.wt-list summary {
+  padding: 4px 0;
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wt-row {
+  display: grid;
+  grid-template-columns: 1fr auto 56px;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.wt-row .muted {
+  text-align: right;
+}
+
+.body-note {
+  margin: 8px 0 0;
+  font-size: 0.74rem;
 }
