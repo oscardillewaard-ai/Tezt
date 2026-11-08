@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '33' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '34' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -441,6 +441,10 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 34,
+    items: ['🧹 Klein onderhoud: Tarapp ruimt bij een update alleen nog zijn eigen offline-kopie op en laat je andere apps met rust 💛'],
+  },
   {
     v: 33,
     items: [
@@ -4731,7 +4735,8 @@ const actions = {
     try {
       const reg = await navigator.serviceWorker?.getRegistration()
       await reg?.update()
-      for (const k of await caches.keys()) await caches.delete(k)
+      // Alleen de caches van Tarapp: de andere apps op dit domein delen dezelfde opslag.
+      for (const k of await caches.keys()) if (k.startsWith('sportagenda-')) await caches.delete(k)
     } catch {
       // Geen cache-API: gewoon herladen.
     }

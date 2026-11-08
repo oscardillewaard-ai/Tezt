@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v33'
+const CACHE = 'sportagenda-v34'
 const SHELL = [
   './',
   'index.html',
@@ -26,7 +26,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // Alleen onze eigen oude versies weg: alle apps op dit domein delen één
+      // cache-opslag, dus zonder dit filter wis je ook de offline-kopie van de andere apps.
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('sportagenda-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   )
 })

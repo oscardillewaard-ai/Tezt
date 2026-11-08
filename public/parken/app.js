@@ -1,7 +1,7 @@
 // Parkenjacht: vink de Nederlandse nationale parken af op een kaart.
 // Plain JS zonder build-stap, net als Tarapp. Gegevens in localStorage.
 
-const APP_VERSION = '3' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '4' // ophogen bij elke release, samen met CACHE in sw.js
 const KEY = 'parken.v1'
 // Adres van de sync-worker (proxy/parken-sync-worker.js). Leeg = de gebruiker
 // vult het zelf in onder ⚙️. Ingevuld = alleen nog "Nieuwe groep starten".
@@ -9,6 +9,10 @@ const DEFAULT_SYNC_URL = 'https://parkenjacht.oscar-dillewaard.workers.dev'
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 4,
+    items: ['🧹 Klein onderhoud: Parkenjacht ruimt bij een update alleen nog zijn eigen offline-kopie op en laat je andere apps met rust 🌳'],
+  },
   {
     v: 3,
     items: [
@@ -699,7 +703,8 @@ sheet.addEventListener('click', async (e) => {
     try {
       const reg = await navigator.serviceWorker?.getRegistration()
       await reg?.update()
-      for (const k of await caches.keys()) await caches.delete(k)
+      // Alleen de caches van Parkenjacht: de andere apps op dit domein delen dezelfde opslag.
+      for (const k of await caches.keys()) if (k.startsWith('parken-')) await caches.delete(k)
     } catch {
       // Geen cache-API: gewoon herladen.
     }
