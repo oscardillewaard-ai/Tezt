@@ -22,7 +22,7 @@ worden hier niet herhaald.
   Parkenjacht en de precache van Bergtrainer, en andersom. Prikbord filtert
   daarom op het eigen voorvoegsel. Het doel van regels 4 en 9 (oude versies
   weg, alleen de app-cache wissen) blijft hetzelfde.
-- **Status:** voorgesteld.
+- **Status:** akkoord (Oscar, 8 nov 2026).
 
 ## A2. De statuspagina van de worker schrijft niet bij elk bezoek naar KV
 
@@ -32,4 +32,4 @@ worden hier niet herhaald.
 - **Waarom anders:** het gratis plan heeft 1.000 KV-writes per dag, gedeeld
   met Parkenjacht (§6.3). De statuspagina controleert de koppeling daarom met
   een leesactie. Een echte schrijftest gebeurt alleen op `/?schrijftest=1`.
-- **Status:** voorgesteld.
+- **Status:** akkoord (Oscar, 8 nov 2026).

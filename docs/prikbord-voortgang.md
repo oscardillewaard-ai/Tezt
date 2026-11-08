@@ -13,7 +13,7 @@ tabel hieronder). Merge die eerst in je eigen werkbranch.
 
 | Mijlpaal | Status | Werkbranch |
 | --- | --- | --- |
-| M0 lezen en plan | klaar, wacht op akkoord van Oscar | `ccr-dd7e09d5-7p41e5` |
+| M0 lezen en plan | klaar, akkoord van Oscar (8 nov); keuze losse repo open (V4) | `ccr-dd7e09d5-7p41e5` |
 | M1 fundament en uiterlijk | nog niet begonnen | |
 | M2 het bord | nog niet begonnen | |
 | M3 samen | nog niet begonnen | |
@@ -31,10 +31,11 @@ tabel hieronder). Merge die eerst in je eigen werkbranch.
   `.oxlintrc.json` die `react/rules-of-hooks` uitzet voor `public/**` maakt
   lint groen (exit 0). Zie vraag V1.
 - Node 22 in de cloudsessie, Node 20 in de deploy-workflow.
-- Vanuit de cloudsessie niet bereikbaar: `developers.cloudflare.com` en
-  `operations.osmfoundation.org`. Voor M3 (KV-limieten) en M4 (regels van
-  Nominatim) moeten die hosts in de netwerkinstellingen worden toegestaan, of
-  Oscar plakt de tekst in de chat.
+- Netwerk: er is een persoonlijke cloudomgeving **"Tezt"** die
+  `developers.cloudflare.com` en `operations.osmfoundation.org` toestaat
+  (plus de package registries). Kies die omgeving bij het starten van een
+  nieuwe chat. Lees die sites met `curl` in Bash: WebFetch gaat niet via de
+  proxy van de sessie en blijft ze weigeren.
 
 ## Plan uit M0: wat ik overneem en waar ik afwijk
 
@@ -48,18 +49,41 @@ tabel hieronder). Merge die eerst in je eigen werkbranch.
 8. **Overdracht:** dit bestand per mijlpaal bijwerken (status, besluiten, open punten, startprompt).
 9. **Deploy:** alleen na akkoord van Oscar mergen naar `claude/gpx-ultrarace-trainingen-zf6zci`.
 
-## Open vragen aan Oscar (M0)
+## Open vragen aan Oscar
 
-- **V1, lint:** mag de `overrides`-regel in `.oxlintrc.json` (rules-of-hooks uit voor `public/**`)? Getest: lint wordt groen. Alternatieven: `useEmoji` hernoemen in Tarapp (dan raak ik Tarapp aan), of alleen de Prikbord-bestanden linten.
-- **V2, cache-bug:** de cache-opruiming in Tarapp en Parkenjacht los repareren (aparte commit, met `CACHE` en `APP_VERSION` opgehoogd), of laten liggen? Valt buiten "raak ze niet aan".
-- **V3, volgorde in M1:** eerst het skelet plus 3 stijlvoorstellen (statisch bord met voorbeeldbriefjes, screenshots op 390 px), dan kiest Oscar, en pas daarna het scheur-en-prik-moment bouwen in de gekozen stijl, allemaal in de M1-chat?
+- **V2, cache-bug:** de cache-opruiming in Tarapp en Parkenjacht los repareren (aparte commit in Tezt, met `CACHE` en `APP_VERSION` opgehoogd)? Oscars "klinkt allemaal goed" lees ik als ja, maar dat moet hij nog bevestigen, want het raakt Tarapp.
+- **V4, losse repo:** Prikbord in een eigen repo (bijv. `oscardillewaard-ai/prikbord`) in plaats van in Tezt? Advies: ja (zie hieronder). Dat besluit valt vóór M1.
+
+### V4: losse repo, de afweging
+
+Wat een eigen repo oplost:
+
+- **Een eigen deploy.** Een kapotte build of falende test van Prikbord houdt Tarapp niet meer tegen (het risico uit §4.3). De tests mogen de deploy dan wél tegenhouden.
+- **Geen service worker van Bergtrainer erboven.** Die heeft scope `/Tezt/`. Een site op `/prikbord/` valt daarbuiten, dus de aanpassingen in `vite.config.ts` zijn niet nodig.
+- **Geen build en geen Vite.** Pages kan de map gewoon serveren.
+- **Geen rode lint door Tarapp** (V1 vervalt), en geen botsingen met andere chats die naar de deploybranch van Tezt pushen.
+- **Een gewone `main`-branch.**
+
+Wat hetzelfde blijft: het domein `oscardillewaard-ai.github.io` en dus de gedeelde `localStorage` en caches (A1 blijft nodig), de CORS-oorsprong van de worker, en het gedeelde KV-quotum van het Cloudflare-account (A2 blijft nodig).
+
+Wat het kost:
+
+- Oscar maakt de repo zelf aan (deze chat mag geen repo's aanmaken) en geeft de GitHub-app van Claude er toegang toe.
+- Pages aanzetten. Uit mijn kennis, niet nagelezen: op het gratis GitHub-plan werkt Pages alleen voor publieke repo's.
+- §1, §4.3 en de paden in §6.1 van de spec worden aangepast. Dat komt in de afwijkingen.
+- De M1-chat moet Tezt erbij halen (alleen lezen) om de code van Tarapp en Parkenjacht te bekijken.
+
+## Nagelezen in de documentatie (8 nov 2026, via curl)
+
+- **Cloudflare KV-limieten** (developers.cloudflare.com/kv/platform/limits): gratis plan 100.000 reads per dag, 1.000 writes per dag, 1 write per seconde op dezelfde sleutel, 1 GB opslag per account, max. 25 MiB per waarde, sleutel max. 512 bytes. Komt overeen met §6.3.
+- **KV is "uiteindelijk consistent"** (developers.cloudflare.com/kv/concepts/how-kv-works): "Changes are usually immediately visible in the Cloudflare global network location at which they are made. Changes may take up to 60 seconds or more to be visible in other global network locations". Ook op dezelfde locatie is dat "not guaranteed". Gevolg: meestal zie je een wijziging binnen een paar tellen, soms pas na een minuut. Het opnieuw sturen uit §6.3 vangt verloren schrijfacties op, en de convergentietest moet ook verouderde reads nabootsen.
+- **Nominatim-beleid** (operations.osmfoundation.org/policies/nominatim): absoluut max. 1 verzoek per seconde voor alle gebruikers samen. De app identificeren met een Referer of User-Agent (een e-mailadres is niet verplicht). Duidelijke bronvermelding. Uit te zetten zonder app-update. Bij voorkeur via een proxy met cache. Autocomplete is verboden, net als systematische zoekopdrachten. Nieuw sinds de spec: een sectie "Usage in LLMs". Daarin staat dat het publieke API alleen gebruikt mag worden als "the application developer has made a deliberate, informed decision to use it and is directly responsible for complying with this policy". Dat is hier Oscar: hij koos Nominatim zelf in de spec.
 
 ## Aannames die ik aanhoud (tenzij Oscar anders zegt)
 
 - **Dubbeltik = hartje** (§5.5) betekent dat een enkele tik ongeveer 250 ms wacht voordat het briefje opent. Instagram doet dat ook. Uitproberen in M2.
 - **Trillen:** voor zover ik weet heeft Safari op de iPhone geen Vibration API (niet getest). Optillen trilt dan alleen op Android.
-- **KV is "uiteindelijk consistent":** uit mijn kennis van de Cloudflare-docs (niet nagelezen, de site is hier niet bereikbaar) kan een andere Cloudflare-locatie tot ongeveer een minuut achterlopen. Meestal zie je een wijziging binnen een paar tellen, soms pas na een minuut. Het opnieuw sturen uit §6.3 vangt verloren schrijfacties op. Een atomair alternatief is Durable Objects, maar dat lijkt voor v1 niet nodig.
-- **Nominatim-User-Agent (M4):** `Prikbord/1.0 (+https://github.com/oscardillewaard-ai/Tezt)`, zonder e-mailadres.
+- **Nominatim-User-Agent (M4):** `Prikbord/1.0 (+<repo-URL>)`, zonder e-mailadres.
 - **Tests niet in de deploy-workflow:** een falende Prikbord-test zou dan ook de updates van Tarapp tegenhouden. Wel lokaal draaien vóór elke commit.
 - **Handschriftletter:** zowel Caveat als Patrick Hand in de stijlvoorstellen, zodat Oscar kiest.
 
@@ -71,7 +95,12 @@ tabel hieronder). Merge die eerst in je eigen werkbranch.
 
 ## Besluiten van Oscar
 
-_(nog leeg: hier komen de antwoorden op V1 t/m V3 en het akkoord op M0)_
+8 nov 2026, Oscar: "Klinkt allemaal goed."
+
+- **M0:** akkoord met het plan, de afwijkingen A1 en A2 en de aannames.
+- **V1, lint:** akkoord met de `overrides`-regel (rules-of-hooks uit voor `public/**`). Vervalt als Prikbord een eigen repo krijgt (V4).
+- **V3, volgorde in M1:** eerst het skelet plus 3 stijlvoorstellen (screenshots op 390 px), dan kiest Oscar, en pas daarna het scheur-en-prik-moment in de gekozen stijl, allemaal in de M1-chat.
+- **Netwerk:** de cloudomgeving "Tezt" is aangemaakt (zie de nulmeting).
 
 ## Logboek
 
@@ -81,4 +110,5 @@ _(nog leeg: hier komen de antwoorden op V1 t/m V3 en het akkoord op M0)_
 - `docs/prikbord-spec.md` opgeslagen (byte voor byte gelijk aan de opdracht).
 - `docs/prikbord-afwijkingen.md` gestart (A1, A2).
 - Getest: baseline lint en build, de lint-override, en of Cache Storage gedeeld wordt (Playwright, Chromium).
-- Niet kunnen nalezen: de KV-documentatie van Cloudflare en het gebruiksbeleid van Nominatim (hosts geblokkeerd in deze sessie).
+- Eerst niet kunnen nalezen: de KV-documentatie van Cloudflare en het gebruiksbeleid van Nominatim. Na het aanmaken van de omgeving "Tezt" wel (zie "Nagelezen in de documentatie").
+- Oscar gaf akkoord op M0 en vroeg of een losse repo beter is (V4).
