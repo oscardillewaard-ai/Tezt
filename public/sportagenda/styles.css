@@ -29,6 +29,7 @@
   --c-warming: #dc2626;
   --c-fietsen: #2563eb;
   --c-zwemmen: #0891b2;
+  --c-mediteren: #4f63b0;
   --period: #be123c; /* ongesteld: druppel en knoppen */
   --day-line: #d6d3d1; /* scheiding tussen de dagen in de week */
   --day-alt: #f7f5f2; /* elke tweede dag iets getint */
@@ -61,6 +62,7 @@
     --c-warming: #f87171;
     --c-fietsen: #60a5fa;
     --c-zwemmen: #22d3ee;
+    --c-mediteren: #a5b4fc;
     --day-line: #3a3431;
     --day-alt: #231f1d;
     --period: #fb7185;
@@ -2292,6 +2294,7 @@ body.in-run main {
 .t-warming { --tc: var(--c-warming); }
 .t-fietsen { --tc: var(--c-fietsen); }
 .t-zwemmen { --tc: var(--c-zwemmen); }
+.t-mediteren { --tc: var(--c-mediteren); }
 
 /* Gedaan: icoon iets rustiger, het groene vinkje voert het woord. */
 .session.done .tico {
@@ -3331,4 +3334,94 @@ button.body-tile {
 .body-note {
   margin: 8px 0 0;
   font-size: 0.74rem;
+}
+
+/* ---------- Mediteren ---------- */
+.med-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.med-chips[hidden] {
+  display: none;
+}
+
+.med-chips .chip {
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.med-chips .chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.med-ring {
+  position: relative;
+  width: min(240px, 70vw);
+  margin: 16px auto;
+}
+
+.med-ring svg {
+  display: block;
+  width: 100%;
+  transform: rotate(-90deg);
+}
+
+.med-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 8;
+}
+
+.med-fill {
+  fill: none;
+  stroke: var(--c-mediteren);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.med-time {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.med-time strong {
+  font-size: 2.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.med-time span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .med-fill {
+    transition: none;
+  }
+}
+
+/* Herinneringen */
+.view-pic.pic-ochtend,
+.view-pic.pic-avond,
+.view-pic.pic-uur {
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+}
+
+.segmented.rem-weeks {
+  grid-template-columns: repeat(3, 1fr);
+  margin: 12px 0;
 }

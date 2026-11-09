@@ -63,11 +63,11 @@ for slug, family, variants in FONTS:
 
 LIGHT_TYPES = """  --c-hardlopen: #ea580c; --c-wedstrijd: #1c2b39; --c-wandelen: #4d7c0f; --c-klimmen: #0284c7;
   --c-boulderen: #92400e; --c-gym: #7c3aed; --c-kracht: #c026d3; --c-thuis: #a16207;
-  --c-routine: #e11d48; --c-yoga: #db2777; --c-warming: #dc2626; --c-fietsen: #2563eb; --c-zwemmen: #0891b2;"""
+  --c-routine: #e11d48; --c-yoga: #db2777; --c-warming: #dc2626; --c-fietsen: #2563eb; --c-zwemmen: #0891b2; --c-mediteren: #4f63b0;"""
 
 DARK_TYPES = """  --c-hardlopen: #fb9a50; --c-wedstrijd: #f1ead7; --c-wandelen: #b5e06a; --c-klimmen: #5cc8f5;
   --c-boulderen: #dcae7c; --c-gym: #b6a1ff; --c-kracht: #f08ff0; --c-thuis: #f2c14e;
-  --c-routine: #ff8296; --c-yoga: #ff94c6; --c-warming: #ff7b6b; --c-fietsen: #79aaff; --c-zwemmen: #4fdbe6;"""
+  --c-routine: #ff8296; --c-yoga: #ff94c6; --c-warming: #ff7b6b; --c-fietsen: #79aaff; --c-zwemmen: #4fdbe6; --c-mediteren: #b4bdfc;"""
 
 # Een landschap in de bovenbalk maakt die hoger; dat winnen we terug in de week.
 COMPACT = """

@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '33' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '35' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -20,6 +20,7 @@ function defaultState() {
       { id: 'fietsen', name: 'Fietsen', emoji: '🚴' },
       { id: 'zwemmen', name: 'Zwemmen', emoji: '🏊' },
       { id: 'yoga', name: 'Yoga / mobiliteit', emoji: '🧘' },
+      { id: 'mediteren', name: 'Mediteren', emoji: '🪷' },
     ],
     templates: [
       {
@@ -79,6 +80,12 @@ function normalize(s) {
   s.series ||= []
   s.plans ||= []
   s.blocks ||= []
+  // Mediteren is later bijgekomen: één keer toevoegen, ook bij bestaande gegevens.
+  s.settings ||= {}
+  if (!s.settings.medAdded) {
+    if (!s.types.some((t) => t.id === 'mediteren')) s.types.push({ id: 'mediteren', name: 'Mediteren', emoji: '🪷' })
+    s.settings.medAdded = true
+  }
   s.body ||= {}
   s.body.weights ||= {}
   s.body.period ||= []
@@ -441,6 +448,14 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 35,
+    items: ['⏰ Herinneringen: zet je trainingen met één tik in de Agenda-app van je iPhone, met een melding op het moment dat jij kiest (Meer → Herinneringen) 💛'],
+  },
+  {
+    v: 34,
+    items: ['🪷 Mediteren is erbij: plan het in je agenda en start de meditatietimer, met een zachte gong aan het begin en het eind 💛'],
+  },
   {
     v: 33,
     items: [
@@ -1558,6 +1573,7 @@ const MORE_PAGES = {
   horloge: { title: 'Horloge', render: () => renderIcuCard() },
   gegevens: { title: 'Je gegevens', render: () => renderDataCard() },
   installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
+  herinneringen: { title: 'Herinneringen', render: () => renderRemindersCard() },
 }
 
 function renderMore() {
@@ -1593,6 +1609,7 @@ function renderMore() {
     <div class="pref-list card">
       ${row({ page: 'activiteiten', icon: 'hardlopen', color: '#ea580c', label: 'Activiteiten', value: String(nTypes) })}
       ${row({ page: 'horloge', icon: 'horloge', color: '#10b981', label: 'Horloge (Zepp)', value: icu ? 'Gekoppeld' : 'Niet gekoppeld' })}
+      ${row({ page: 'herinneringen', icon: 'bel', color: '#ef4444', label: 'Herinneringen', sub: 'Via de Agenda-app van je iPhone', value: state.settings?.reminderLast ? 'Aan' : '' })}
       <label class="pref-row">
         <span class="pref-ico" style="background:#8b5cf6">${svgIcon('stem')}</span>
         <span class="pref-label">Gesproken aanwijzingen<small>Bij intervaltraining</small></span>
@@ -2487,7 +2504,7 @@ function openSessionDetail(s) {
       ${
         s.done
           ? `<p class="detail-done">${esc(doneLine)}</p>${pain}<button type="button" class="linkbtn" id="untick">↩︎ Toch niet gedaan</button>`
-          : '<button type="button" class="btn primary block" id="tick">✓ Afvinken</button>'
+          : `${s.typeId === 'mediteren' ? '<button type="button" class="btn primary block" id="meditate">🪷 Meditatie starten</button><p></p>' : ''}<button type="button" class="btn ${s.typeId === 'mediteren' ? '' : 'primary'} block" id="tick">✓ Afvinken</button>`
       }
       ${planRemoveButton(s)}
       <div class="actions">
@@ -2497,6 +2514,7 @@ function openSessionDetail(s) {
     </form>`,
     () => {},
   )
+  sheet.querySelector('#meditate')?.addEventListener('click', () => openMeditation(s))
   sheet.querySelector('#tick')?.addEventListener('click', () => {
     s.done = true
     save()
@@ -2516,6 +2534,121 @@ function openSessionDetail(s) {
     openSessionSheet(s)
   }
   sheet.querySelector('#cancel').onclick = closeSheet
+}
+
+// ---------- Mediteren ----------
+// Rustige timer: kies de minuten, een zachte gong bij begin en eind, daarna afgevinkt.
+// Loopt op tijdstempels, dus klopt ook als de telefoon even op slot gaat.
+
+function gong(times = 1) {
+  navigator.vibrate?.(times > 1 ? [300, 200, 300] : 300)
+  if (!audio) return
+  for (let i = 0; i < times; i++) {
+    const t0 = audio.currentTime + i * 1.6
+    for (const [freq, vol] of [[396, 0.22], [792, 0.06], [1188, 0.03]]) {
+      const osc = audio.createOscillator()
+      const gain = audio.createGain()
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.0001, t0)
+      gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.5)
+      osc.connect(gain).connect(audio.destination)
+      osc.start(t0)
+      osc.stop(t0 + 3.6)
+    }
+  }
+}
+
+function openMeditation(s) {
+  let minutes = Number(s.duration) || 10
+  let endAt = null // tijdstip waarop de meditatie klaar is
+  let left = null // ms over tijdens een pauze
+  let timer = null
+  const R = 88
+  const C = 2 * Math.PI * R
+  openSheet(
+    `
+    <form method="dialog" class="med">
+      <h2>🪷 Mediteren</h2>
+      <div class="med-chips" id="med-chips">
+        ${[3, 5, 10, 15, 20, 30].map((m) => `<button type="button" class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${m} min</button>`).join('')}
+      </div>
+      <div class="med-ring">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle cx="100" cy="100" r="${R}" class="med-track"/>
+          <circle cx="100" cy="100" r="${R}" class="med-fill" id="med-fill" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="0"/>
+        </svg>
+        <div class="med-time"><strong id="med-time"></strong><span id="med-sub">Adem rustig in en uit</span></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="med-stop">Stoppen</button>
+        <button type="button" class="btn primary" id="med-go">▶ Start</button>
+      </div>
+    </form>`,
+    () => false,
+  )
+  const timeEl = sheet.querySelector('#med-time')
+  const subEl = sheet.querySelector('#med-sub')
+  const fill = sheet.querySelector('#med-fill')
+  const go = sheet.querySelector('#med-go')
+  const chips = sheet.querySelector('#med-chips')
+  const total = () => minutes * 60000
+  const paint = () => {
+    const rest = endAt ? Math.max(0, endAt - Date.now()) : left ?? total()
+    timeEl.textContent = fmtClock(rest + 999)
+    fill.setAttribute('stroke-dashoffset', ((1 - rest / total()) * C).toFixed(1))
+    if (endAt && rest <= 0) finish()
+  }
+  const stopTimer = () => {
+    clearInterval(timer)
+    timer = null
+    keepScreenOn(false)
+  }
+  const finish = () => {
+    stopTimer()
+    endAt = null
+    gong(2)
+    s.done = true
+    s.duration = minutes
+    save()
+    closeSheet()
+    render()
+    afterTick(s)
+  }
+  chips.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-min]')
+    if (!b || endAt || left != null) return
+    minutes = Number(b.dataset.min)
+    chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b))
+    paint()
+  })
+  go.onclick = () => {
+    unlockAudio()
+    if (endAt) {
+      // Pauze
+      left = endAt - Date.now()
+      endAt = null
+      stopTimer()
+      go.textContent = '▶ Verder'
+      subEl.textContent = 'Gepauzeerd'
+      return
+    }
+    if (left == null) gong(1)
+    endAt = Date.now() + (left ?? total())
+    left = null
+    chips.hidden = true
+    go.textContent = '❚❚ Pauze'
+    subEl.textContent = 'Adem rustig in en uit'
+    keepScreenOn(true)
+    timer = setInterval(paint, 250)
+  }
+  sheet.querySelector('#med-stop').onclick = () => {
+    stopTimer()
+    closeSheet()
+  }
+  // Venster dicht (tik ernaast): timer stoppen.
+  sheet.addEventListener('close', stopTimer, { once: true })
+  paint()
 }
 
 function openShinSheet(s) {
@@ -3310,6 +3443,7 @@ const ICU_TYPES = {
   WeightTraining: ['kracht', 'gym'],
   RockClimbing: ['klimmen', 'boulderen'],
   Yoga: ['yoga'],
+  Meditation: ['mediteren'],
 }
 
 // Gelopen trainingen van de afgelopen twee weken ophalen: een geplande training
@@ -3504,6 +3638,8 @@ const BLOCK_TYPES = {
   zwemmen: 'zwemmen',
   yoga: 'yoga',
   mobiliteit: 'yoga',
+  mediteren: 'mediteren',
+  meditatie: 'mediteren',
 }
 
 // "2 × 12–15" -> 2 sets van "12–15"; "12 min" / "5 + 3 min" -> 1 × seconden.
@@ -3582,6 +3718,7 @@ const ACTIVITY_WORDS = [
   [/^zwem/, 'zwemmen'],
   [/^(hardlopen|lopen|run)\b/, 'hardlopen'],
   [/^yoga/, 'yoga'],
+  [/^medit/, 'mediteren'],
 ]
 const activityOf = (part) => ACTIVITY_WORDS.find(([re]) => re.test(String(part).trim().toLowerCase()))?.[1]
 
@@ -4672,6 +4809,19 @@ const actions = {
   },
   'edit-template': (el) => openTemplateSheet(templateById(el.dataset.id)),
   'view-menu': () => openViewSheet(),
+  'set-reminder': (el) => {
+    state.settings ||= {}
+    state.settings.reminder = el.dataset.when
+    save()
+    render()
+  },
+  'set-reminder-weeks': (el) => {
+    state.settings ||= {}
+    state.settings.reminderWeeks = Number(el.dataset.weeks)
+    save()
+    render()
+  },
+  'export-reminders': () => exportReminders(),
   'day-sheet': (el) => openDaySheet(el.dataset.date),
   'period-today': () => {
     const k = todayKey()
@@ -4811,6 +4961,107 @@ view.addEventListener('change', async (e) => {
     alert('Dit bestand is geen geldige Tarapp-back-up.')
   }
 })
+
+// ---------- Herinneringen via de Agenda-app ----------
+// Een webapp kan op de iPhone niet zelf op een vast moment een melding sturen
+// (daar is een server voor nodig). Daarom zetten we de komende trainingen als
+// .ics-bestand in de Agenda-app, met een herinnering erbij: die meldt de iPhone zelf.
+
+const REMINDER_OPTIONS = [
+  { id: 'ochtend', name: 'Om 8:00 op de dag zelf' },
+  { id: 'avond', name: 'De avond ervoor om 20:00' },
+  { id: 'uur', name: 'Een uur van tevoren', note: 'zonder tijd: om 8:00' },
+]
+const reminderWhen = () => (REMINDER_OPTIONS.some((o) => o.id === state.settings?.reminder) ? state.settings.reminder : 'ochtend')
+const reminderWeeks = () => Number(state.settings?.reminderWeeks) || 4
+
+const icsEsc = (t) => String(t).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1')
+const icsDate = (k) => k.replaceAll('-', '')
+// Regels van meer dan 75 tekens vouwen, zoals het formaat voorschrijft.
+const icsFold = (line) => line.match(/.{1,73}/gu)?.join('\r\n ') ?? line
+
+function icsText() {
+  const today = todayKey()
+  const until = toKey(addDays(new Date(), reminderWeeks() * 7))
+  const when = reminderWhen()
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tarapp//NL', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Tarapp']
+  const list = sortSessions(state.sessions.filter((s) => !s.done && s.date >= today && s.date <= until))
+  for (const s of list) {
+    const t = typeById(s.typeId)
+    const timed = /^\d{1,2}:\d{2}/.test(s.time || '')
+    const [hh, mm] = timed ? s.time.split(':').map(Number) : [0, 0]
+    // Minuten na middernacht van de dag zelf; de herinnering rekent vanaf het begin.
+    const start = timed ? hh * 60 + (mm || 0) : 0
+    const remindAt = when === 'avond' ? -240 : when === 'uur' && timed ? start - 60 : 8 * 60
+    const offset = remindAt - start
+    const trig = `${offset < 0 ? '-' : ''}PT${Math.abs(offset)}M`
+    const what = [s.run?.label, s.note].filter(Boolean).join(' · ')
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:tarapp-${s.id}@tarapp`,
+      `DTSTAMP:${stamp}`,
+      timed
+        ? `DTSTART:${icsDate(s.date)}T${pad(hh)}${pad(mm || 0)}00`
+        : `DTSTART;VALUE=DATE:${icsDate(s.date)}`,
+      timed ? `DURATION:PT${Number(s.duration) || 60}M` : `DTEND;VALUE=DATE:${icsDate(toKey(addDays(fromKey(s.date), 1)))}`,
+      icsFold(`SUMMARY:${icsEsc(`${t.emoji || ''} ${s.title || t.name}`.trim())}`),
+      ...(what ? [icsFold(`DESCRIPTION:${icsEsc(what)}`)] : []),
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      icsFold(`DESCRIPTION:${icsEsc(`Tarapp: ${s.title || t.name} 💛`)}`),
+      `TRIGGER:${trig}`,
+      'END:VALARM',
+      'END:VEVENT',
+    )
+  }
+  lines.push('END:VCALENDAR')
+  return { text: lines.join('\r\n') + '\r\n', count: list.length }
+}
+
+function exportReminders() {
+  const { text, count } = icsText()
+  if (!count) return showToast('Er staan de komende weken geen trainingen in je agenda')
+  const file = new File([text], `tarapp-${todayKey()}.ics`, { type: 'text/calendar' })
+  // Openen laat iPhone vragen om alles aan de Agenda-app toe te voegen.
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(file)
+  a.download = file.name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000)
+  state.settings ||= {}
+  state.settings.reminderLast = todayKey()
+  save()
+  render()
+  showToast(`${count} trainingen klaargezet voor je agenda 💛`)
+}
+
+function renderRemindersCard() {
+  const when = reminderWhen()
+  const weeks = reminderWeeks()
+  const last = state.settings?.reminderLast
+  return `
+    <section class="card">
+      <p class="muted">Zet je komende trainingen in de Agenda-app van je iPhone, met een herinnering erbij. Die herinnering komt van je iPhone zelf, ook als Tarapp dicht is.</p>
+      <h2>Wanneer wil je een herinnering?</h2>
+      <div class="theme-list" role="radiogroup" aria-label="Moment van de herinnering">
+        ${REMINDER_OPTIONS.map(
+          (o) => `
+          <button type="button" class="theme-opt view-opt ${o.id === when ? 'on' : ''}" role="radio" aria-checked="${o.id === when}" data-action="set-reminder" data-when="${o.id}">
+            <span class="view-pic pic-${o.id}" aria-hidden="true">⏰</span>
+            <span class="theme-text"><strong>${esc(o.name)}</strong>${o.note ? `<span class="muted">${esc(o.note)}</span>` : ''}</span>
+            <span class="theme-check" aria-hidden="true">${CHECK_ICON}</span>
+          </button>`,
+        ).join('')}
+      </div>
+      <div class="segmented rem-weeks" role="radiogroup" aria-label="Hoe ver vooruit">
+        ${[2, 4, 8].map((w) => `<button type="button" class="${w === weeks ? 'on' : ''}" data-action="set-reminder-weeks" data-weeks="${w}">${w} weken</button>`).join('')}
+      </div>
+      <button type="button" class="btn primary block" data-action="export-reminders">📅 Zet in mijn agenda</button>
+      ${last ? `<p class="muted">Laatst gedaan op ${shortDate(fromKey(last))}.</p>` : ''}
+    </section>
+    <p class="muted">Pas je later iets aan in Tarapp, doe dit dan opnieuw. Je iPhone kan dan dubbele afspraken laten zien; die verwijder je in de Agenda-app.</p>`
+}
 
 async function exportData() {
   const json = JSON.stringify(state, null, 2)

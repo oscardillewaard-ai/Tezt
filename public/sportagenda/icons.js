@@ -20,6 +20,9 @@ const ICON_PATHS = {
     '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l3.8-7h5.7L18 16M9.8 9 12 16H6M14 6.5h2.4"/>',
   zwemmen:
     '<circle cx="16.5" cy="6.5" r="1.8"/><path d="M4.5 12.5l4.2-3.2 3.6 1.8 2.7-1.6"/><path d="M3 16.5c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1"/><path d="M3 20c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1"/>',
+  // Lotus: mediteren.
+  mediteren:
+    '<path d="M12 6c1.8 1.8 2.6 4 2.6 6.5S13.4 17 12 18c-1.4-1-2.6-3-2.6-5.5S10.2 7.8 12 6z"/><path d="M12 18c-3.6 0-6.6-1.7-8-4.6 2.6-.7 5.1 0 6.7 1.7"/><path d="M12 18c3.6 0 6.6-1.7 8-4.6-2.6-.7-5.1 0-6.7 1.7"/><path d="M5 20.5h14"/>',
   yoga: '<circle cx="12" cy="4.8" r="2"/><path d="M12 8.2v5"/><path d="M6.5 10.8 12 13.2l5.5-2.4"/><path d="M5.5 18.5c2-2.6 4.1-3.4 6.5-3.4s4.5.8 6.5 3.4z"/>',
   // Op één been balanceren: enkelbalans, heupblok en andere routines.
   routine: '<circle cx="12" cy="4.6" r="2"/><path d="M12 8.2v5.8M6.5 10.4h11M12 14v7M12 14l4.2 1.8-1.3 3.2"/>',
@@ -47,6 +50,7 @@ const ICON_PATHS = {
   telefoon: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
   druppel: '<path d="M12 3.2c2.9 3.8 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3.1-7.2 6-11z" fill="currentColor" stroke="none"/>',
   weegschaal: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M7.8 10.5a4.2 4.2 0 0 1 8.4 0z"/><path d="M12 10.5l1.7-2.3"/>',
+  bel: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   smiley:
     '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c.9 1.4 2.1 2.1 3.5 2.1s2.6-.7 3.5-2.1"/><g fill="currentColor" stroke="none"><circle cx="9.2" cy="10" r="1.1"/><circle cx="14.8" cy="10" r="1.1"/></g>',
   // Weergave van de agenda: een scherm met regels.
@@ -60,7 +64,7 @@ const ICON_PATHS = {
 }
 
 // Activiteiten met een eigen icoon (de rest, zelf toegevoegd, houdt zijn emoji).
-const TYPE_ICONS = ['hardlopen', 'gym', 'kracht', 'klimmen', 'boulderen', 'wandelen', 'fietsen', 'zwemmen', 'yoga', 'routine', 'thuis', 'warming', 'wedstrijd']
+const TYPE_ICONS = ['hardlopen', 'gym', 'kracht', 'klimmen', 'boulderen', 'wandelen', 'fietsen', 'zwemmen', 'yoga', 'mediteren', 'routine', 'thuis', 'warming', 'wedstrijd']
 
 function svgIcon(name, cls = '') {
   const p = ICON_PATHS[name]
