@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '35' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '36' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -448,6 +448,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 36, items: ['De prullenbak verschijnt bij het slepen nu bovenin, dus je kunt een training ook gewoon naar zondag slepen 💛'] },
   {
     v: 35,
     items: ['⏰ Herinneringen: zet je trainingen met één tik in de Agenda-app van je iPhone, met een melding op het moment dat jij kiest (Meer → Herinneringen) 💛'],
@@ -4511,13 +4512,14 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
     return st.y >= r.top && st.y <= r.bottom && st.x >= r.left && st.x <= r.right
   }
 
-  // Bij de rand van een scrollend venster blijven = meescrollen
-  // (niet boven de prullenbak, die zit zelf onderaan).
+  // Bij de rand van een scrollend venster blijven = meescrollen. Op de pagina zelf
+  // is de onderrand de tabbalk; in een venster ligt de prullenbak onderaan.
   const autoScroll = () => {
     if (!st?.active) return
     const win = scroller === window
-    const r = win ? { top: topbarBottom(), bottom: window.innerHeight } : scroller.getBoundingClientRect()
-    const bottom = st.trash ? Math.min(r.bottom, st.trash.getBoundingClientRect().top) : r.bottom
+    const tabTop = document.querySelector('.tabbar')?.getBoundingClientRect().top || window.innerHeight
+    const r = win ? { top: topbarBottom(), bottom: Math.min(window.innerHeight, tabTop) } : scroller.getBoundingClientRect()
+    const bottom = st.trash && !st.trash.classList.contains('at-top') ? Math.min(r.bottom, st.trash.getBoundingClientRect().top) : r.bottom
     const edge = 64
     const speed = overTrash() ? 0 : st.y < r.top + edge ? -12 : st.y > bottom - edge ? 12 : 0
     if (speed) {
@@ -4552,10 +4554,16 @@ function makeDraggable(root, { item, handle, delay = 0, scroller, onStart, onMov
       st.trash = document.createElement('div')
       st.trash.className = 'trash-zone'
       st.trash.innerHTML = '<span>🗑️</span> Sleep hierheen om te verwijderen'
-      // Boven de tabbalk zetten in plaats van eroverheen.
-      const tabbar = document.querySelector('.tabbar')
-      if (layer === document.body && tabbar?.getBoundingClientRect().height > 0) {
-        st.trash.style.bottom = `${window.innerHeight - tabbar.getBoundingClientRect().top + 10}px`
+      // Op de pagina over de bovenbalk: daar ligt nooit een dag, dus alle dagen
+      // (ook zondag onderaan) blijven bereikbaar. In een venster blijft hij onderaan.
+      const topbar = document.querySelector('.topbar')
+      const tb = topbar?.getBoundingClientRect()
+      if (layer === document.body && tb?.height > 0) {
+        const safeTop = Math.max(0, parseFloat(getComputedStyle(topbar).paddingTop) - 10)
+        st.trash.classList.add('at-top')
+        st.trash.style.top = `${Math.max(0, tb.top) + safeTop + 4}px`
+        st.trash.style.bottom = 'auto'
+        st.trash.style.height = `${Math.max(44, tb.bottom - Math.max(0, tb.top) - safeTop - 8)}px`
       }
       layer.append(st.trash)
     }

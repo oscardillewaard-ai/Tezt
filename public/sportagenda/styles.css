@@ -1584,6 +1584,23 @@ body.is-dragging * {
   scale: 0.85;
 }
 
+.trash-zone.at-top {
+  height: 48px;
+  font-size: 0.9rem;
+  animation-name: trash-in-top;
+}
+
+.trash-zone.at-top span {
+  font-size: 1.2rem;
+}
+
+@keyframes trash-in-top {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+}
+
 @keyframes trash-in {
   from {
     transform: translateY(20px);
@@ -3424,4 +3441,10 @@ button.body-tile {
 .segmented.rem-weeks {
   grid-template-columns: repeat(3, 1fr);
   margin: 12px 0;
+}
+
+/* Tijdens slepen mag een melding geen dag afdekken: doorzichtig en niet aan te raken. */
+body.is-dragging .toast {
+  opacity: 0.25;
+  pointer-events: none;
 }
