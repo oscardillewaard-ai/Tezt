@@ -237,3 +237,15 @@ dialog form { text-align: right; }
   .twijfels canvas { width: 64px; height: 64px; }
   th, td { padding-left: 6px; }
 }
+
+/* inklapbare blokken */
+details.blok { border-top: 1px solid var(--rand); margin-top: 14px; }
+details.blok > summary { cursor: pointer; list-style: none; padding: 12px 0; font-weight: 600; display: flex; gap: 8px;
+                         align-items: baseline; min-height: 44px; }
+details.blok > summary::-webkit-details-marker { display: none; }
+details.blok > summary::after { content: '▾'; margin-left: auto; color: var(--inkt-3); transition: transform .15s; }
+details.blok[open] > summary::after { transform: rotate(180deg); }
+details.blok > summary small { font-weight: 400; color: var(--inkt-2); font-size: 13px; }
+details.blok > :not(summary) { margin-bottom: 8px; }
+.keuze.klein button { min-height: 36px; padding: 6px 8px; font-size: 14px; }
+#resultaat .opties { margin-top: 12px; }

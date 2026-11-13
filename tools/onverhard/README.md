@@ -284,10 +284,10 @@ draait in je browser; er is geen eigen server.
 - **Van A naar B**: zoek een plek (adres, straat, postcode, plaats; via de
   PDOK Locatieserver) of tik op de kaart. Elk volgend punt wordt het nieuwe
   eindpunt; de punten ertussen zijn tussenpunten.
-- **Rondje**: kies een startpunt en een lengte. De app probeert ronde rondjes
-  in 12 richtingen en langgerekte (2,5 keer zo lang als breed) in 6
-  richtingen; die laatste passen in een smalle strook natuur, zoals de duinen
-  langs de kust. Je krijgt er minstens twee die echt van elkaar verschillen.
+- **Rondje**: kies een startpunt en een lengte. Standaard ("Grote lus") maakt
+  de app rondjes zoals mensen ze zelf tekenen: heen over het ene pad, terug
+  over een ander (zie hieronder). "Kronkelen in de buurt" zigzagt door een
+  compact gebied. Je krijgt er minstens twee die echt van elkaar verschillen.
 - **Rondje via een keerpunt**: tik in de modus Rondje een tweede punt. Heen en
   terug gaan dan via verschillende paden. De app probeert terugwegen opzij en
   voorbij het keerpunt (zodat je doorloopt in plaats van omkeert) en biedt
@@ -317,6 +317,9 @@ draait in je browser; er is geen eigen server.
   meldt de app hoeveel strand er nog in zit.
 - *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
   kaart.
+- *Luchtfoto's bij twijfelstukken* (standaard uit): een uitsnede van de
+  luchtfoto bij elk twijfelstuk, met een kleurindicatie. In de praktijk voegde
+  het weinig toe, daarom staat het uit.
 - *Ik heb een toegangskaart* (standaard uit): in duinen van waterbedrijven
   (Kijfhoek en de Bierlap van Dunea, de Amsterdamse Waterleidingduinen, PWN)
   staan veel paden of de toegangen ernaartoe in OpenStreetMap als afgesloten
@@ -334,32 +337,50 @@ draait in je browser; er is geen eigen server.
   meer dan 25% heen en terug gaat, biedt de app alleen aan als er niets anders
   is.
 
-**Hoe een rondje gezocht wordt**: per vorm en richting liggen drie
-tussenpunten op een cirkel of ellips door het startpunt.
+**Hoe een rondje gezocht wordt** ("Grote lus"): per windrichting (8) legt de
+app een keerpunt op ongeveer een kwart van de lengte; Komoot-rondjes zijn
+3,4 tot 5,3 keer zo lang als hun verste punt. Het keerpunt wordt naar de
+natuur getrokken (de officiële kaart, 100 m rondom: duin, bos, heide tellen,
+bebouwing, verharding en zee niet), van een "eilandje" af gehaald (paden die
+alleen via afgesloten wegen bereikbaar zijn: BRouter meldt dan "target
+island") en van een doodlopend pad. Dan zoekt hij een brede lus: de heenweg
+direct of via een punt links of rechts van de rechte lijn, de terugweg direct,
+via links of rechts of schuin voorbij het keerpunt. Van al die combinaties
+wint het paar dat echt een lus is (hooguit 15% van de terugweg over de
+heenweg), het meeste onverhard en smalle paadjes heeft en het dichtst bij de
+gevraagde lengte komt. Zit de lengte er meer dan 20% naast, dan schuift het
+keerpunt en volgt nog één poging. De verhouding lengte / afstand tot het
+keerpunt leert de app van de vorige richtingen.
 
-1. *Verkennen*: elke vorm één route. Een tussenpunt in zee (volgens de
-   officiële kaart) schuift eerst richting de start. Valt een punt op een
-   "eilandje" (paden die alleen via afgesloten wegen bereikbaar zijn, zoals in
-   waterwingebieden), dan meldt BRouter "target island" en schuift dat punt
-   ook. De omweg ten opzichte van hemelsbreed (op kronkelige duinpaden groot)
-   leert de app van de vorige routes, zodat de lengte meteen ongeveer klopt.
-2. *Bijstellen*: alleen de zes kansrijkste brengt hij op lengte. Doodlopende
-   stukjes haalt hij weg: komt de route bij een tussenpunt een pad in en over
-   hetzelfde pad terug, dan schuift dat punt naar het begin van dat stukje. Die
-   zes gaan langs de officiële kaart.
-3. *Kiezen*: eerst rondjes binnen ±10% van de lengte, met hooguit 12% heen en
-   terug en (bij "Strand overslaan") hooguit 300 m strand. Daarbinnen wint
-   het hoogste aandeel onverhard, met extra punten voor smalle paadjes.
+Bij de eindkeuze gaan rondjes met hooguit 15% heen en terug voor. Daarbinnen
+telt het aandeel onverhard, smalle paadjes (bij trail), aftrek voor heen en
+terug en strand, en een lengte buiten ±10% kost veel punten.
+
+"Kronkelen in de buurt" legt vijf tussenpunten in een ster om een middelpunt
+(afwisselend ver en dichtbij), met dezelfde correcties voor zee, eilandjes en
+doodlopende paden.
 
 De publieke BRouter-server antwoordt bij te veel verzoeken tegelijk met
-"probeer later". Daarom stuurt de app één verzoek tegelijk (minstens 0,7 s
-ertussen) en houdt hij het aantal klein: een rondje kost zo'n 40 tot 70
-verzoeken en 40 tot 75 seconden. Vergelijking met Komoot, vanaf hetzelfde
-startpunt in Meijendel (15 km, "jogging"): langs de officiële kaart 67 tot
-78% onverhard tegen 63% bij Komoot, grotendeels over dezelfde paden. Beide
-lopen om Kijfhoek en de Bierlap heen, omdat de toegangen daar in OpenStreetMap
-afgesloten zijn. Met toegangskaart en kronkelen: 14,9 km, 97% onverhard, een
-kwart van de route in Kijfhoek en de Bierlap, 4,5 km met kaartje.
+"probeer later". Daarom stuurt de app één verzoek tegelijk (minstens een
+seconde ertussen). Een rondje kost daardoor al gauw een paar minuten.
+
+**Vergelijking met Komoot** (`benchmark_rondjes.mjs`): zes trailgebieden, elk
+met een Komoot-hardlooproute als referentie, zelfde start en lengte. Onverhard
+gemeten langs de officiële kaart (voor Komoot hebben we geen OpenStreetMap-tags):
+
+| Gebied | Komoot | Onze route A | Heen en terug (A) |
+|---|---|---|---|
+| Meijendel (15 km) | 63% | 75% | 3% |
+| Voornes Duin, Rockanje (13 km) | 92% | 67% (92% smalle paadjes) | 0% |
+| N70, Berg en Dal (15 km) | 79% | 89% | 24% (zie onder) |
+| Schoorlse Duinen (14 km) | 88% | 94% (11,6 km) | 0% |
+| Loonse en Drunense Duinen (11 km) | 97% | 94% | 2% |
+| Veluwezoom (15 km) | 89% | 96% | 9% |
+
+Na deze meting is de grens voor heen en terug van 25% naar 15% gegaan. Bij
+Rockanje is "onverhard" volgens de officiële kaart lager dan volgens
+OpenStreetMap, omdat smalle duinpaden daar niet als pad op de officiële kaart
+staan.
 
 **Verschillen met de Python-tool**
 
@@ -389,6 +410,7 @@ node --test tools/onverhard/test_web_kern.mjs          # offline: rekenkern, teg
 NODE_USE_ENV_PROXY=1 node tools/onverhard/vergelijk_web.mjs uit/test.json "51.9921,4.3481" ...   # naast Python leggen
 (cd public && python3 -m http.server 8765) &
 node tools/onverhard/test_web_e2e.mjs <map> uit/test.json 'p=51.9921,4.3481;51.9255,4.4679&trail=0&strand=0'
+NODE_USE_ENV_PROXY=1 node tools/onverhard/benchmark_rondjes.mjs <map met komoot-gpx> [uit.json] [gebied ...]   # rondjes naast Komoot
 ```
 
 `NODE_USE_ENV_PROXY=1` is alleen nodig achter een proxy. De end-to-end-test

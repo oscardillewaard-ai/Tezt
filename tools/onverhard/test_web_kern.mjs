@@ -268,3 +268,25 @@ test('aandeel smalle paadjes en strand in een analyse', () => {
   assert.ok(Math.abs(K.paadjesAandeel(an) - 0.5) < 0.01)
   assert.equal(K.strandMeter(an), 0)
 })
+
+test('vormen van rondjes: rond, langgerekt en kronkel', () => {
+  assert.ok(Math.abs(K.vormOmtrek(1) - 4 * Math.SQRT2) < 1e-3)
+  assert.ok(K.vormOmtrek(2.5) < K.vormOmtrek(1))
+  const ster = K.kronkelPunten([52, 5], 0, 1000)
+  assert.equal(ster.length, 7) // start, vijf tussenpunten, start
+  const s = K.naarRd(5, 52)
+  const afst = ster.slice(1, -1).map(([la, lo]) => { const p = K.naarRd(lo, la); return Math.hypot(p[0] - s[0], p[1] - s[1]) })
+  assert.ok(Math.max(...afst) > 1500 && Math.min(...afst) > 300) // afwisselend ver en dichtbij, nooit op de start
+  assert.deepEqual(K.vormPunten([52, 5], 0, 1000, 0), ster)
+})
+
+test('toegangskaart: afgesloten paden herkennen en het profiel', () => {
+  assert.equal(K.alleenMetKaartje('highway=track access=no foot=no'), true)
+  assert.equal(K.alleenMetKaartje('highway=path access=private'), true)
+  assert.equal(K.alleenMetKaartje('highway=path access=no foot=permissive'), false)
+  assert.equal(K.alleenMetKaartje('highway=path foot=yes'), false)
+  const p = K.maakProfiel(1, { trail: true, kaartje: true })
+  assert.ok(p.includes('assign afgesloten') && p.includes('multiply ( if afgesloten then 1.3 else 1 )'))
+  assert.ok(!/assign forbidden = [^\n]*access=private/.test(p))
+  assert.ok(K.maakProfiel(1, { trail: true }).includes('access=private|no not footok'))
+})

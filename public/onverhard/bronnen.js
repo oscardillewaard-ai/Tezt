@@ -327,7 +327,13 @@ async function optiesVoorDeel(a, b, br, bgt, aantal, meld, wat, waarschuwingen) 
       t = await br.route([a, b], i)
     } catch (fout) {
       if (afgebroken(fout) || i === 0) throw fout // zonder de eerste route geen plan
-      waarschuwingen.push(`alternatief ${i + 1} (${wat.toLowerCase()}) niet beschikbaar (${fout.melding || fout.message})`)
+      // de gratis BRouter-server stopt zware berekeningen ('watchdog'); de volgende alternatieven lukken dan ook niet
+      const zwaar = /watchdog|killed|timeout|geen antwoord/i.test(fout.melding || '')
+      const wie = wat === 'Route' ? 'deze route' : wat.toLowerCase()
+      waarschuwingen.push(zwaar
+        ? `Voor ${wie} kon BRouter maar ${lijst.length} van de ${aantal} gevraagde routes berekenen: de gratis server stopt zware berekeningen, zoals lange afstanden. Kies "1 route" of plan in kortere stukken.`
+        : `Route ${i + 1} voor ${wie} lukte niet (${fout.melding || fout.message}).`)
+      if (zwaar) break
       continue
     }
     if (lijst.some((o) => K.zelfdeTraject(o.traject, t))) continue
@@ -524,6 +530,11 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
       }
       Object.assign(k, nieuw)
     }
+    // de laatste poging kan een nieuwe route zijn: ook daarvan doodlopende stukjes weghalen
+    const schoon = await zonderDoodlopend(k.t, k.punten, k.punten.slice(1, -1).map((_, j) => j + 1), br)
+    k.t = schoon.traject
+    k.punten = schoon.punten
+    k.lengte = K.lijnLengte(K.trajectXy(k.t))
     k.afwijking = afwijkingVan(k.t, k.punten)
     k.traject = { ...k.t, punten: k.punten }
     meld(`Ondergrond van rondje ${i + 1} van ${kansrijk.length} controleren`)
@@ -559,9 +570,10 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
  * punt links en rechts van de rechte lijn, en kiezen de combinaties waarbij
  * de terugweg zo min mogelijk over de heenweg loopt.
  */
-export async function planLus(start, keer, br, bgt, alternatieven, meld = () => {}) {
+export async function planLus(start, keer, br, bgt, alternatieven, meld = () => {}, { licht = false } = {}) {
   const waarschuwingen = []
-  const aantal = Math.max(2, alternatieven)
+  // licht (voor automatische rondjes): één heenweg, de directe terugweg en vier terugwegen opzij of voorbij het keerpunt
+  const aantal = licht ? 1 : Math.max(2, alternatieven)
   const heen = await optiesVoorDeel(start, keer, br, bgt, aantal, meld, 'Heenweg', waarschuwingen)
   const terug = await optiesVoorDeel(keer, start, br, bgt, aantal, meld, 'Terugweg', waarschuwingen)
   const s = K.naarRd(start[1], start[0])
@@ -572,9 +584,9 @@ export async function planLus(start, keer, br, bgt, alternatieven, meld = () => 
   const richting = [(k[0] - s[0]) / d, (k[1] - s[1]) / d]
   const kandidaten = [
     // opzij van de rechte lijn, dichtbij en verder weg
-    ...[0.35, -0.35, 0.6, -0.6].map((f) => [mid[0] + loodrecht[0] * f * d, mid[1] + loodrecht[1] * f * d]),
+    ...(licht ? [0.35, -0.35] : [0.35, -0.35, 0.6, -0.6]).map((f) => [mid[0] + loodrecht[0] * f * d, mid[1] + loodrecht[1] * f * d]),
     // voorbij het keerpunt, schuin links en rechts: dan loop je door in plaats van om te keren
-    ...[35, -35, 75, -75].map((graden) => {
+    ...(licht ? [40, -40] : [35, -35, 75, -75]).map((graden) => {
       const h = (graden * Math.PI) / 180
       const r = [richting[0] * Math.cos(h) - richting[1] * Math.sin(h), richting[0] * Math.sin(h) + richting[1] * Math.cos(h)]
       const afst = Math.min(Math.max(0.25 * d, 300), 1500)
@@ -624,6 +636,154 @@ export async function planLus(start, keer, br, bgt, alternatieven, meld = () => 
     waarschuwingen.push('er is maar één echte lus via dit keerpunt gevonden; verschuif het keerpunt voor meer keus')
   }
   return { opties, waarschuwingen }
+}
+
+/**
+ * Een brede lus via een keerpunt, voor automatische rondjes. Heenweg: direct
+ * of via een punt links of rechts van de rechte lijn (op halve afstand
+ * opzij); terugweg: direct, via links of rechts, of schuin voorbij het
+ * keerpunt. Van alle combinaties kiezen we het paar dat echt een lus is,
+ * veel onverhard en smalle paden heeft en het dichtst bij de gevraagde lengte
+ * komt. Geeft {traject, an, lengte} of null.
+ */
+async function bredeLus(start, keer, br, bgt, doel) {
+  const s = K.naarRd(start[1], start[0])
+  const k = K.naarRd(keer[1], keer[0])
+  const d = Math.hypot(k[0] - s[0], k[1] - s[1]) || 1
+  const mid = [(s[0] + k[0]) / 2, (s[1] + k[1]) / 2]
+  const lood = [-(k[1] - s[1]) / d, (k[0] - s[0]) / d]
+  const richting = [(k[0] - s[0]) / d, (k[1] - s[1]) / d]
+  const opzij = (f) => naarLatLon([mid[0] + lood[0] * f * d, mid[1] + lood[1] * f * d])
+  const voorbij = (graden) => {
+    const h = (graden * Math.PI) / 180
+    const r = [richting[0] * Math.cos(h) - richting[1] * Math.sin(h), richting[0] * Math.sin(h) + richting[1] * Math.cos(h)]
+    const afst = Math.min(Math.max(0.3 * d, 300), 1500)
+    return naarLatLon([k[0] + r[0] * afst, k[1] + r[1] * afst])
+  }
+  const deel = async (punten) => {
+    try {
+      const t0 = await br.route(punten, 0)
+      const schoon = punten.length > 2 ? await zonderDoodlopend(t0, punten, [1], br) : { traject: t0, punten }
+      const an = await analyseerRoute(schoon.traject, bgt)
+      return { traject: schoon.traject, punten: schoon.punten, an }
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      return null
+    }
+  }
+  const heen = []
+  for (const via of [null, opzij(0.5), opzij(-0.5)]) {
+    const r = await deel(via ? [start, via, keer] : [start, keer])
+    if (r && !heen.some((h) => K.zelfdeTraject(h.traject, r.traject))) heen.push(r)
+  }
+  if (!heen.length) throw new BronFout('BRouter', 'geen heenweg naar het keerpunt')
+  const terug = []
+  for (const via of [null, opzij(0.5), opzij(-0.5), voorbij(40)]) {
+    const r = await deel(via ? [keer, via, start] : [keer, start])
+    if (r && !terug.some((t) => K.zelfdeTraject(t.traject, r.traject))) terug.push(r)
+  }
+  let beste = null
+  for (const h of heen) {
+    for (const t of terug) {
+      const ov = K.overlap(h.an.xy, t.an.xy)
+      const L = h.an.lengte + t.an.lengte
+      const gewogen = (f) => (f(h.an) * h.an.lengte + f(t.an) * t.an.lengte) / L
+      const zacht = gewogen((a) => K.zachtAandeel(a, bgt ? 'eind' : 'osm'))
+      const paadjes = gewogen((a) => K.paadjesAandeel(a))
+      const strand = (K.strandMeter(h.an) + K.strandMeter(t.an)) / L
+      const waarde = zacht + (br.trail ? 0.5 * paadjes : 0) - 1.5 * ov - (br.strandMijden ? 4 * strand : 0)
+        - 3 * Math.max(0, Math.abs(L - doel) / doel - 0.1)
+      const kand = { h, t, ov, L, waarde, echt: ov <= 0.15 }
+      if (!beste || kand.echt > beste.echt || (kand.echt === beste.echt && kand.waarde > beste.waarde)) beste = kand
+    }
+  }
+  const traject = K.plak([beste.h.traject, beste.t.traject])
+  traject.punten = [...beste.h.punten.slice(0, -1), ...beste.t.punten]
+  const an = await analyseerRoute(traject, bgt)
+  return { traject, an, lengte: an.lengte }
+}
+
+/**
+ * Een rondje zoals mensen ze zelf maken: heen over het ene pad, terug over
+ * een ander. Per windrichting kiezen we een keerpunt (naar de natuur
+ * getrokken, niet op een eilandje, niet op een doodlopend pad) en plannen
+ * we een lus via dat keerpunt. De verhouding lengte / afstand tot het
+ * keerpunt leren we van de vorige richtingen, zodat de lengte meteen ongeveer
+ * klopt.
+ */
+export async function planRondjeLussen(start, km, br, bgt, aantalOpties, meld = () => {}) {
+  const doel = km * 1000
+  const waarschuwingen = []
+  const fouten = []
+  const s = K.naarRd(start[1], start[0])
+  const metingen = []
+  let verhouding = 4.2 // Komoot-rondjes zijn 3,4 tot 5,3 keer zo lang als hun verste punt
+  const lijst = []
+  const richtingen = 8
+  for (let n = 0; n < richtingen; n++) {
+    const peiling = (360 * n) / richtingen
+    meld(`Rondjes zoeken: richting ${n + 1} van ${richtingen}`)
+    let afstand = doel / verhouding
+    let keer = naarLatLon(K.verplaats(s, peiling, afstand))
+    let beste = null
+    for (let poging = 0; poging < 2; poging++) {
+      keer = (await opLand([start, keer, start], bgt))[1]
+      let o
+      try {
+        o = await bredeLus(start, keer, br, bgt, doel)
+      } catch (fout) {
+        if (afgebroken(fout)) throw fout
+        if (!/island|not mapped|no track/i.test(fout.melding || '')) {
+          fouten.push(fout.melding || fout.message)
+          break
+        }
+        keer = [keer[0] + 0.25 * (start[0] - keer[0]), keer[1] + 0.25 * (start[1] - keer[1])] // eilandje: dichter bij de start
+        continue
+      }
+      const an = o.an
+      const kr = K.naarRd(keer[1], keer[0])
+      // het keerpunt op een doodlopend pad? dan naar het begin daarvan en nog een keer
+      const spoor = K.doodlopend(an.xy, kr)
+      const dk = Math.hypot(kr[0] - s[0], kr[1] - s[1]) || 1
+      metingen.push(an.lengte / dk)
+      verhouding = metingen.slice().sort((a, b) => a - b)[Math.floor(metingen.length / 2)]
+      const kand = { peiling, traject: o.traject, an, keer, lengte: an.lengte, afwijking: 0, osm: 0 }
+      if (spoor.lengte < 25 && (!beste || Math.abs(an.lengte - doel) < Math.abs(beste.lengte - doel))) beste = kand
+      if (spoor.lengte >= 25) {
+        keer = naarLatLon(spoor.basis)
+        continue
+      }
+      if (Math.abs(an.lengte - doel) / doel <= 0.2) break // een tweede poging kost veel verzoeken
+      afstand = dk * Math.max(0.5, Math.min(2.5, doel / an.lengte))
+      keer = naarLatLon(K.verplaats(s, peiling, afstand))
+    }
+    if (beste) {
+      beste.score = waardering(beste.an, br, bgt ? 'eind' : 'osm')
+      lijst.push(beste)
+    }
+  }
+  if (!lijst.length) throw new BronFout('BRouter', 'geen enkel rondje gevonden: ' + fouten.join('; '))
+  const voldoet = (k) => k.an.dubbel <= 0.12 && (!br.strandMijden || K.strandMeter(k.an) <= 300)
+  // heen en terug en strand zitten al in de score; een lengte buiten ±10% kost veel punten
+  const waarde = (k) => k.score - 3 * Math.max(0, Math.abs(k.lengte - doel) / doel - 0.1)
+  const lus = (k) => k.an.dubbel <= 0.15 // Komoot-rondjes gaan hooguit 6% heen en terug
+  lijst.sort((a, b) => lus(b) - lus(a) || waarde(b) - waarde(a))
+  const opties = []
+  for (const k of lijst) {
+    if (opties.length >= Math.max(2, aantalOpties)) break
+    if (opties.length && k.an.dubbel > 0.25) continue
+    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
+  }
+  for (const o of opties) {
+    if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
+      waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: in die richting lukte ${km} km niet`)
+    }
+  }
+  const uitleg = lijst.map((k) => ({
+    richting: k.peiling, rek: 'lus', km: k.lengte / 1000, afwijking: 0, osm: 0, score: k.score,
+    zacht: K.zachtAandeel(k.an, 'eind'), paadjes: K.paadjesAandeel(k.an), strand: K.strandMeter(k.an), dubbel: k.an.dubbel, voldoet: voldoet(k),
+  }))
+  return { opties, waarschuwingen, doel, uitleg }
 }
 
 const LETTERS = 'ABCDEFGH'
@@ -732,6 +892,7 @@ export async function maakPlan(opties) {
   const alternatieven = Math.max(1, opties.alternatieven ?? 2)
   let plan
   if (opties.rondjeKm && opties.punten.length > 1) plan = await planLus(opties.punten[0], opties.punten[1], br, bgt, alternatieven, meld)
+  else if (opties.rondjeKm && opties.vorm !== 'kronkel') plan = await planRondjeLussen(opties.punten[0], opties.rondjeKm, br, bgt, alternatieven, meld)
   else if (opties.rondjeKm) plan = await planRondje(opties.punten[0], opties.rondjeKm, br, bgt, opties.kandidaten ?? 12, alternatieven, meld, opties.vorm)
   else plan = await planRoute(opties.punten, br, bgt, alternatieven, meld)
   const lijst = []

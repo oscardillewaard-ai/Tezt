@@ -44,7 +44,7 @@ function leesKleuren() {
 leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus' }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false }
 let uitslag = null // wat maakPlan teruggaf: alle routes
 let plan = null // de details van de gekozen route
 let gekozen = 0
@@ -364,6 +364,25 @@ el('kaartje').addEventListener('change', () => {
   staat.kaartje = el('kaartje').checked
   bewaar()
 })
+el('luchtfoto').addEventListener('change', () => {
+  staat.luchtfoto = el('luchtfoto').checked
+  bewaar()
+  if (plan) tekenTwijfels()
+})
+/** Eén regel onder 'Instellingen' met wat er aan staat. */
+function vatSamen() {
+  const delen = [staat.trail ? 'trail' : 'alles onverhard']
+  if (staat.strand) delen.push('strand overslaan')
+  if (staat.kaartje) delen.push('toegangskaart')
+  if (staat.law !== 1) delen.push(staat.law <= 0.3 ? 'sterke LAW-voorkeur' : 'lichte LAW-voorkeur')
+  delen.push(staat.grondig === 0 ? '1 route, zonder officiële kaart' : `${Math.max(1, staat.grondig)} ${staat.grondig === 1 ? 'route' : 'routes'}`)
+  if (staat.luchtfoto) delen.push("luchtfoto's")
+  el('instSamenvatting').textContent = '· ' + delen.join(' · ')
+}
+el('instellingen').addEventListener('change', vatSamen)
+el('twijfelblok').addEventListener('toggle', () => {
+  if (plan) tekenRoute(false)
+})
 el('vorm').addEventListener('change', () => {
   staat.vorm = el('vorm').value
   bewaar()
@@ -527,7 +546,8 @@ function tekenRoute(passend) {
     lijn.bindPopup(() => popup(s), { maxWidth: 300 })
     lijn.bindTooltip(() => `km ${nl(s.van / 1000)}–${nl(s.tot / 1000)} · ${s[bron]}${s.twijfel ? ' · twijfel' : ''}`, { sticky: true })
     lijnen.push([lijn, s])
-    if (s.twijfel) {
+    const twijfelsTonen = el('twijfelblok').open
+    if (s.twijfel && twijfelsTonen) {
       // dunne stippellijn eroverheen, zodat twijfel niet alleen aan kleur hangt
       L.polyline(pad, { color: KLEUR.inkt, weight: 1.5, dashArray: '3 6', interactive: false }).addTo(routeLaag)
     }
@@ -536,9 +556,11 @@ function tekenRoute(passend) {
       const [mx, my] = K.puntOpLijn(s.xy, K.lijnLengte(s.xy) / 2)
       const [lon, lat] = K.naarWgs(mx, my)
       s.midden = [lat, lon]
-      L.marker(s.midden, { icon: icoon(s.nr, 'tw'), keyboard: false })
-        .on('click', () => lijn.openPopup(s.midden))
-        .addTo(routeLaag)
+      if (twijfelsTonen) {
+        L.marker(s.midden, { icon: icoon(s.nr, 'tw'), keyboard: false })
+          .on('click', () => lijn.openPopup(s.midden))
+          .addTo(routeLaag)
+      }
     }
   }
   if (passend) {
@@ -768,7 +790,8 @@ function tekenTwijfels() {
   const lijst = el('twijfels')
   lijst.innerHTML = ''
   el('twijfelkop').textContent = `Twijfelstukken (${plan.twijfels.length})`
-  const metFoto = new Set(plan.twijfels.slice().sort((a, b) => b.tot - b.van - (a.tot - a.van)).slice(0, MAX_FOTOS))
+  el('twijfelblok').hidden = !plan.twijfels.length && !plan.twijfelKort.aantal
+  const metFoto = new Set(staat.luchtfoto ? plan.twijfels.slice().sort((a, b) => b.tot - b.van - (a.tot - a.van)).slice(0, MAX_FOTOS) : [])
   for (const s of plan.twijfels) {
     const li = document.createElement('li')
     li.innerHTML =
@@ -796,6 +819,7 @@ function tekenTwijfels() {
       li.appendChild(document.createElement('span'))
     }
     li.addEventListener('click', () => {
+      if (!twijfelLijn[s.nr]) return
       kaart.once('moveend', () => twijfelLijn[s.nr].openPopup(s.midden))
       kaart.fitBounds(twijfelLijn[s.nr].getBounds().pad(0.6), { maxZoom: 19, animate: false })
       if (window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -803,7 +827,7 @@ function tekenTwijfels() {
     lijst.appendChild(li)
   }
   let noot = plan.twijfels.length
-    ? 'Tik op een regel om erheen te zoomen; tik op de foto om hem te vergroten. '
+    ? `Stukken waar de bronnen het oneens zijn. Tik op een regel om erheen te zoomen${staat.luchtfoto ? '; tik op de foto om hem te vergroten' : ''}. `
     : `Geen twijfelstukken van ${MIN_TWIJFEL} m of langer. `
   if (plan.twijfelKort.aantal) {
     noot += `Daarnaast ${plan.twijfelKort.aantal} ${plan.twijfelKort.aantal === 1 ? 'kort stukje' : 'korte stukjes'} ` +
@@ -886,6 +910,8 @@ if (el('grondig').value !== String(staat.grondig)) el('grondig').value = '2'
 el('trail').value = staat.trail ? '1' : '0'
 el('strand').checked = staat.strand
 el('kaartje').checked = !!staat.kaartje
+el('luchtfoto').checked = !!staat.luchtfoto
+vatSamen()
 el('vorm').value = staat.vorm === 'kronkel' ? 'kronkel' : 'lus'
 for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
 puntenGewijzigd()
