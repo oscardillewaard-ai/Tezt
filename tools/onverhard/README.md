@@ -316,7 +316,10 @@ draait in je browser; er is geen eigen server.
   als hij niet veel langer wordt en niet meer heen en terug gaat; anders
   meldt de app hoeveel strand er nog in zit.
 - *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
-  kaart.
+  kaart. Bij een rondje is "1 route" ook een snelle zoektocht (6 richtingen en
+  5 in plaats van 7 routes per lus): ongeveer half zo lang wachten, maar in de
+  vergelijking met Komoot duidelijk minder mooie rondjes (bijvoorbeeld
+  Meijendel 56% in plaats van 75% onverhard, N70 55% in plaats van 86%).
 - *Luchtfoto's bij twijfelstukken* (standaard uit): een uitsnede van de
   luchtfoto bij elk twijfelstuk, met een kleurindicatie. In de praktijk voegde
   het weinig toe, daarom staat het uit.
