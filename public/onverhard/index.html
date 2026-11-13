@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Plan een hardlooproute over zo veel mogelijk onverharde paden en controleer de ondergrond met de BGT en de luchtfoto." />
+    <meta name="description" content="Plan trailrunroutes over zo veel mogelijk onverharde paden en controleer de ondergrond met de officiële kaart en de luchtfoto." />
     <meta name="theme-color" content="#14532d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -14,6 +14,16 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="vendor/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
+    <script>
+      // thema meteen zetten, vóór de pagina zichtbaar wordt (geen witte flits)
+      try {
+        const k = localStorage.getItem('onverhard.thema') || 'auto'
+        const donker = k === 'donker' || (k === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = donker ? 'dark' : 'light'
+      } catch {
+        // geen opslag: de media-query in de css regelt het
+      }
+    </script>
     <title>Onverhard</title>
   </head>
   <body>
@@ -21,14 +31,22 @@
       <div id="kaart" aria-label="Kaart: tik om punten te zetten"></div>
       <main>
         <header>
-          <h1>Onverhard</h1>
-          <p class="sub">Hardlooproutes over zo veel mogelijk onverharde paden, gecontroleerd met de BGT en de luchtfoto.</p>
+          <div>
+            <h1>Onverhard</h1>
+            <p class="sub">Trailrunroutes over zo veel mogelijk onverharde paden, gecontroleerd met de officiële kaart van de overheid en de luchtfoto.</p>
+          </div>
+          <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
         </header>
 
         <section id="invoer">
           <div class="keuze" id="modus" role="group" aria-label="Soort route">
             <button type="button" data-modus="route" aria-pressed="true">Van A naar B</button>
             <button type="button" data-modus="rondje" aria-pressed="false">Rondje</button>
+          </div>
+
+          <div class="zoek">
+            <input type="search" id="zoek" placeholder="Zoek een plek, adres of postcode" autocomplete="off" enterkeyhint="search" aria-label="Zoek een plek" aria-controls="zoekresultaten" />
+            <ul id="zoekresultaten" role="listbox" hidden></ul>
           </div>
           <p class="hint" id="hint"></p>
           <ol class="punten" id="punten"></ol>
@@ -43,7 +61,15 @@
             <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
           </label>
           <label class="veld">
-            <span>LAW-paden (landelijke wandelroutes)</span>
+            <span>Soort paden</span>
+            <select id="trail">
+              <option value="1">Smalle paadjes eerst (trail)</option>
+              <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
+            </select>
+          </label>
+          <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
+          <label class="veld">
+            <span>Landelijke wandelroutes (LAW)</span>
             <select id="law">
               <option value="1">Geen voorkeur</option>
               <option value="0.6">Lichte voorkeur</option>
@@ -51,12 +77,12 @@
             </select>
           </label>
           <label class="veld">
-            <span>Controle met de BGT</span>
+            <span>Hoeveel routes vergelijken</span>
             <select id="grondig">
-              <option value="2">Normaal: 2 alternatieven vergelijken</option>
-              <option value="4">Grondig: 4 alternatieven vergelijken</option>
-              <option value="1">Snel: alleen de route controleren</option>
-              <option value="0">Uit: alleen OpenStreetMap</option>
+              <option value="2">2 routes</option>
+              <option value="4">4 routes (duurt langer)</option>
+              <option value="1">1 route (snelst)</option>
+              <option value="0">1 route, zonder officiële kaart</option>
             </select>
           </label>
 
@@ -71,17 +97,22 @@
 
         <section id="resultaat" hidden>
           <div class="kern" id="kern"></div>
+          <div id="meldingen"></div>
+
+          <h2>Routes</h2>
+          <ul class="opties" id="opties"></ul>
+          <p class="noot">Tik op een route om hem te kiezen. Met "op kaart" zet je routes naast elkaar op de kaart (gestippeld).</p>
+
           <div class="knoppen">
             <button type="button" class="hoofd" id="gpx">Download GPX</button>
             <button type="button" id="deel">Kopieer link</button>
           </div>
-          <div id="meldingen"></div>
 
           <h2>Kleur de route naar</h2>
           <div class="keuze" id="bron" role="group" aria-label="Kleur de route naar">
             <button type="button" data-bron="eind" aria-pressed="true">Eindoordeel</button>
-            <button type="button" data-bron="bgt" aria-pressed="false">BGT</button>
-            <button type="button" data-bron="osm" aria-pressed="false">OSM</button>
+            <button type="button" data-bron="bgt" aria-pressed="false">Officiële kaart</button>
+            <button type="button" data-bron="osm" aria-pressed="false">OpenStreetMap</button>
           </div>
 
           <h2>Ondergrond per bron</h2>
@@ -92,21 +123,19 @@
           <table id="tabel"></table>
           <p class="noot" id="noot"></p>
 
-          <h2>Langste zachte stukken</h2>
+          <h2>Langste onverharde stukken</h2>
           <table id="zacht"></table>
 
           <h2 id="twijfelkop">Twijfelstukken</h2>
           <ul class="twijfels" id="twijfels"></ul>
           <p class="noot" id="twijfelnoot"></p>
-
-          <div id="planblok"></div>
         </section>
 
         <section>
           <h2>Goed om te weten</h2>
-          <p class="noot">Eindoordeel = BGT als die iets weet, anders OpenStreetMap. De BGT is zo actueel als de gemeente of andere bronhouder haar bijhoudt; smalle graspaden staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
-          <p class="noot">Een route van 18 km kost met "Normaal" ongeveer 9 MB aan BGT-tegels van PDOK en is in 10 tot 20 seconden klaar ("Snel" 5 MB, "Grondig" 15 MB). Plan je binnen een uur opnieuw in dezelfde buurt, dan komen de tegels uit het geheugen van je browser.</p>
-          <p class="noot">Bronnen: route © OpenStreetMap-bijdragers via BRouter · ondergrond: BGT via PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar BRouter en PDOK.</p>
+          <p class="noot"><b>Officiële kaart</b> is de BGT (Basisregistratie Grootschalige Topografie): de kaart die gemeenten, provincies en waterschappen bijhouden, met per vlak de ondergrond. <b>OpenStreetMap</b> is de kaart van vrijwilligers; daarop worden ook de routes berekend. <b>Eindoordeel</b>: de officiële kaart als die iets weet, anders OpenStreetMap.</p>
+          <p class="noot">De officiële kaart is zo actueel als de beheerder haar bijhoudt, en smalle paadjes staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
+          <p class="noot">Bronnen: route © OpenStreetMap-bijdragers via BRouter · officiële kaart en zoeken: PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar BRouter en PDOK.</p>
         </section>
       </main>
     </div>

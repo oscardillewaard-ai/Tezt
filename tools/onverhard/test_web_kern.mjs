@@ -230,3 +230,41 @@ test('dubbel gelopen, rondjepunten, GPX en kleurindicatie', () => {
   assert.equal(K.kleurIndicatie(150, 148, 146).steun, 'hard')
   assert.equal(K.kleurIndicatie(40, 45, 42).steun, null)
 })
+
+test('doodlopend stuk en overlap tussen routes', () => {
+  assert.deepEqual(K.doodlopend([[0, 0], [100, 0], [100, 80], [100, 0], [200, 0]], [100, 80]), { lengte: 80, basis: [100, 0] })
+  assert.equal(K.doodlopend([[0, 0], [100, 0], [200, 0]], [100, 0]).lengte, 0)
+  const heen = [[0, 0], [100, 0], [200, 0]]
+  assert.equal(K.overlap(heen, [[200, 0], [0, 0]]), 1)
+  assert.ok(K.overlap(heen, [[200, 0], [200, 300], [0, 300], [0, 0]]) < 0.2)
+})
+
+test('strand = zandvlak zonder pad vlak bij de zee; verderop is het een zandverstuiving', () => {
+  const v = new K.BgtVlakken()
+  v.voegToe('onbegroeidterreindeel', feature('zand', 'zand', vierkant(0, 0, 2000, 100)))
+  v.voegToeZee('zee1', K.geojsonVlakken(vierkant(0, -500, 2000, 0)))
+  const strand = v.zoek(1000, 50, 0, null)
+  assert.equal(strand.klasse, K.ONVERHARD)
+  assert.equal(strand.strand, true)
+  const ver = new K.BgtVlakken()
+  ver.voegToe('onbegroeidterreindeel', feature('zand', 'zand', vierkant(0, 0, 2000, 100)))
+  ver.voegToeZee('zee1', K.geojsonVlakken(vierkant(0, -2000, 2000, -1000)))
+  assert.equal(ver.zoek(1000, 50, 0, null).strand, false)
+})
+
+test('trailprofiel: smalle paadjes goedkoopst, klassiek profiel ongewijzigd', () => {
+  const trail = K.maakProfiel(1, { trail: true })
+  assert.ok(trail.includes('else if highway=path then ( if ishalf then 1.1 else 1 )'))
+  assert.ok(!trail.includes('NIETLAW'))
+  assert.equal(K.maakProfiel(1), K.maakProfiel(1, { trail: false }))
+  assert.equal(K.kostenfactor(K.ONVERHARD, 'highway=path', true), 1)
+  assert.equal(K.kostenfactor(K.ONVERHARD, 'highway=track', true), 1.3)
+  assert.equal(K.kostenfactor(K.GESLOTEN, 'highway=path', true), 3)
+})
+
+test('aandeel smalle paadjes en strand in een analyse', () => {
+  const t = K.leesBrouterRoute(brouterFeature()) // 137 m path/gras, 137 m fietspad/asfalt
+  const an = K.analyseer(t, null)
+  assert.ok(Math.abs(K.paadjesAandeel(an) - 0.5) < 0.01)
+  assert.equal(K.strandMeter(an), 0)
+})

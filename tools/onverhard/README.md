@@ -275,57 +275,89 @@ veranderen mee met OSM en de BGT):
 
 ## Webversie
 
-In `public/onverhard/` van deze repo staat dezelfde planner als webapp (na
-deploy: `https://oscardillewaard-ai.github.io/Tezt/onverhard/`). Je tikt
-punten op de kaart of kiest "Rondje", en krijgt dezelfde kaart, tabel,
-twijfelstukken met luchtfoto en een GPX om te downloaden. Alles draait in je
-browser; er is geen eigen server.
+In `public/onverhard/` van deze repo staat de planner als webapp, gemaakt voor
+**trailrunnen**: `https://oscardillewaard-ai.github.io/Tezt/onverhard/`. Alles
+draait in je browser; er is geen eigen server.
 
-De rekenkern (`kern.js`) is een vertaling van `onverhard.py`: hetzelfde
-routeprofiel, dezelfde klassen, dezelfde regels voor het BGT-oordeel en de
-twijfelstukken, dezelfde ronde 2 en hetzelfde rondje. Wat anders is:
+**Wat je ermee doet**
+
+- **Van A naar B**: zoek een plek (adres, straat, postcode, plaats; via de
+  PDOK Locatieserver) of tik op de kaart. Elk volgend punt wordt het nieuwe
+  eindpunt; de punten ertussen zijn tussenpunten.
+- **Rondje**: kies een startpunt en een lengte. De app probeert acht
+  richtingen en houdt de rondjes binnen ±10% van de lengte. Je krijgt er
+  minstens twee die echt van elkaar verschillen.
+- **Rondje via een keerpunt**: tik in de modus Rondje een tweede punt. Heen en
+  terug gaan dan via verschillende paden. De app probeert terugwegen opzij en
+  voorbij het keerpunt (zodat je doorloopt in plaats van omkeert) en biedt
+  alleen echte lussen aan: hooguit 15% van de terugweg over de heenweg.
+- **Routes vergelijken**: je krijgt routes A, B, … (A is de aanbevolen). Tik
+  een route om hem te kiezen. Met "op kaart" zet je routes gestippeld naast
+  elkaar; tik op zo'n stippellijn om die route te kiezen.
+- **Kleur de route naar** het eindoordeel, de officiële kaart (BGT) of
+  OpenStreetMap, met tabel, twijfelstukken met luchtfoto en een GPX-download.
+- Licht, donker of automatisch thema (knop rechtsboven).
+
+**Instellingen**
+
+- *Soort paden*: "Smalle paadjes eerst (trail)" is de standaard. Dan kost een
+  `path` 1, een onverhard `footway` 1, een brede zandweg (`track`) of
+  ruiterpad 1,3, een voetpad zonder ondergrond (vaak een stoep) 2,5 en
+  verharding 3 tot 8. Paadjes zonder `surface`-tag (in duinen en bossen vaak
+  zo) tellen dus ook als fijn. "Alles wat onverhard is" gebruikt het profiel
+  van het Python-script.
+- *Strand overslaan* (standaard aan): aan de tags van OpenStreetMap zie je
+  niet of een zandpad op het strand ligt. De officiële kaart weet het wel: het
+  strand is een zandvlak zonder pad, vlak bij een watervlak van het type
+  "zee". Zandverstuivingen in de duinen tellen dus niet als strand. Loopt een
+  route over het strand, dan vraagt de app hem opnieuw op met no-go-zones
+  (BRouter-parameter `nogos`) op die stukken. Die nieuwe route telt alleen
+  als hij niet veel langer wordt en niet meer heen en terug gaat; anders
+  meldt de app hoeveel strand er nog in zit.
+- *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
+  kaart.
+
+**Rondjes en doodlopende paden**: de tussenpunten van een rondje liggen op
+een cirkel. Valt er een op een doodlopend pad, dan zou je daar heen en weer
+lopen. De app herkent dat (de route valt voor en na het punt samen), legt het
+tussenpunt op de plek waar het doodlopende stuk begint en vraagt de route
+opnieuw op, vóór de lengte wordt beoordeeld. Richtingen waarvan een
+tussenpunt meer dan 300 m van de route ligt (in zee, of geen pad in de buurt)
+vallen af.
+
+**Verschillen met de Python-tool**
 
 | | Python-tool | Webversie |
 |---|---|---|
-| BGT ophalen | OGC API Features (GeoJSON per bbox) | **vectortegels** van PDOK (zoomniveau 12, tegels van 215 × 215 m) |
+| Profiel | onverhard (klassiek) | standaard trail; klassiek kan ook |
+| Officiële kaart ophalen | OGC API Features (GeoJSON per bbox) | **vectortegels** van PDOK (zoomniveau 12, 215 × 215 m) |
+| Strand | niet apart | herkend en standaard vermeden |
+| Rondje via keerpunt, zoeken, routes vergelijken | nee | ja |
 | Omrekenen naar RD | pyproj | benaderingsformules (binnen 0,3 m van pyproj) |
 | Kleurindicatie luchtfoto | kleur + textuur | alleen kleur |
-| Cache | map `cache/` op schijf | de browser bewaart BGT-tegels een uur |
-| Uitvoer | GPX, HTML, PNG's, terminal, JSON | kaart en tabel in de app, GPX-download, deellink |
+| Cache | map `cache/` op schijf | de browser bewaart kaarttegels een uur |
 
-**Waarom vectortegels:** een bbox-vraag aan de OGC API stuurt elk vlak dat de
-bbox raakt in zijn geheel terug, als tekst, met 31 velden. Bij een route van
-18 km was dat 27 tot 109 MB, en het geheugen van de browser liep op tot bijna
-400 MB. Dat is te veel voor een telefoon. De vectortegels bevatten dezelfde vlakken
-(gecontroleerd: dezelfde `lokaal_id`'s in drie tegels, randen binnen 5 cm),
-maar compact gecodeerd. De tool leest ze met een eigen kleine lezer (`leesTegel`
-in `kern.js`). Gemeten in Chromium, Delft → Rotterdam via de Slinksloot (18 km):
+De vectortegels bevatten dezelfde vlakken als de OGC API (gecontroleerd:
+dezelfde `lokaal_id`'s in drie tegels, randen binnen 5 cm), maar compact
+gecodeerd. Een route van 18 km kost daardoor 5 tot 15 MB in plaats van 27 tot
+109 MB, en het geheugen van de browser blijft rond de 30 MB in plaats van tot
+400 MB. Met het klassieke profiel geeft de webversie op de testroutes dezelfde
+uitkomst als de Python-tool: hooguit 29 m verschil per ondergrondklasse op
+18 km. Elk verzoek heeft een tijdslimiet van 90 seconden, zodat een server
+die niet reageert de app niet laat vastlopen.
 
-| Controle met de BGT | Alternatieven per deel | Data | Klaar in | Piekgeheugen |
-|---|---|---|---|---|
-| Snel | 1 | 5 MB | 7 s | 15 MB |
-| Normaal (standaard) | 2 | 9 MB | 11–13 s | 33 MB |
-| Grondig | 4 | 15 MB | 21 s | 31 MB |
-
-**Zelfde uitkomst:** op de vier testroutes van hieronder geeft de webversie
-dezelfde lengte, dezelfde gekozen alternatieven en hetzelfde aantal
-twijfelstukken als de Python-tool. Per ondergrondklasse scheelt het hooguit
-29 m (Delft → Rotterdam, 18 km). Bij `--law 0.3` (23 km) is het 97 m, maar
-alleen tussen open en gesloten verharding; onverhard en half verhard zijn daar
-tot op de meter gelijk.
-
-Testen van de webversie:
+**Testen van de webversie**
 
 ```
-node --test tools/onverhard/test_web_kern.mjs          # offline, rekenkern en tegellezer
+node --test tools/onverhard/test_web_kern.mjs          # offline: rekenkern, tegellezer, strand, doodlopend
 NODE_USE_ENV_PROXY=1 node tools/onverhard/vergelijk_web.mjs uit/test.json "51.9921,4.3481" ...   # naast Python leggen
 (cd public && python3 -m http.server 8765) &
-node tools/onverhard/test_web_e2e.mjs <map> uit/test.json 'p=51.9921,4.3481;51.9255,4.4679'   # in een echte browser
+node tools/onverhard/test_web_e2e.mjs <map> uit/test.json 'p=51.9921,4.3481;51.9255,4.4679&trail=0&strand=0'
 ```
 
 `NODE_USE_ENV_PROXY=1` is alleen nodig achter een proxy. De end-to-end-test
 gebruikt Playwright uit de `node_modules` van de repo; zet `CHROMIUM_PAD` als
-die geen eigen browser heeft.
+die geen eigen browser heeft, en `ONVERHARD_URL` om de live site te testen.
 
 ## Bronnen
 

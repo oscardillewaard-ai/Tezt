@@ -148,24 +148,25 @@ Iconen: `node scripts/gen-parken-icons.mjs`.
 ## Onverhard (losse app)
 
 In `public/onverhard/` staat Onverhard, een vierde losstaande PWA zonder
-build-stap: plan een hardlooproute over zo veel mogelijk onverharde paden en
-laat de ondergrond controleren met de BGT (Basisregistratie Grootschalige
-Topografie) en de luchtfoto van PDOK. Tik punten op de kaart (start, eventuele
-tussenpunten, eind) of kies "Rondje" met een lengte; de app laat de route per
-stuk kleuren naar ondergrond (OSM, BGT of het eindoordeel), geeft km en % per
-klasse, de langste zachte stukken en de twijfelstukken met een luchtfoto-
-uitsnede, en een GPX om te downloaden.
+build-stap: plan trailrunroutes over zo veel mogelijk onverharde, smalle
+paadjes en laat de ondergrond controleren met de officiële kaart (BGT) en de
+luchtfoto van PDOK. Zoek of tik punten (start, tussenpunten, eind), of kies
+"Rondje" met een lengte of via een keerpunt (heen en terug via verschillende
+paden). Je krijgt routes A, B, … om te vergelijken en naast elkaar op de kaart
+te zetten, met per route km en % per ondergrond, de langste onverharde
+stukken, twijfelstukken met luchtfoto en een GPX-download. Het strand wordt
+standaard overgeslagen; er is een licht en een donker thema.
 
 Het is de browserversie van de Python-tool in `tools/onverhard/`; daar staat
-ook de uitleg van de methode, de keuzes en de beperkingen (README). Alles
-draait in de browser: routes komen van de publieke BRouter-server, de BGT als
-vectortegels en de luchtfoto's van PDOK. Er is geen eigen server en er zijn
-geen sleutels nodig.
+de uitleg van de methode, de keuzes en de beperkingen (README, sectie
+Webversie). Alles draait in de browser: routes van de publieke BRouter-server,
+de officiële kaart als vectortegels, zoeken en luchtfoto's van PDOK. Er is
+geen eigen server en er zijn geen sleutels nodig.
 
-- `kern.js`: rekenkern zonder netwerk (vertaling van `onverhard.py`, plus een
-  kleine lezer voor de vectortegels); getest met
-  `node --test tools/onverhard/test_web_kern.mjs`.
-- `bronnen.js`: BRouter, PDOK en de planner (route, alternatieven, rondje).
+- `kern.js`: rekenkern zonder netwerk (vertaling van `onverhard.py`, plus de
+  tegellezer, strandherkenning, doodlopende stukken en het trailprofiel);
+  getest met `node --test tools/onverhard/test_web_kern.mjs`.
+- `bronnen.js`: BRouter, PDOK en de planner (route, rondje, lus via keerpunt).
 - `app.js`: de interface.
 
 Na deploy staat hij op `https://<user>.github.io/Tezt/onverhard/`. Afspraken
@@ -173,9 +174,9 @@ zoals bij de andere losse apps: geen trek-omlaag-om-te-verversen en een
 network-first service worker (`CACHE` in `sw.js` ophogen bij een release).
 Een "Wat is er nieuw?"-melding en blijvende opslag zijn er nog niet; er valt
 weinig te verliezen, want alleen de laatste punten en instellingen staan in
-`localStorage` (sleutel `onverhard.v1`). Een route delen gaat met "Kopieer
-link" (punten in het `#`-deel van de link).
+`localStorage` (sleutels `onverhard.v1` en `onverhard.thema`). Een route delen
+gaat met "Kopieer link" (punten en instellingen in het `#`-deel van de link).
 
 De kaart gebruikt Leaflet (meegeleverd in `public/onverhard/vendor/`, BSD-2)
-met tegels van OpenStreetMap en de PDOK-luchtfoto. Iconen:
-`node scripts/gen-onverhard-icons.mjs`.
+met tegels van OpenStreetMap (in het donkere thema omgekeerd) en de
+PDOK-luchtfoto. Iconen: `node scripts/gen-onverhard-icons.mjs`.

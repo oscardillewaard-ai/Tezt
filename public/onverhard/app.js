@@ -2,10 +2,11 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
-import { maakPlan, luchtfotoUrl } from './bronnen.js'
+import { maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
+const THEMA = 'onverhard.thema'
 const MIN_TWIJFEL = 30 // twijfelstukken korter dan dit (m) worden niet apart genoemd
 const MAX_FOTOS = 12
 const FOTO_M = 120 // zijde van een luchtfoto-uitsnede in meters
@@ -15,15 +16,8 @@ const NEDERLAND = { zuid: 50.5, noord: 53.8, west: 3.0, oost: 7.4 }
 const el = (id) => document.getElementById(id)
 const nl = (x, d = 2) => Number(x).toFixed(d).replace('.', ',')
 const km = (m) => nl(m / 1000) + ' km'
+const pct = (x, d = 0) => nl(100 * x, d) + '%'
 const veilig = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
-const stijl = getComputedStyle(document.documentElement)
-const KLEUR = {
-  [K.ONVERHARD]: stijl.getPropertyValue('--onverhard').trim(),
-  [K.HALF]: stijl.getPropertyValue('--half').trim(),
-  [K.OPEN]: stijl.getPropertyValue('--open').trim(),
-  [K.GESLOTEN]: stijl.getPropertyValue('--gesloten').trim(),
-  [K.ONBEKEND]: stijl.getPropertyValue('--onbekend').trim(),
-}
 const TOELICHTING = {
   [K.ONVERHARD]: 'gras, zand, aarde, bospad',
   [K.HALF]: 'schelpen, grind',
@@ -31,11 +25,30 @@ const TOELICHTING = {
   [K.GESLOTEN]: 'asfalt, beton',
   [K.ONBEKEND]: 'geen gegevens',
 }
-const BRONNAAM = { eind: 'Eindoordeel', bgt: 'BGT', osm: 'OSM' }
+const BRONNAAM = { eind: 'Eindoordeel', bgt: 'Officiële kaart', osm: 'OpenStreetMap' }
+
+let KLEUR = {}
+function leesKleuren() {
+  const stijl = getComputedStyle(document.documentElement)
+  const v = (naam) => stijl.getPropertyValue(naam).trim()
+  KLEUR = {
+    [K.ONVERHARD]: v('--onverhard'),
+    [K.HALF]: v('--half'),
+    [K.OPEN]: v('--open'),
+    [K.GESLOTEN]: v('--gesloten'),
+    [K.ONBEKEND]: v('--onbekend'),
+    rouw: v('--rouw'),
+    inkt: v('--inkt'),
+  }
+}
+leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2 }
-let plan = null // het laatste resultaat van maakPlan
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true }
+let uitslag = null // wat maakPlan teruggaf: alle routes
+let plan = null // de details van de gekozen route
+let gekozen = 0
+const opKaart = new Set() // routes die op de kaart staan
 let bron = 'eind' // waar de routekleur naar kijkt
 let stopper = null // AbortController van de lopende planning
 
@@ -68,6 +81,8 @@ function laad() {
     if (hash.get('rondje')) staat.km = Number(hash.get('rondje')) || staat.km
     staat.law = Number(hash.get('law')) || 1
     if (hash.get('bgt') !== null) staat.grondig = Number(hash.get('bgt'))
+    if (hash.get('trail') !== null) staat.trail = hash.get('trail') !== '0'
+    if (hash.get('strand') !== null) staat.strand = hash.get('strand') !== '0'
   }
   if (!Array.isArray(staat.punten)) staat.punten = []
   // de link uit de adresbalk halen: anders wint hij bij herladen van je nieuwe punten
@@ -80,8 +95,41 @@ function deelLink() {
   let hash = `#p=${p}`
   if (staat.modus === 'rondje') hash += `&rondje=${staat.km}`
   if (staat.law !== 1) hash += `&law=${staat.law}`
+  if (!staat.trail) hash += '&trail=0'
+  if (!staat.strand) hash += '&strand=0'
   return location.origin + location.pathname + hash
 }
+
+// ---------- Thema ----------
+const THEMA_TEKST = { auto: ['◐', 'automatisch'], licht: ['☀', 'licht'], donker: ['☾', 'donker'] }
+function themaKeuze() {
+  try {
+    return localStorage.getItem(THEMA) || 'auto'
+  } catch {
+    return 'auto'
+  }
+}
+function zetThema(keuze) {
+  try {
+    localStorage.setItem(THEMA, keuze)
+  } catch {
+    // zonder opslag geldt de keuze tot je de pagina sluit
+  }
+  const donker = keuze === 'donker' || (keuze === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.dataset.theme = donker ? 'dark' : 'light'
+  el('thema').textContent = THEMA_TEKST[keuze][0]
+  el('thema').setAttribute('aria-label', `Thema: ${THEMA_TEKST[keuze][1]} (tik om te wisselen)`)
+  el('thema').title = `Thema: ${THEMA_TEKST[keuze][1]}`
+  leesKleuren()
+  if (plan) herteken()
+}
+el('thema').addEventListener('click', () => {
+  const volgorde = ['auto', 'licht', 'donker']
+  zetThema(volgorde[(volgorde.indexOf(themaKeuze()) + 1) % volgorde.length])
+})
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (themaKeuze() === 'auto') zetThema('auto')
+})
 
 // ---------- Kaart ----------
 const kaart = L.map('kaart', { maxZoom: 21 }).setView([52.1, 5.3], 8)
@@ -89,6 +137,7 @@ const lagen = {
   OpenStreetMap: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 21,
     maxNativeZoom: 19,
+    className: 'osm-tegels',
     attribution: '© OpenStreetMap-bijdragers',
   }),
   'Luchtfoto (PDOK)': L.tileLayer(
@@ -96,15 +145,17 @@ const lagen = {
     { maxZoom: 21, maxNativeZoom: 21, attribution: 'Luchtfoto: PDOK / Het Waterschapshuis' },
   ),
 }
-// De BGT-kaart van PDOK bestaat pas vanaf zoomniveau 17: daarom een aan/uit-laag.
+// De kaart van de officiële registratie (BGT) bestaat pas vanaf zoomniveau 17: daarom een aan/uit-laag.
 const bgtLaag = L.tileLayer(
   'https://service.pdok.nl/lv/bgt/wmts/v1_0/standaardvisualisatie/EPSG:3857/{z}/{x}/{y}.png',
   { minZoom: 17, maxZoom: 21, maxNativeZoom: 20, opacity: 0.8, attribution: 'BGT: Kadaster / PDOK' },
 )
 lagen.OpenStreetMap.addTo(kaart)
-L.control.layers(lagen, { 'BGT-vlakken (vanaf zoom 17)': bgtLaag }).addTo(kaart)
+L.control.layers(lagen, { 'Officiële kaart (vanaf zoom 17)': bgtLaag }).addTo(kaart)
 L.control.scale({ imperial: false }).addTo(kaart)
+kaart.createPane('alternatieven').style.zIndex = 390 // onder de gekozen route
 const puntLaag = L.layerGroup().addTo(kaart)
+const altLaag = L.layerGroup().addTo(kaart)
 const routeLaag = L.layerGroup().addTo(kaart)
 const icoon = (tekst, klasse = '') =>
   L.divIcon({ className: '', html: `<div class="punt ${klasse}">${tekst}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] })
@@ -114,17 +165,23 @@ function inNederland([lat, lon]) {
 }
 
 function puntNaam(i) {
-  if (staat.modus === 'rondje') return 'Start en finish'
+  if (staat.modus === 'rondje') return i === 0 ? 'Start en finish' : 'Keerpunt'
   if (i === 0) return 'Start'
   return i === staat.punten.length - 1 ? 'Eind' : `Tussenpunt ${i}`
+}
+
+function puntLabel(i) {
+  if (staat.modus === 'rondje') return i === 0 ? ['S', ''] : ['K', 'via']
+  const laatste = i === staat.punten.length - 1
+  if (i === 0) return ['S', '']
+  return laatste ? ['F', ''] : [String(i), 'via']
 }
 
 function tekenPunten() {
   puntLaag.clearLayers()
   staat.punten.forEach((p, i) => {
-    const laatste = i === staat.punten.length - 1
-    const tekst = i === 0 ? 'S' : laatste ? 'F' : String(i)
-    const marker = L.marker(p, { icon: icoon(tekst, i === 0 || laatste ? '' : 'via'), draggable: true, title: puntNaam(i) })
+    const [tekst, klasse] = puntLabel(i)
+    const marker = L.marker(p, { icon: icoon(tekst, klasse), draggable: true, title: puntNaam(i), zIndexOffset: 1000 })
     marker.on('dragend', () => {
       const { lat, lng } = marker.getLatLng()
       staat.punten[i] = [lat, lng]
@@ -150,10 +207,8 @@ function tekenPuntenlijst() {
   lijst.innerHTML = ''
   staat.punten.forEach((p, i) => {
     const li = document.createElement('li')
-    const laatste = i === staat.punten.length - 1
-    li.innerHTML =
-      `<div class="punt ${i === 0 || laatste ? '' : 'via'}">${i === 0 ? 'S' : laatste ? 'F' : i}</div>` +
-      `<div>${puntNaam(i)}<small>${p[0].toFixed(5)}, ${p[1].toFixed(5)}</small></div>`
+    const [tekst, klasse] = puntLabel(i)
+    li.innerHTML = `<div class="punt ${klasse}">${tekst}</div><div>${puntNaam(i)}<small>${p[0].toFixed(5)}, ${p[1].toFixed(5)}</small></div>`
     const knop = document.createElement('button')
     knop.type = 'button'
     knop.textContent = '✕'
@@ -167,23 +222,25 @@ function tekenPuntenlijst() {
   })
   const rondje = staat.modus === 'rondje'
   const n = staat.punten.length
-  el('hint').textContent = rondje
-    ? n
-      ? 'Tik op de kaart om het startpunt te verplaatsen.'
-      : 'Tik op de kaart om het startpunt te kiezen.'
-    : n === 0
-      ? 'Tik op de kaart om het startpunt te zetten.'
-      : n === 1
-        ? 'Tik nog een keer voor het eindpunt.'
-        : 'Elke volgende tik wordt het nieuwe eindpunt; de punten ertussen zijn tussenpunten. Zo dwing je een mooi pad af.'
+  let hint
+  if (rondje) {
+    if (n === 0) hint = 'Zoek of tik het startpunt.'
+    else if (n === 1) hint = 'Kies hieronder de lengte, of tik een keerpunt: dan gaan heen en terug via verschillende paden.'
+    else hint = 'Heen en terug gaan via verschillende paden. Tik opnieuw om het keerpunt te verplaatsen.'
+  } else if (n === 0) hint = 'Zoek of tik het startpunt.'
+  else if (n === 1) hint = 'Zoek of tik het eindpunt.'
+  else hint = 'Elk volgend punt wordt het nieuwe eindpunt; de punten ertussen zijn tussenpunten. Zo dwing je een mooi pad af.'
+  el('hint').textContent = hint
   el('keerom').hidden = rondje || n < 2
   el('wis').hidden = n === 0
+  el('kmveld').hidden = !rondje || n > 1
   el('plan').disabled = rondje ? n < 1 : n < 2
-  el('plan').textContent = rondje ? 'Plan rondje' : 'Plan route'
+  if (!rondje) el('plan').textContent = 'Plan route'
+  else el('plan').textContent = n > 1 ? 'Plan rondje via keerpunt' : 'Plan rondje'
 }
 
 function puntenGewijzigd() {
-  if (staat.modus === 'rondje' && staat.punten.length > 1) staat.punten = [staat.punten[0]]
+  if (staat.modus === 'rondje' && staat.punten.length > 2) staat.punten = [staat.punten[0], staat.punten[staat.punten.length - 1]]
   bewaar()
   tekenPunten()
   tekenPuntenlijst()
@@ -194,24 +251,84 @@ function toonFout(tekst) {
   el('fout').hidden = !tekst
 }
 
-kaart.on('click', (e) => {
+function voegPuntToe(p) {
   if (stopper) return // tijdens het plannen geen punten verzetten
-  const p = [e.latlng.lat, e.latlng.lng]
   if (!inNederland(p)) {
-    toonFout('Dat punt ligt buiten Nederland. De BGT en de luchtfoto dekken alleen Nederland.')
+    toonFout('Dat punt ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
   }
   toonFout('')
-  if (staat.modus === 'rondje') staat.punten = [p]
+  if (staat.modus === 'rondje') staat.punten = staat.punten.length ? [staat.punten[0], p] : [p]
   else staat.punten.push(p)
   puntenGewijzigd()
+}
+
+kaart.on('click', (e) => voegPuntToe([e.latlng.lat, e.latlng.lng]))
+
+// ---------- Zoeken ----------
+let zoekTimer = null
+let zoekStopper = null
+let zoekTreffers = []
+function verbergZoek() {
+  el('zoekresultaten').hidden = true
+  zoekTreffers = []
+}
+function kiesTreffer(t) {
+  el('zoek').value = ''
+  verbergZoek()
+  kaart.setView(t.punt, Math.max(kaart.getZoom(), 15))
+  voegPuntToe(t.punt)
+}
+async function zoek(tekst) {
+  if (zoekStopper) zoekStopper.abort()
+  zoekStopper = new AbortController()
+  const lijst = el('zoekresultaten')
+  try {
+    zoekTreffers = (await zoekPlaats(tekst, zoekStopper.signal)).filter((t) => inNederland(t.punt))
+  } catch (fout) {
+    if (fout.name === 'AbortError') return
+    lijst.innerHTML = '<li class="leeg">Zoeken lukt nu niet; tik de plek op de kaart.</li>'
+    lijst.hidden = false
+    return
+  }
+  lijst.innerHTML = ''
+  if (!zoekTreffers.length) lijst.innerHTML = '<li class="leeg">Niets gevonden.</li>'
+  for (const t of zoekTreffers) {
+    const li = document.createElement('li')
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.setAttribute('role', 'option')
+    knop.innerHTML = `${veilig(t.naam)}<small>${veilig(t.soort)}</small>`
+    knop.addEventListener('click', () => kiesTreffer(t))
+    li.appendChild(knop)
+    lijst.appendChild(li)
+  }
+  lijst.hidden = false
+}
+el('zoek').addEventListener('input', () => {
+  clearTimeout(zoekTimer)
+  const tekst = el('zoek').value.trim()
+  if (tekst.length < 3) {
+    verbergZoek()
+    return
+  }
+  zoekTimer = setTimeout(() => zoek(tekst), 300)
+})
+el('zoek').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && zoekTreffers.length) {
+    e.preventDefault()
+    kiesTreffer(zoekTreffers[0])
+  } else if (e.key === 'Escape') verbergZoek()
+})
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.zoek')) verbergZoek()
 })
 
 // ---------- Invoer ----------
 function zetModus(modus) {
+  if (modus === 'rondje' && staat.modus !== 'rondje') staat.punten = staat.punten.slice(0, 1) // alleen de start blijft
   staat.modus = modus
   for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === modus))
-  el('kmveld').hidden = modus !== 'rondje'
   puntenGewijzigd()
 }
 el('modus').addEventListener('click', (e) => {
@@ -228,6 +345,14 @@ el('law').addEventListener('change', () => {
 })
 el('grondig').addEventListener('change', () => {
   staat.grondig = Number(el('grondig').value)
+  bewaar()
+})
+el('trail').addEventListener('change', () => {
+  staat.trail = el('trail').value === '1'
+  bewaar()
+})
+el('strand').addEventListener('change', () => {
+  staat.strand = el('strand').checked
   bewaar()
 })
 el('keerom').addEventListener('click', () => {
@@ -248,25 +373,28 @@ el('locatie').addEventListener('click', () => {
       const p = [pos.coords.latitude, pos.coords.longitude]
       kaart.setView(p, 15)
       if (!inNederland(p)) {
-        toonFout('Je staat buiten Nederland. De BGT en de luchtfoto dekken alleen Nederland.')
+        toonFout('Je staat buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
         return
       }
-      if (!staat.punten.length) {
-        staat.punten = [p]
-        puntenGewijzigd()
-      }
+      if (!staat.punten.length) voegPuntToe(p)
     },
-    () => toonFout('Je locatie is niet beschikbaar. Geef de browser toestemming of tik zelf op de kaart.'),
+    () => toonFout('Je locatie is niet beschikbaar. Geef de browser toestemming, of zoek of tik zelf een plek.'),
     { enableHighAccuracy: true, timeout: 10000 },
   )
 })
 
 // ---------- Plannen ----------
+function stopBezig() {
+  stopper = null
+  el('plan').hidden = false
+  el('bezig').hidden = true
+}
+
 async function planNu() {
   if (stopper) return
   toonFout('')
   if (!staat.punten.every(inNederland)) {
-    toonFout('Een van de punten ligt buiten Nederland. De BGT en de luchtfoto dekken alleen Nederland.')
+    toonFout('Een van de punten ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
   }
   stopper = new AbortController()
@@ -280,13 +408,13 @@ async function planNu() {
   try {
     const rondje = staat.modus === 'rondje'
     const resultaat = await maakPlan({
-      punten: rondje ? [staat.punten[0]] : staat.punten,
+      punten: rondje ? staat.punten.slice(0, 2) : staat.punten,
       rondjeKm: rondje ? staat.km : null,
       law: staat.law,
+      trail: staat.trail,
+      strandMijden: staat.strand,
       alternatieven: Math.max(1, staat.grondig),
-      bgtKandidaten: staat.grondig >= 4 ? 3 : staat.grondig >= 2 ? 2 : 1,
       metBgt: staat.grondig > 0,
-      minTwijfel: MIN_TWIJFEL,
       signal: stopper.signal,
       meld: (tekst) => {
         stap = tekst
@@ -294,13 +422,17 @@ async function planNu() {
         el('voortgang').style.width = '0'
       },
       voortgang: (klaar, totaal) => {
-        status(`${stap}: ${klaar} van ${totaal} BGT-tegels`)
+        status(`${stap}: ${klaar} van ${totaal} kaarttegels`)
         el('voortgang').style.width = `${(100 * klaar) / totaal}%`
       },
     })
-    plan = resultaat
+    uitslag = resultaat
+    gekozen = 0
+    opKaart.clear()
+    uitslag.opties.forEach((_, i) => opKaart.add(i)) // eerst alle routes tonen, om te vergelijken
+    plan = details(uitslag.opties[0], MIN_TWIJFEL)
     stopBezig() // eerst de voortgangsbalk weg, dan pas naar het resultaat scrollen (anders schuift het weg)
-    toonResultaat()
+    toonResultaat(true)
   } catch (fout) {
     if (fout.name === 'AbortError') toonFout('Gestopt. Er is geen route gemaakt.')
     else if (fout.bron) toonFout(`Het lukte niet bij ${fout.bron}: ${fout.melding}. Er is geen route gemaakt.`)
@@ -312,14 +444,16 @@ async function planNu() {
     stopBezig()
   }
 }
-
-function stopBezig() {
-  stopper = null
-  el('plan').hidden = false
-  el('bezig').hidden = true
-}
 el('plan').addEventListener('click', planNu)
 el('stop').addEventListener('click', () => stopper && stopper.abort())
+
+function kiesRoute(i) {
+  if (!uitslag || i === gekozen) return
+  gekozen = i
+  opKaart.add(i)
+  plan = details(uitslag.opties[i], MIN_TWIJFEL)
+  toonResultaat(false)
+}
 
 // ---------- Resultaat ----------
 const naarLatLon = (xy) => xy.map(([x, y]) => {
@@ -331,29 +465,55 @@ let twijfelLijn = {}
 
 function popup(s) {
   let h =
-    `<b>km ${nl(s.van / 1000)}–${nl(s.tot / 1000)}</b> · ${Math.round(s.tot - s.van)} m<br>` +
-    `Eindoordeel: <b>${s.eind}</b><br>OSM: ${s.osm}${s.osmZeker ? '' : ' (aanname)'}<br>` +
-    `<code>${veilig(s.tags.slice(0, 4).join(' | '))}</code><br>BGT: ${s.bgt}<br><code>${veilig(s.bgtUitleg)}</code>`
+    `<b>Route ${plan.naam} · km ${nl(s.van / 1000)}–${nl(s.tot / 1000)}</b> · ${Math.round(s.tot - s.van)} m<br>` +
+    `Eindoordeel: <b>${s.eind}</b><br>OpenStreetMap: ${s.osm}${s.osmZeker ? '' : ' (aanname)'}<br>` +
+    `<code>${veilig(s.tags.slice(0, 4).join(' | '))}</code><br>Officiële kaart: ${s.bgt}${s.strand ? ' (strand)' : ''}<br>` +
+    `<code>${veilig(s.bgtUitleg)}</code>`
   if (s.twijfel) h += `<br><b style="color:var(--twijfel)">Twijfel${s.nr ? ' #' + s.nr : ''}:</b> ${veilig(s.twijfelTekst)}`
   if (s.indicatie) h += `<br>Kleurindicatie luchtfoto: ${veilig(s.indicatie)}`
   return h
 }
 
-function tekenRoute() {
+/** De andere routes die op de kaart staan: dun en gestippeld, in de kleur van de ondergrond. */
+function tekenAlternatieven() {
+  altLaag.clearLayers()
+  for (const i of opKaart) {
+    if (i === gekozen) continue
+    const o = uitslag.opties[i]
+    const tip = `Route ${o.naam}: ${nl(o.km)} km, ${pct(o.zacht)} onverhard. Tik om te kiezen.`
+    const kies = () => kiesRoute(i)
+    L.polyline(naarLatLon(o.analyse.xy), { pane: 'alternatieven', color: KLEUR.rouw, weight: 7, opacity: 0.7, bubblingMouseEvents: false })
+      .bindTooltip(tip, { sticky: true })
+      .on('click', kies)
+      .addTo(altLaag)
+    for (const s of o.analyse.samengevoegd) {
+      L.polyline(naarLatLon(s.xy), {
+        pane: 'alternatieven', color: KLEUR[s.eind], weight: 3.5, dashArray: '6 6', lineCap: 'butt', bubblingMouseEvents: false,
+      })
+        .bindTooltip(tip, { sticky: true })
+        .on('click', kies)
+        .addTo(altLaag)
+    }
+    const [lat, lon] = naarLatLon([K.puntOpLijn(o.analyse.xy, o.analyse.lengte * 0.3)])[0]
+    L.marker([lat, lon], { icon: icoon(o.naam, 'alt'), keyboard: false, title: tip }).on('click', kies).addTo(altLaag)
+  }
+}
+
+function tekenRoute(passend) {
   routeLaag.clearLayers()
   lijnen = []
   twijfelLijn = {}
   const alles = naarLatLon(plan.analyse.xy)
-  L.polyline(alles, { color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(routeLaag)
+  L.polyline(alles, { color: KLEUR.rouw, weight: 9, opacity: 0.9, interactive: false }).addTo(routeLaag)
   for (const s of plan.analyse.samengevoegd) {
     const pad = naarLatLon(s.xy)
-    const lijn = L.polyline(pad, { color: KLEUR[s[bron]], weight: 5, opacity: 1, lineCap: 'butt' }).addTo(routeLaag)
+    const lijn = L.polyline(pad, { color: KLEUR[s[bron]], weight: 5, opacity: 1, lineCap: 'butt', bubblingMouseEvents: false }).addTo(routeLaag)
     lijn.bindPopup(() => popup(s), { maxWidth: 300 })
     lijn.bindTooltip(() => `km ${nl(s.van / 1000)}–${nl(s.tot / 1000)} · ${s[bron]}${s.twijfel ? ' · twijfel' : ''}`, { sticky: true })
     lijnen.push([lijn, s])
     if (s.twijfel) {
       // dunne stippellijn eroverheen, zodat twijfel niet alleen aan kleur hangt
-      L.polyline(pad, { color: '#111', weight: 1.5, dashArray: '3 6', interactive: false }).addTo(routeLaag)
+      L.polyline(pad, { color: KLEUR.inkt, weight: 1.5, dashArray: '3 6', interactive: false }).addTo(routeLaag)
     }
     if (s.nr) {
       twijfelLijn[s.nr] = lijn
@@ -365,7 +525,11 @@ function tekenRoute() {
         .addTo(routeLaag)
     }
   }
-  kaart.fitBounds(L.latLngBounds(alles).pad(0.06))
+  if (passend) {
+    const grens = L.latLngBounds(alles)
+    for (const i of opKaart) grens.extend(L.latLngBounds(naarLatLon(uitslag.opties[i].analyse.xy)))
+    kaart.fitBounds(grens.pad(0.06))
+  }
 }
 
 function kleurRoute() {
@@ -378,6 +542,36 @@ el('bron').addEventListener('click', (e) => {
     kleurRoute()
   }
 })
+
+function tekenOpties() {
+  const lijst = el('opties')
+  lijst.innerHTML = ''
+  const rondje = staat.modus === 'rondje'
+  uitslag.opties.forEach((o, i) => {
+    const li = document.createElement('li')
+    li.className = 'optie' + (i === gekozen ? ' gekozen' : '')
+    const kies = document.createElement('button')
+    kies.type = 'button'
+    kies.className = 'kies'
+    kies.setAttribute('aria-pressed', String(i === gekozen))
+    let regel = `${nl(o.km)} km · ${pct(o.zacht)} onverhard · ${pct(o.paadjes)} smalle paadjes`
+    if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
+    if (rondje && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
+    if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
+    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>Route ${o.naam}</b>${i === 0 ? ' · aanbevolen' : ''}<small>${regel}</small></span>`
+    kies.addEventListener('click', () => kiesRoute(i))
+    const toon = document.createElement('label')
+    toon.className = 'toon'
+    toon.innerHTML = `<input type="checkbox" ${opKaart.has(i) ? 'checked' : ''} ${i === gekozen ? 'disabled' : ''}> op kaart`
+    toon.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) opKaart.add(i)
+      else opKaart.delete(i)
+      tekenAlternatieven()
+    })
+    li.append(kies, toon)
+    lijst.appendChild(li)
+  })
+}
 
 const tip = el('tip')
 function verplaatsTip(e) {
@@ -422,7 +616,7 @@ function tekenBalken() {
 
 function tekenTabel() {
   const cel = (c) => `${nl(c.km)} km<small>${nl(c.pct, 1)}%</small>`
-  let h = '<tr><th>Ondergrond</th><th>OSM</th><th>BGT</th><th>Eindoordeel</th></tr>'
+  let h = '<tr><th>Ondergrond</th><th>OpenStreet&shy;Map</th><th>Officiële kaart</th><th>Eind&shy;oordeel</th></tr>'
   for (const r of plan.tabel) {
     h +=
       `<tr><td><i style="background:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></td>` +
@@ -434,10 +628,13 @@ function tekenTabel() {
   el('tabel').innerHTML = h
   const a = plan.analyse
   const gok = a.stukken.filter((s) => !s.osmZeker && s.osm !== K.ONBEKEND).reduce((som, s) => som + s.tot - s.van, 0)
-  let noot = a.bgtGebruikt ? '' : 'De BGT is niet gebruikt: het eindoordeel is alleen op OSM gebaseerd. '
-  noot += `In de OSM-kolom is ${km(gok)} een aanname op basis van het wegtype (geen surface-tag). `
-  noot += `${nl(100 * plan.law, 0)}% van de route loopt over een LAW.`
-  if (a.dubbel > 0.02) noot += ` Ongeveer ${nl(100 * a.dubbel, 0)}% gaat heen en terug over hetzelfde pad.`
+  let noot = a.bgtGebruikt ? '' : 'De officiële kaart is niet gebruikt: het eindoordeel komt alleen van OpenStreetMap. '
+  noot += `Bij OpenStreetMap is ${km(gok)} een aanname op basis van het soort weg (geen ondergrond ingevuld). `
+  noot += `${pct(K.paadjesAandeel(a))} van de route gaat over smalle onverharde paadjes`
+  noot += plan.law > 0.005 ? `, ${pct(plan.law)} over een landelijke wandelroute (LAW).` : '.'
+  const strand = K.strandMeter(a)
+  if (strand > 50) noot += ` Over het strand: ${km(strand)}.`
+  if (a.dubbel > 0.02) noot += ` Ongeveer ${pct(a.dubbel)} gaat heen en terug over hetzelfde pad.`
   el('noot').textContent = noot
 }
 
@@ -452,7 +649,7 @@ function tekenZachteStukken() {
   const t = el('zacht')
   t.innerHTML = '<tr><th>Waar</th><th>Lengte</th><th>Ondergrond</th></tr>'
   if (!plan.zachteStukken.length) {
-    t.innerHTML = '<tr><td>Geen zachte stukken gevonden.</td></tr>'
+    t.innerHTML = '<tr><td>Geen onverharde stukken gevonden.</td></tr>'
     return
   }
   for (const z of plan.zachteStukken) {
@@ -471,6 +668,7 @@ function tekenLuchtfoto(canvas, s, regel) {
   const bb = [mx - h, my - h, mx + h, my + h].map((v) => Math.round(v * 10) / 10)
   const schaal = FOTO_PX / FOTO_M
   const px = ([x, y]) => [(x - bb[0]) * schaal, (bb[3] - y) * schaal]
+  const route = plan.analyse.xy
   const beeld = new Image()
   beeld.crossOrigin = 'anonymous' // nodig om de pixels te mogen lezen
   beeld.onload = () => {
@@ -507,7 +705,7 @@ function tekenLuchtfoto(canvas, s, regel) {
         const ind = K.kleurIndicatie(r / n, g / n, b / n)
         s.indicatie = ind.tekst
         if (ind.steun && s.twijfel === 'conflict') {
-          s.indicatie += ` (past bij ${K.groep(s.osm) === ind.steun ? 'OSM' : 'de BGT'})`
+          s.indicatie += ` (past bij ${K.groep(s.osm) === ind.steun ? 'OpenStreetMap' : 'de officiële kaart'})`
         }
         regel.textContent = `Eindoordeel: ${s.eind} · luchtfoto (indicatie): ${s.indicatie}`
       }
@@ -530,7 +728,7 @@ function tekenLuchtfoto(canvas, s, regel) {
       c.stroke()
       ctx.drawImage(laag, 0, 0)
     }
-    rand(plan.analyse.xy, '#fff', 2)
+    rand(route, '#fff', 2)
     rand(s.xy, '#ff00c8', 4)
     // schaalbalk van 20 m
     ctx.fillStyle = '#fff'
@@ -595,60 +793,43 @@ function tekenTwijfels() {
   el('twijfelnoot').textContent = noot
 }
 
-function tekenPlanlog() {
-  const log = plan.log
-  const pct = (x) => (x === null || x === undefined ? '–' : nl(100 * x, 1) + '%')
-  if (!log.length) {
-    el('planblok').innerHTML = ''
-    return
-  }
-  let h
-  if (log[0].richting !== undefined) {
-    h = '<h2>Kandidaten voor het rondje</h2><table><tr><th>Richting</th><th>km</th><th>Zacht OSM</th><th>Zacht BGT</th><th>Dubbel</th></tr>'
-    for (const k of log) {
-      if (k.fout) {
-        h += `<tr><td>${Math.round(k.richting)}° (mislukt)</td><td colspan="4">${veilig(k.fout)}</td></tr>`
-        continue
-      }
-      h +=
-        `<tr${k.gekozen ? ' class="som"' : ''}><td>${Math.round(k.richting)}°${k.gekozen ? ' ← gekozen' : k.binnen ? '' : ' (te kort of te lang)'}</td>` +
-        `<td>${nl(k.km)}</td><td>${pct(k.osm)}</td><td>${pct(k.eind)}</td><td>${pct(k.dubbel)}</td></tr>`
-    }
-    h += '</table><p class="noot">Zacht = onverhard + half verhard. Alleen de beste kandidaten volgens OSM zijn langs de BGT gelegd.</p>'
-  } else {
-    h = '<h2>Alternatieven langs de BGT</h2><table><tr><th>Deel · alt.</th><th>km</th><th>Zacht OSM</th><th>Zacht eind</th><th>LAW</th><th>Kosten</th></tr>'
-    for (const k of log) {
-      h +=
-        `<tr${k.gekozen ? ' class="som"' : ''}><td>${k.deel} · ${k.alt}${k.gekozen ? ' ← gekozen' : ''}</td><td>${nl(k.km)}</td>` +
-        `<td>${pct(k.osm)}</td><td>${pct(k.eind)}</td><td>${pct(k.law)}</td><td>${nl(k.kosten, 1)}</td></tr>`
-    }
-    h += '</table><p class="noot">Kosten = gewogen kilometers volgens het routeprofiel, met de ondergrond van het eindoordeel ingevuld. Per deel wint het alternatief met de laagste kosten.</p>'
-  }
-  el('planblok').innerHTML = h
+function tekenKern() {
+  el('kern').innerHTML =
+    `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
+    `<div><b>${pct(plan.zacht.eind)}</b><span>onverhard + half verhard</span></div>` +
+    `<div><b>${pct(K.paadjesAandeel(plan.analyse))}</b><span>smalle paadjes</span></div>` +
+    `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`
 }
 
-function toonResultaat() {
+/** Alles opnieuw tekenen in de huidige kleuren (na een themawissel), zonder de kaart te verschuiven. */
+function herteken() {
+  tekenAlternatieven()
+  tekenRoute(false)
+  kleurRoute()
+  tekenBalken()
+  tekenTabel()
+}
+
+function toonResultaat(nieuw) {
   el('resultaat').hidden = false
-  el('kern').innerHTML =
-    `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>totale afstand</span></div>` +
-    `<div><b>${nl(100 * plan.zacht.eind, 0)}%</b><span>onverhard + half verhard</span></div>` +
-    `<div><b>${plan.twijfels.length}</b><span>twijfelstukken</span></div>`
-  el('meldingen').innerHTML = plan.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
-  tekenRoute()
+  tekenKern()
+  el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
+  tekenOpties()
+  tekenAlternatieven()
+  tekenRoute(nieuw)
   tekenBalken()
   tekenTabel()
   tekenZachteStukken()
   tekenTwijfels()
-  tekenPlanlog()
   kleurRoute()
-  el('resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (nieuw) el('resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 el('gpx').addEventListener('click', () => {
   if (!plan) return
   const nu = new Date()
   const stempel = nu.toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-')
-  const naam = `onverhard-${stempel}`
+  const naam = `onverhard-${stempel}-route-${plan.naam}`
   const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu)], { type: 'application/gpx+xml' }))
   const a = document.createElement('a')
   a.href = url
@@ -673,6 +854,7 @@ el('deel').addEventListener('click', async () => {
 
 // ---------- Start ----------
 const hash = laad()
+zetThema(themaKeuze())
 el('km').value = staat.km
 el('law').value = String(staat.law)
 if (el('law').value !== String(staat.law)) {
@@ -681,16 +863,21 @@ if (el('law').value !== String(staat.law)) {
   el('law').value = String(staat.law)
 }
 el('grondig').value = String(staat.grondig)
-zetModus(staat.modus === 'rondje' ? 'rondje' : 'route')
+if (el('grondig').value !== String(staat.grondig)) el('grondig').value = '2'
+el('trail').value = staat.trail ? '1' : '0'
+el('strand').checked = staat.strand
+for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
+puntenGewijzigd()
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))
 else if (staat.punten.length === 1) kaart.setView(staat.punten[0], 13)
-// #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
-if (hash.get('plan') && !el('plan').disabled) planNu()
-// een gedeelde link openen terwijl de app al open staat: opnieuw beginnen met die punten
+// een gedeelde link opent terwijl de app al open staat: opnieuw beginnen met die punten
 window.addEventListener('hashchange', () => {
   if (new URLSearchParams(location.hash.slice(1)).get('p')) location.reload()
 })
-window.onverhard = { krijgPlan: () => plan } // voor de end-to-end-test
+// #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
+if (hash.get('plan') && !el('plan').disabled) planNu()
+// voor de end-to-end-test
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute } }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})

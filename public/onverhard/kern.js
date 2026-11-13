@@ -146,10 +146,31 @@ assign initialcost = 0
  * hetzelfde pad zonder LAW. We maken daarvoor alle andere wegen 1/law keer
  * duurder, zodat de kostenfactor nergens onder 1 komt.
  */
-export function maakProfiel(law) {
+export function maakProfiel(law, { trail = false } = {}) {
   if (!(law >= 0.05 && law <= 1)) throw new Error('De LAW-factor moet tussen 0,05 en 1 liggen')
-  return PROFIEL.replace('NIETLAW', (1 / law).toFixed(4))
+  const tekst = trail ? PROFIEL.replace(/assign base =[\s\S]*?\nassign islaw/, TRAIL_BASIS + '\nassign islaw') : PROFIEL
+  return tekst.replace('NIETLAW', (1 / law).toFixed(4))
 }
+
+// Trailrunnen: smalle paadjes zijn het fijnst, ongeacht of er een surface-tag
+// op staat (in de duinen en bossen vaak niet). Brede zandwegen zijn iets
+// minder, ruiterpaden even duur als brede zandwegen, verharding het minst.
+const TRAIL_BASIS = `assign base =
+  if forbidden then 10000
+  else if ispaved then
+     ( if highway=path|track|footway|pedestrian|bridleway then 3 else if highway=primary|primary_link then 8 else if highway=secondary|secondary_link then 6 else 4 )
+  else if highway=path then ( if ishalf then 1.1 else 1 )
+  else if highway=footway|steps then ( if isunpaved then 1 else if ishalf then 1.2 else 2.5 )
+  else if highway=bridleway then 1.3
+  else if highway=track then
+     ( if tracktype=grade1 then 3 else if ishalf then 1.4 else 1.3 )
+  else if isunpaved then 1.3
+  else if ishalf then 1.4
+  else if highway=pedestrian then 2.5
+  else if highway=residential|living_street|service|unclassified|cycleway|tertiary|tertiary_link then 4
+  else if highway=secondary|secondary_link then 6
+  else if highway=primary|primary_link then 8
+  else 10000`
 
 /**
  * Zet een BRouter-GeoJSON-feature om in een traject. properties.messages is
@@ -295,7 +316,15 @@ export function isLaw(tags) {
 }
 
 /** De kostenfactor uit het routeprofiel, maar met een gegeven ondergrondklasse. */
-export function kostenfactor(klasse, tags) {
+export function kostenfactor(klasse, tags, trail = false) {
+  if (trail && (klasse === ONVERHARD || klasse === HALF)) {
+    const highway = tagsObject(tags).highway || ''
+    const half = klasse === HALF
+    if (highway === 'path') return half ? 1.1 : 1
+    if (highway === 'footway' || highway === 'steps') return half ? 1.2 : 1
+    if (highway === 'bridleway') return 1.3
+    return half ? 1.4 : 1.3
+  }
   if (klasse === ONVERHARD) return 1
   if (klasse === HALF) return 1.1
   const highway = tagsObject(tags).highway || ''
@@ -517,7 +546,7 @@ function leesVlakken(geom, x0, y1, schaal) {
 }
 
 const NODIGE_VELDEN = new Set([
-  'lokaal_id', 'functie', 'fysiek_voorkomen', 'plus_fysiek_voorkomen', 'relatieve_hoogteligging', 'status',
+  'lokaal_id', 'functie', 'fysiek_voorkomen', 'plus_fysiek_voorkomen', 'relatieve_hoogteligging', 'status', 'type',
 ])
 
 function leesLaag(bytes, col, row, lagen, uit) {
@@ -572,7 +601,7 @@ function leesLaag(bytes, col, row, lagen, uit) {
  * Lees een BGT-vectortegel (de uitgepakte bytes). Geeft de vlakken van de
  * gevraagde lagen: [{collectie, props, polygonen}], polygonen in RD.
  */
-export function leesTegel(bytes, col, row, lagen = BGT_COLLECTIES) {
+export function leesTegel(bytes, col, row, lagen = [...BGT_COLLECTIES, 'waterdeel']) {
   const uit = []
   const l = new Lezer(bytes)
   while (!l.klaar()) {
@@ -643,6 +672,38 @@ export class BgtVlakken {
     this.lijst = []
     this.index = new Map() // 'collectie|lokaal_id' -> plaats in lijst
     this.rooster = new Map()
+    this.zee = [] // watervlakken van het type 'zee': om het strand te herkennen
+    this.zeeIds = new Set()
+  }
+
+  /** Bewaar een zeevlak (BGT waterdeel, type zee). */
+  voegToeZee(id, polygonen) {
+    if (this.zeeIds.has(id)) return
+    this.zeeIds.add(id)
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const poly of polygonen) {
+      const r = poly[0]
+      for (let i = 0; i < r.length; i += 2) {
+        if (r[i] < minX) minX = r[i]
+        if (r[i] > maxX) maxX = r[i]
+        if (r[i + 1] < minY) minY = r[i + 1]
+        if (r[i + 1] > maxY) maxY = r[i + 1]
+      }
+    }
+    this.zee.push({ polygonen, bbox: [minX, minY, maxX, maxY] })
+  }
+
+  /** Ligt dit punt binnen 'afstand' meter van de zee? */
+  bijZee(x, y, afstand = 250) {
+    for (const z of this.zee) {
+      const b = z.bbox
+      if (x < b[0] - afstand || x > b[2] + afstand || y < b[1] - afstand || y > b[3] + afstand) continue
+      if (afstandTotVlak(x, y, z.polygonen) <= afstand) return true
+    }
+    return false
   }
 
   /** Voeg een GeoJSON-feature (in RD) toe. Geeft false als het niet meetelt. */
@@ -734,7 +795,7 @@ export class BgtVlakken {
    * bermvlak) of 'geen'.
    */
   zoek(x, y, niveau, osmGroep) {
-    const leeg = { klasse: ONBEKEND, uitleg: 'geen BGT-vlak op deze plek', bron: 'geen' }
+    const leeg = { klasse: ONBEKEND, uitleg: 'de officiële kaart heeft hier niets', bron: 'geen' }
     const kandidaten = this.kandidaten(x, y)
     if (!kandidaten.length) return leeg
     const opNiveau = (lijst) => {
@@ -767,7 +828,9 @@ export class BgtVlakken {
       }
     }
     if (direct) {
-      return { klasse: direct.klasse, uitleg: `geen pad geregistreerd; lijn ligt in ${vlakUitleg(direct)}`, bron: 'terrein' }
+      // het strand: een zandvlakte zonder pad erin, vlak bij de zee (anders is het een zandverstuiving)
+      const strand = direct.collectie === 'onbegroeidterreindeel' && direct.fysiek === 'zand' && this.bijZee(x, y)
+      return { klasse: direct.klasse, uitleg: `geen pad geregistreerd; lijn ligt in ${vlakUitleg(direct)}`, bron: 'terrein', strand }
     }
     return leeg
   }
@@ -798,10 +861,10 @@ export function bepaalEindEnTwijfel(s) {
   if (gb && go && gb !== go) {
     if (s.osmZeker) {
       s.twijfel = 'conflict'
-      s.twijfelTekst = `OSM zegt ${s.osm} (${s.osmUitleg}), BGT zegt ${s.bgt}`
+      s.twijfelTekst = `OpenStreetMap zegt ${s.osm} (${s.osmUitleg}), de officiële kaart zegt ${s.bgt}`
     } else if (s.bgtBron === 'terrein') {
       s.twijfel = 'bgt-zwak'
-      s.twijfelTekst = `OSM vermoedt ${s.osm} (${s.osmUitleg}); de BGT kent hier geen pad en de lijn ligt in ${s.bgt} terrein`
+      s.twijfelTekst = `OpenStreetMap vermoedt ${s.osm} (${s.osmUitleg}); de officiële kaart kent hier geen pad en de lijn ligt in ${s.bgt} terrein`
     }
   } else if (gb === null) {
     if (s.osm === ONBEKEND) {
@@ -809,7 +872,7 @@ export function bepaalEindEnTwijfel(s) {
       s.twijfelTekst = `geen van beide bronnen kent de ondergrond (${s.osmUitleg}; ${s.bgtUitleg})`
     } else if (!s.osmZeker) {
       s.twijfel = 'osm-aanname'
-      s.twijfelTekst = `alleen een OSM-aanname (${s.osmUitleg}); BGT: ${s.bgtUitleg}`
+      s.twijfelTekst = `alleen een aanname van OpenStreetMap (${s.osmUitleg}); officiële kaart: ${s.bgtUitleg}`
     }
   }
 }
@@ -839,7 +902,7 @@ export function maakStukken(traject, xy) {
         osmZeker: osm.zeker,
         osmUitleg: osm.uitleg,
         bgt: ONBEKEND,
-        bgtUitleg: 'BGT niet geraadpleegd',
+        bgtUitleg: 'officiële kaart niet geraadpleegd',
         bgtBron: 'geen',
         eind: ONBEKEND,
         twijfel: '',
@@ -917,6 +980,7 @@ export function analyseer(traject, vlakken, klaar = null) {
       s.bgtUitleg = detail.uitleg
       s.bgtBron = detail.bron
       s.bgtAandeel = top.n / lijst.length
+      s.strand = !!detail.strand
     })
     bgtGebruikt = vlakken.lijst.length > 0
   }
@@ -949,6 +1013,24 @@ export function zachtAandeel(analyse, bron = 'eind') {
   return (v[ONVERHARD] + v[HALF]) / analyse.lengte
 }
 
+/** Meters over het strand (volgens de officiële kaart). */
+export function strandMeter(analyse) {
+  let som = 0
+  for (const s of analyse.stukken) if (s.strand) som += s.tot - s.van
+  return som
+}
+
+/** Aandeel over smalle onverharde paadjes (path, footway): waar trailrunners voor komen. */
+export function paadjesAandeel(analyse) {
+  if (!analyse.lengte) return 0
+  let som = 0
+  for (const s of analyse.stukken) {
+    const highway = tagsObject(s.tags[0]).highway
+    if ((highway === 'path' || highway === 'footway') && groep(s.eind) === 'zacht') som += s.tot - s.van
+  }
+  return som / analyse.lengte
+}
+
 export function lawAandeel(analyse) {
   if (!analyse.lengte) return 0
   let som = 0
@@ -957,10 +1039,10 @@ export function lawAandeel(analyse) {
 }
 
 /** Routekosten in 'gewogen km' met de ondergrond van het eindoordeel. */
-export function routeKosten(analyse, lawFactor = 1) {
+export function routeKosten(analyse, lawFactor = 1, trail = false, strandStraf = 0) {
   let totaal = 0
   for (const s of analyse.stukken) {
-    const f = kostenfactor(s.eind, s.tags[0])
+    const f = kostenfactor(s.eind, s.tags[0], trail) + (s.strand ? strandStraf : 0)
     totaal += (s.tot - s.van) * (isLaw(s.tags[0]) ? f : f / lawFactor)
   }
   return totaal / 1000
@@ -1002,6 +1084,67 @@ export function tabel(analyse) {
     }
     return rij
   })
+}
+
+// ---------- Routes vergelijken ----------
+/** Punten om de 'stap' meter langs een lijn (één keer doorlopen). */
+export function bemonster(xy, stap) {
+  const uit = []
+  if (xy.length < 2) return xy.slice()
+  let rest = 0
+  for (let i = 1; i < xy.length; i++) {
+    const a = xy[i - 1]
+    const l = afstand(a, xy[i])
+    let d = rest
+    while (d <= l) {
+      const f = l ? d / l : 0
+      uit.push([a[0] + f * (xy[i][0] - a[0]), a[1] + f * (xy[i][1] - a[1])])
+      d += stap
+    }
+    rest = d - l
+  }
+  uit.push(xy[xy.length - 1])
+  return uit
+}
+
+/** Aandeel van route B dat binnen 'marge' meter van route A loopt (0..1). */
+export function overlap(xyA, xyB, marge = 20) {
+  const rooster = new Set()
+  for (const [x, y] of bemonster(xyA, marge / 2)) rooster.add(Math.floor(x / marge) + ',' + Math.floor(y / marge))
+  const punten = bemonster(xyB, 10)
+  let raak = 0
+  for (const [x, y] of punten) {
+    const cx = Math.floor(x / marge)
+    const cy = Math.floor(y / marge)
+    let gevonden = false
+    for (let dx = -1; dx <= 1 && !gevonden; dx++) {
+      for (let dy = -1; dy <= 1 && !gevonden; dy++) gevonden = rooster.has(cx + dx + ',' + (cy + dy))
+    }
+    if (gevonden) raak += 1
+  }
+  return punten.length ? raak / punten.length : 0
+}
+
+/**
+ * Loopt de route bij dit punt een doodlopend stuk in en over hetzelfde pad
+ * weer terug? We zoeken de plek op de route die het dichtst bij het punt
+ * ligt en kijken hoe ver de route ervoor en erna samenvalt. Geeft
+ * {lengte, basis}: de lengte van het doodlopende stuk (enkele reis) en de
+ * plek waar het begint.
+ */
+export function doodlopend(xy, punt, stap = 5, marge = 8) {
+  const cum = [0]
+  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + afstand(xy[i - 1], xy[i]))
+  let beste = 0
+  for (let i = 1; i < xy.length; i++) if (afstand(xy[i], punt) < afstand(xy[beste], punt)) beste = i
+  const s = cum[beste]
+  const totaal = cum[cum.length - 1]
+  let d = 0
+  while (s - d - stap >= 0 && s + d + stap <= totaal) {
+    if (afstand(puntOpLijn(xy, s - d - stap), puntOpLijn(xy, s + d + stap)) > marge) break
+    d += stap
+  }
+  return { lengte: d, basis: puntOpLijn(xy, s - d) }
 }
 
 // ---------- Rondje ----------

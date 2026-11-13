@@ -6,7 +6,7 @@
 //
 // (NODE_USE_ENV_PROXY is alleen nodig achter een proxy.)
 import fs from 'node:fs'
-import { maakPlan } from '../../public/onverhard/bronnen.js'
+import { maakPlan, details } from '../../public/onverhard/bronnen.js'
 
 const args = process.argv.slice(2)
 const optie = (naam) => {
@@ -20,13 +20,15 @@ const punten = args.map((a) => a.split(',').map(Number))
 
 const t0 = Date.now()
 let laatste = ''
-const plan = await maakPlan({
-  punten, law, rondjeKm,
+// zelfde instellingen als het Python-script: klassiek profiel, strand niet apart, 4 alternatieven
+const uitslag = await maakPlan({
+  punten, law, rondjeKm, trail: false, strandMijden: false, alternatieven: 4,
   meld: (tekst) => {
     if (tekst !== laatste) console.error('  ' + tekst)
     laatste = tekst
   },
 })
+const plan = { ...details(uitslag.opties[0]), verzoeken: uitslag.verzoeken, vlakken: uitslag.vlakken, meldingen: uitslag.meldingen }
 const nl = (x, d = 2) => x.toFixed(d).replace('.', ',')
 console.log(`\nWeb: ${nl(plan.analyse.lengte / 1000)} km, ${plan.twijfels.length} twijfelstukken, LAW ${nl(100 * plan.law, 1)}%, ` +
   `${plan.verzoeken} verzoeken, ${plan.vlakken} vlakken, ${Math.round((Date.now() - t0) / 1000)} s`)
@@ -43,4 +45,4 @@ for (const [i, rij] of plan.tabel.entries()) {
 }
 for (const m of plan.meldingen) console.log('LET OP: ' + m)
 if (pythonJson) console.log(`\nGrootste verschil met Python: ${nl(grootste, 0)} m`)
-for (const k of plan.log) console.log(JSON.stringify(Object.fromEntries(Object.entries(k).map(([a, b]) => [a, typeof b === 'number' ? Math.round(b * 1000) / 1000 : b]))))
+for (const o of uitslag.opties) console.log(`route ${o.naam}: ${nl(o.km)} km, ${nl(100 * o.zacht, 1)}% onverhard, ${nl(100 * o.law, 1)}% LAW`)
