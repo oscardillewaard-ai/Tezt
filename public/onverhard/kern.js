@@ -146,9 +146,19 @@ assign initialcost = 0
  * hetzelfde pad zonder LAW. We maken daarvoor alle andere wegen 1/law keer
  * duurder, zodat de kostenfactor nergens onder 1 komt.
  */
-export function maakProfiel(law, { trail = false } = {}) {
+export function maakProfiel(law, { trail = false, kaartje = false } = {}) {
   if (!(law >= 0.05 && law <= 1)) throw new Error('De LAW-factor moet tussen 0,05 en 1 liggen')
-  const tekst = trail ? PROFIEL.replace(/assign base =[\s\S]*?\nassign islaw/, TRAIL_BASIS + '\nassign islaw') : PROFIEL
+  let tekst = trail ? PROFIEL.replace(/assign base =[\s\S]*?\nassign islaw/, TRAIL_BASIS + '\nassign islaw') : PROFIEL
+  if (kaartje) {
+    // Met een toegangskaart (Dunea, Waternet, PWN) mogen paden die in OpenStreetMap
+    // als afgesloten staan meedoen, maar 30% duurder: open paden gaan voor.
+    tekst = tekst
+      .replace(/assign forbidden = [\s\S]*?\nassign base/, `assign forbidden = highway=motorway|motorway_link|trunk|trunk_link|construction|proposed
+assign afgesloten = or ( and access=private|no not footok ) foot=no|private
+assign base`)
+      .replace('assign costfactor = if islaw then base else multiply base NIETLAW',
+        'assign costfactor = multiply ( if afgesloten then 1.3 else 1 ) ( if islaw then base else multiply base NIETLAW )')
+  }
   return tekst.replace('NIETLAW', (1 / law).toFixed(4))
 }
 
@@ -308,6 +318,13 @@ export function osmNiveau(tags) {
   if ((t.bridge || 'no') !== 'no') return 1
   if ((t.tunnel || 'no') !== 'no') return -1
   return 0
+}
+
+/** Staat dit stuk in OpenStreetMap als afgesloten voor wandelaars (alleen met een toegangskaart)? */
+export function alleenMetKaartje(tags) {
+  const t = tagsObject(tags)
+  const footok = ['yes', 'designated', 'permissive'].includes(t.foot)
+  return (['no', 'private'].includes(t.access) && !footok) || ['no', 'private'].includes(t.foot)
 }
 
 export function isLaw(tags) {
@@ -924,6 +941,7 @@ export function maakStukken(traject, xy) {
         tot: gelopen + (lengte * (j + 1)) / n,
         xy: n === 1 ? punten : snijLijn(punten, (lengte * j) / n, (lengte * (j + 1)) / n),
         tags: [tags],
+        kaartje: alleenMetKaartje(tags),
         osm: osm.klasse,
         osmZeker: osm.zeker,
         osmUitleg: osm.uitleg,
@@ -1015,7 +1033,7 @@ export function analyseer(traject, vlakken, klaar = null) {
   const samen = []
   for (const s of stukken) {
     const v = samen[samen.length - 1]
-    if (v && v.osm === s.osm && v.osmZeker === s.osmZeker && v.bgt === s.bgt && v.eind === s.eind && v.twijfel === s.twijfel) {
+    if (v && v.osm === s.osm && v.osmZeker === s.osmZeker && v.bgt === s.bgt && v.eind === s.eind && v.twijfel === s.twijfel && v.kaartje === s.kaartje) {
       v.tot = s.tot
       v.xy = v.xy.concat(s.xy.slice(1))
       for (const t of s.tags) if (!v.tags.includes(t)) v.tags.push(t)
@@ -1037,6 +1055,13 @@ export function zachtAandeel(analyse, bron = 'eind') {
   if (!analyse.lengte) return 0
   const v = kmPerKlasse(analyse, bron)
   return (v[ONVERHARD] + v[HALF]) / analyse.lengte
+}
+
+/** Meters over paden die alleen met een toegangskaart open zijn. */
+export function kaartjeMeter(analyse) {
+  let som = 0
+  for (const s of analyse.stukken) if (s.kaartje) som += s.tot - s.van
+  return som
 }
 
 /** Meters over het strand (volgens de officiële kaart). */
@@ -1201,8 +1226,35 @@ export function rondjePunten(start, peiling, straal, rek = 1) {
   return [start, ...via, start]
 }
 
-/** Omtrek (hemelsbreed, langs de tussenpunten) van zo'n rondje. */
-export const rondjeOmtrek = (straal, rek = 1) => 4 * Math.hypot(straal, straal / rek)
+/**
+ * Een kronkelrondje: vijf tussenpunten rond een middelpunt, afwisselend ver
+ * en dichtbij (een ster). De route zigzagt zo door een compact gebied in plaats
+ * van één grote lus te maken.
+ */
+export function kronkelPunten(start, peiling, straal) {
+  const s = naarRd(start[1], start[0])
+  const midden = verplaats(s, peiling, straal)
+  const via = [1, 2, 3, 4, 5].map((k) => {
+    const [x, y] = verplaats(midden, peiling + 180 + 60 * k, k % 2 ? 0.45 * straal : straal)
+    const [lon, lat] = naarWgs(x, y)
+    return [lat, lon]
+  })
+  return [start, ...via, start]
+}
+
+/** Punten van een rondje van de gegeven vorm: rek 0 = kronkelen, anders een (langgerekte) lus. */
+export function vormPunten(start, peiling, straal, rek = 1) {
+  return rek === 0 ? kronkelPunten(start, peiling, straal) : rondjePunten(start, peiling, straal, rek)
+}
+
+/** Omtrek (hemelsbreed, langs de tussenpunten) van zo'n rondje met straal 1 m. */
+export function vormOmtrek(rek = 1) {
+  const start = [52, 5]
+  const xy = vormPunten(start, 0, 1000, rek).map(([la, lo]) => naarRd(lo, la))
+  return lijnLengte(xy) / 1000
+}
+
+export const rondjeOmtrek = (straal, rek = 1) => straal * vormOmtrek(rek)
 
 // ---------- GPX ----------
 const xmlVeilig = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])

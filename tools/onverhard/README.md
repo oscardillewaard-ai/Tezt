@@ -317,6 +317,22 @@ draait in je browser; er is geen eigen server.
   meldt de app hoeveel strand er nog in zit.
 - *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
   kaart.
+- *Ik heb een toegangskaart* (standaard uit): in duinen van waterbedrijven
+  (Kijfhoek en de Bierlap van Dunea, de Amsterdamse Waterleidingduinen, PWN)
+  staan veel paden of de toegangen ernaartoe in OpenStreetMap als afgesloten
+  (`access=no`, `foot=no`), terwijl je er met een dagkaart wel mag lopen. Het
+  paden-netwerk binnenin is dan voor elke planner een "eilandje". Met het vinkje
+  mogen afgesloten paden meedoen, 30% duurder dan open paden, zodat open paden
+  voorgaan. Alleen midden in de natuur (de officiële kaart rondom: duin, bos,
+  heide); een afgesloten stuk bij bebouwing of op een erf wordt alsnog met
+  no-go-zones vermeden. De app meldt hoeveel km een kaartje nodig heeft.
+  Militair terrein en tijdelijk afgesloten natuur zien er op de kaart net zo
+  uit: de borden ter plekke gaan voor.
+- *Vorm van het rondje*: "Grote lus" of "Kronkelen in de buurt". Kronkelen
+  legt vijf tussenpunten in een ster om een middelpunt, afwisselend ver en
+  dichtbij, zodat de route door een compact gebied zigzagt. Een rondje dat
+  meer dan 25% heen en terug gaat, biedt de app alleen aan als er niets anders
+  is.
 
 **Hoe een rondje gezocht wordt**: per vorm en richting liggen drie
 tussenpunten op een cirkel of ellips door het startpunt.
@@ -339,8 +355,11 @@ De publieke BRouter-server antwoordt bij te veel verzoeken tegelijk met
 "probeer later". Daarom stuurt de app één verzoek tegelijk (minstens 0,7 s
 ertussen) en houdt hij het aantal klein: een rondje kost zo'n 40 tot 70
 verzoeken en 40 tot 75 seconden. Vergelijking met Komoot, vanaf hetzelfde
-startpunt in Meijendel (15 km, "jogging"): langs de officiële kaart 67%
-onverhard tegen 63% bij Komoot, en 58% van de route over dezelfde paden.
+startpunt in Meijendel (15 km, "jogging"): langs de officiële kaart 67 tot
+78% onverhard tegen 63% bij Komoot, grotendeels over dezelfde paden. Beide
+lopen om Kijfhoek en de Bierlap heen, omdat de toegangen daar in OpenStreetMap
+afgesloten zijn. Met toegangskaart en kronkelen: 14,9 km, 97% onverhard, een
+kwart van de route in Kijfhoek en de Bierlap, 4,5 km met kaartje.
 
 **Verschillen met de Python-tool**
 

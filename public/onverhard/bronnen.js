@@ -103,12 +103,13 @@ function brouterBeurt(signal) {
 }
 
 export class BRouter {
-  constructor(law = 1, signal = undefined, { trail = false, strandMijden = false } = {}) {
+  constructor(law = 1, signal = undefined, { trail = false, strandMijden = false, kaartje = false } = {}) {
     this.law = law
     this.signal = signal
     this.trail = trail
     this.strandMijden = strandMijden
-    this.profiel = K.maakProfiel(law, { trail })
+    this.kaartje = kaartje
+    this.profiel = K.maakProfiel(law, { trail, kaartje })
     this.verzoeken = 0
   }
 
@@ -440,7 +441,7 @@ function waardering(an, br, bron) {
  * officiële kaart. Zo blijft het aantal verzoeken aan BRouter klein; de
  * publieke server antwoordt bij te veel verzoeken met 'probeer later'.
  */
-export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, meld = () => {}) {
+export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, meld = () => {}, vorm = 'lus') {
   const doel = km * 1000
   const fouten = []
   const waarschuwingen = []
@@ -454,7 +455,7 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
     }))
   }
   const probeer = async (peiling, straal, rek) => {
-    const punten = await opLand(K.rondjePunten(start, peiling, straal, rek), bgt)
+    const punten = await opLand(K.vormPunten(start, peiling, straal, rek), bgt)
     const r = await routeMetUitwijk(punten, br)
     const lengte = K.lijnLengte(K.trajectXy(r.traject))
     metingen.push(lengte / K.rondjeOmtrek(straal, rek))
@@ -463,10 +464,13 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   }
 
   // fase 1: verkennen, met ronde rondjes en langgerekte (die passen in een smalle strook natuur)
-  const vormen = [
-    ...Array.from({ length: kandidaten }, (_, n) => [(360 * n) / kandidaten, 1]),
-    ...Array.from({ length: kandidaten / 2 }, (_, n) => [15 + (720 * n) / kandidaten, 2.5]),
-  ]
+  // rek 1 = rond, 2,5 = langgerekt, 0 = kronkelen (een ster van vijf tussenpunten)
+  const vormen = vorm === 'kronkel'
+    ? Array.from({ length: kandidaten }, (_, n) => [(360 * n) / kandidaten, 0])
+    : [
+        ...Array.from({ length: kandidaten }, (_, n) => [(360 * n) / kandidaten, 1]),
+        ...Array.from({ length: kandidaten / 2 }, (_, n) => [15 + (720 * n) / kandidaten, 2.5]),
+      ]
   const lijst = []
   for (const [n, [peiling, rek]] of vormen.entries()) {
     meld(`Rondjes verkennen: ${n + 1} van ${vormen.length}`)
@@ -506,7 +510,7 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   for (const [i, k] of kansrijk.entries()) {
     meld(`Rondje ${i + 1} van ${kansrijk.length} op lengte brengen`)
     for (let ronde = 0; ronde < 3; ronde++) {
-      const schoon = await zonderDoodlopend(k.t, k.punten, [1, 2, 3], br)
+      const schoon = await zonderDoodlopend(k.t, k.punten, k.punten.slice(1, -1).map((_, i) => i + 1), br)
       k.t = schoon.traject
       k.punten = schoon.punten
       k.lengte = K.lijnLengte(K.trajectXy(k.t))
@@ -534,6 +538,7 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   const opties = []
   for (const k of kansrijk) {
     if (opties.length >= Math.max(2, aantalOpties)) break
+    if (opties.length && k.an.dubbel > 0.25) continue // een rondje dat vooral heen en terug gaat, alleen als er niets anders is
     if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
   }
   for (const o of opties) {
@@ -624,14 +629,31 @@ export async function planLus(start, keer, br, bgt, alternatieven, meld = () => 
 const LETTERS = 'ABCDEFGH'
 
 /**
- * No-go-cirkels op de strandstukken van een route, niet vlak bij de
- * routepunten (een cirkel om een routepunt negeert BRouter).
+ * Stukken die een route niet mag hebben: strand (als je dat wilt overslaan),
+ * en met een toegangskaart: afgesloten paden die NIET midden in de natuur
+ * liggen (dat is eerder een erf, een tuin of een bedrijfsterrein dan een
+ * waterleidingduin). Zet bij elk stuk 'ongewenst'.
  */
-function strandNogos(an, punten) {
+async function markeerOngewenst(an, br, bgt) {
+  let meter = 0
+  for (const s of an.stukken) {
+    s.ongewenst = br.strandMijden && s.strand
+    if (!s.ongewenst && s.kaartje && bgt) {
+      const [x, y] = K.puntOpLijn(s.xy, K.lijnLengte(s.xy) / 2)
+      await bgt.haalVoor([{ x: x - 100, y: y - 100 }, { x: x + 100, y: y + 100 }, { x: x - 100, y: y + 100 }, { x: x + 100, y: y - 100 }])
+      s.ongewenst = bgt.vlakken.natuur(x, y) < 0.6
+    }
+    if (s.ongewenst) meter += s.tot - s.van
+  }
+  return meter
+}
+
+/** No-go-cirkels op de ongewenste stukken, niet vlak bij de routepunten (die negeert BRouter). */
+function ongewenstNogos(an, punten) {
   const rd = punten.map(([lat, lon]) => K.naarRd(lon, lat))
   const uit = []
   for (const s of an.stukken) {
-    if (!s.strand) continue
+    if (!s.ongewenst) continue
     for (const p of K.bemonster(s.xy, 75)) {
       if (rd.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 150)) continue
       const [lon, lat] = K.naarWgs(p[0], p[1])
@@ -642,17 +664,18 @@ function strandNogos(an, punten) {
 }
 
 /**
- * Vraag de route opnieuw op zonder de strandstukken (hooguit twee keer). De
- * nieuwe route telt alleen als hij niet veel langer wordt (bij een rondje:
+ * Vraag de route opnieuw op zonder de ongewenste stukken (hooguit twee keer).
+ * De nieuwe route telt alleen als hij niet veel langer wordt (bij een rondje:
  * binnen 10% van de gevraagde lengte) en niet meer heen en terug gaat.
  */
-async function zonderStrand(o, br, bgt, meld, naam, doel) {
+async function zonderOngewenst(o, br, bgt, meld, naam, doel) {
   let nogos = []
-  for (let ronde = 0; ronde < 2 && K.strandMeter(o.an) > 100; ronde++) {
-    const extra = strandNogos(o.an, o.traject.punten)
+  let meter = await markeerOngewenst(o.an, br, bgt)
+  for (let ronde = 0; ronde < 2 && meter > 100; ronde++) {
+    const extra = ongewenstNogos(o.an, o.traject.punten)
     if (!extra.length) break
     nogos = nogos.concat(extra)
-    meld(`Route ${naam} om het strand heen leggen`)
+    meld(`Route ${naam} om ongewenste stukken heen leggen`)
     let t
     try {
       t = await br.route(o.traject.punten, o.alt || 0, nogos)
@@ -662,12 +685,15 @@ async function zonderStrand(o, br, bgt, meld, naam, doel) {
     }
     t.punten = o.traject.punten
     const an = await analyseerRoute(t, bgt)
-    if (K.strandMeter(an) >= K.strandMeter(o.an)) break
+    const nieuw = await markeerOngewenst(an, br, bgt)
+    if (nieuw >= meter) break
     const lengteGoed = doel ? Math.abs(an.lengte - doel) / doel <= 0.1 : an.lengte <= 1.25 * o.an.lengte
     if (!lengteGoed || an.dubbel > o.an.dubbel + 0.05) break
     o.traject = t
     o.an = an
+    meter = nieuw
   }
+  return meter
 }
 
 /** Alles wat de app over één route-optie laat zien. */
@@ -699,12 +725,14 @@ export function details(optie, minTwijfel = 30) {
  */
 export async function maakPlan(opties) {
   const meld = opties.meld || (() => {})
-  const br = new BRouter(opties.law ?? 1, opties.signal, { trail: opties.trail ?? true, strandMijden: opties.strandMijden ?? true })
+  const br = new BRouter(opties.law ?? 1, opties.signal, {
+    trail: opties.trail ?? true, strandMijden: opties.strandMijden ?? true, kaartje: opties.kaartje ?? false,
+  })
   const bgt = opties.metBgt === false ? null : new Bgt({ signal: opties.signal, voortgang: opties.voortgang })
   const alternatieven = Math.max(1, opties.alternatieven ?? 2)
   let plan
   if (opties.rondjeKm && opties.punten.length > 1) plan = await planLus(opties.punten[0], opties.punten[1], br, bgt, alternatieven, meld)
-  else if (opties.rondjeKm) plan = await planRondje(opties.punten[0], opties.rondjeKm, br, bgt, opties.kandidaten ?? 12, alternatieven, meld)
+  else if (opties.rondjeKm) plan = await planRondje(opties.punten[0], opties.rondjeKm, br, bgt, opties.kandidaten ?? 12, alternatieven, meld, opties.vorm)
   else plan = await planRoute(opties.punten, br, bgt, alternatieven, meld)
   const lijst = []
   const meldingen = plan.waarschuwingen.slice()
@@ -713,7 +741,7 @@ export async function maakPlan(opties) {
       meld(`Route ${LETTERS[i]} samenstellen`)
       o.an = await analyseerRoute(o.traject, bgt)
     }
-    if (br.strandMijden && bgt) await zonderStrand(o, br, bgt, meld, LETTERS[i], plan.doel)
+    if ((br.strandMijden || br.kaartje) && bgt) await zonderOngewenst(o, br, bgt, meld, LETTERS[i], plan.doel)
     if (lijst.some((x) => K.zelfdeTraject(x.traject, o.traject))) continue
     lijst.push({
       naam: LETTERS[i],
@@ -725,6 +753,7 @@ export async function maakPlan(opties) {
       dubbel: o.an.dubbel,
       paadjes: K.paadjesAandeel(o.an),
       strand: K.strandMeter(o.an),
+      kaartje: K.kaartjeMeter(o.an),
     })
   }
   lijst.forEach((o, i) => {

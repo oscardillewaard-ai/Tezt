@@ -44,7 +44,7 @@ function leesKleuren() {
 leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus' }
 let uitslag = null // wat maakPlan teruggaf: alle routes
 let plan = null // de details van de gekozen route
 let gekozen = 0
@@ -83,6 +83,8 @@ function laad() {
     if (hash.get('bgt') !== null) staat.grondig = Number(hash.get('bgt'))
     if (hash.get('trail') !== null) staat.trail = hash.get('trail') !== '0'
     if (hash.get('strand') !== null) staat.strand = hash.get('strand') !== '0'
+    staat.kaartje = hash.get('kaartje') === '1'
+    staat.vorm = hash.get('vorm') === 'kronkel' ? 'kronkel' : 'lus'
   }
   if (!Array.isArray(staat.punten)) staat.punten = []
   // de link uit de adresbalk halen: anders wint hij bij herladen van je nieuwe punten
@@ -97,6 +99,8 @@ function deelLink() {
   if (staat.law !== 1) hash += `&law=${staat.law}`
   if (!staat.trail) hash += '&trail=0'
   if (!staat.strand) hash += '&strand=0'
+  if (staat.kaartje) hash += '&kaartje=1'
+  if (staat.modus === 'rondje' && staat.vorm === 'kronkel') hash += '&vorm=kronkel'
   return location.origin + location.pathname + hash
 }
 
@@ -234,6 +238,7 @@ function tekenPuntenlijst() {
   el('keerom').hidden = rondje || n < 2
   el('wis').hidden = n === 0
   el('kmveld').hidden = !rondje || n > 1
+  el('vormveld').hidden = !rondje || n > 1
   el('plan').disabled = rondje ? n < 1 : n < 2
   if (!rondje) el('plan').textContent = 'Plan route'
   else el('plan').textContent = n > 1 ? 'Plan rondje via keerpunt' : 'Plan rondje'
@@ -355,6 +360,14 @@ el('strand').addEventListener('change', () => {
   staat.strand = el('strand').checked
   bewaar()
 })
+el('kaartje').addEventListener('change', () => {
+  staat.kaartje = el('kaartje').checked
+  bewaar()
+})
+el('vorm').addEventListener('change', () => {
+  staat.vorm = el('vorm').value
+  bewaar()
+})
 el('keerom').addEventListener('click', () => {
   staat.punten.reverse()
   puntenGewijzigd()
@@ -413,6 +426,8 @@ async function planNu() {
       law: staat.law,
       trail: staat.trail,
       strandMijden: staat.strand,
+      kaartje: staat.kaartje,
+      vorm: staat.vorm,
       alternatieven: Math.max(1, staat.grondig),
       metBgt: staat.grondig > 0,
       signal: stopper.signal,
@@ -469,6 +484,7 @@ function popup(s) {
     `Eindoordeel: <b>${s.eind}</b><br>OpenStreetMap: ${s.osm}${s.osmZeker ? '' : ' (aanname)'}<br>` +
     `<code>${veilig(s.tags.slice(0, 4).join(' | '))}</code><br>Officiële kaart: ${s.bgt}${s.strand ? ' (strand)' : ''}<br>` +
     `<code>${veilig(s.bgtUitleg)}</code>`
+  if (s.kaartje) h += '<br><b>Toegang:</b> in OpenStreetMap afgesloten; alleen met een toegangskaart (en als de borden het toelaten)'
   if (s.twijfel) h += `<br><b style="color:var(--twijfel)">Twijfel${s.nr ? ' #' + s.nr : ''}:</b> ${veilig(s.twijfelTekst)}`
   if (s.indicatie) h += `<br>Kleurindicatie luchtfoto: ${veilig(s.indicatie)}`
   return h
@@ -558,6 +574,7 @@ function tekenOpties() {
     if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
     if (rondje && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
+    if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
     kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>Route ${o.naam}</b>${i === 0 ? ' · aanbevolen' : ''}<small>${regel}</small></span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
@@ -634,6 +651,8 @@ function tekenTabel() {
   noot += plan.law > 0.005 ? `, ${pct(plan.law)} over een landelijke wandelroute (LAW).` : '.'
   const strand = K.strandMeter(a)
   if (strand > 50) noot += ` Over het strand: ${km(strand)}.`
+  const kaartje = K.kaartjeMeter(a)
+  if (kaartje > 50) noot += ` ${km(kaartje)} gaat over paden die in OpenStreetMap afgesloten zijn: daar heb je een toegangskaart nodig (koop die bij de ingang, vaak via een QR-code) en let op de borden.`
   if (a.dubbel > 0.02) noot += ` Ongeveer ${pct(a.dubbel)} gaat heen en terug over hetzelfde pad.`
   el('noot').textContent = noot
 }
@@ -866,6 +885,8 @@ el('grondig').value = String(staat.grondig)
 if (el('grondig').value !== String(staat.grondig)) el('grondig').value = '2'
 el('trail').value = staat.trail ? '1' : '0'
 el('strand').checked = staat.strand
+el('kaartje').checked = !!staat.kaartje
+el('vorm').value = staat.vorm === 'kronkel' ? 'kronkel' : 'lus'
 for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
 puntenGewijzigd()
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))

@@ -60,6 +60,13 @@
             <span>Lengte van het rondje</span>
             <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
           </label>
+          <label class="veld" id="vormveld" hidden>
+            <span>Vorm van het rondje</span>
+            <select id="vorm">
+              <option value="lus">Grote lus</option>
+              <option value="kronkel">Kronkelen in de buurt</option>
+            </select>
+          </label>
           <label class="veld">
             <span>Soort paden</span>
             <select id="trail">
@@ -68,6 +75,7 @@
             </select>
           </label>
           <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
+          <label class="vinkje"><input type="checkbox" id="kaartje" /> Ik heb een toegangskaart voor de waterleidingduinen (Dunea, Waternet, PWN)</label>
           <label class="veld">
             <span>Landelijke wandelroutes (LAW)</span>
             <select id="law">
@@ -134,6 +142,7 @@
         <section>
           <h2>Goed om te weten</h2>
           <p class="noot"><b>Officiële kaart</b> is de BGT (Basisregistratie Grootschalige Topografie): de kaart die gemeenten, provincies en waterschappen bijhouden, met per vlak de ondergrond. <b>OpenStreetMap</b> is de kaart van vrijwilligers; daarop worden ook de routes berekend. <b>Eindoordeel</b>: de officiële kaart als die iets weet, anders OpenStreetMap.</p>
+          <p class="noot"><b>Toegangskaart</b>: in duingebieden van waterbedrijven (zoals Kijfhoek en de Bierlap van Dunea, of de Amsterdamse Waterleidingduinen) staan veel paden in OpenStreetMap als afgesloten, terwijl je er met een dagkaart (vaak via een QR-code bij de ingang) wel mag lopen. Met het vinkje mogen die paden meedoen, maar alleen midden in de natuur; afgesloten stukken bij bebouwing of op een erf blijven verboden. Controleer ter plekke de borden: ook militair terrein en tijdelijk afgesloten natuur kunnen zo op de kaart staan.</p>
           <p class="noot">De officiële kaart is zo actueel als de beheerder haar bijhoudt, en smalle paadjes staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
           <p class="noot">Bronnen: route © OpenStreetMap-bijdragers via BRouter · officiële kaart en zoeken: PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar BRouter en PDOK.</p>
         </section>
