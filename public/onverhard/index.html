@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Plan een hardlooproute over zo veel mogelijk onverharde paden en controleer de ondergrond met de BGT en de luchtfoto." />
+    <meta name="theme-color" content="#14532d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Onverhard" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="vendor/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Onverhard</title>
+  </head>
+  <body>
+    <div class="app">
+      <div id="kaart" aria-label="Kaart: tik om punten te zetten"></div>
+      <main>
+        <header>
+          <h1>Onverhard</h1>
+          <p class="sub">Hardlooproutes over zo veel mogelijk onverharde paden, gecontroleerd met de BGT en de luchtfoto.</p>
+        </header>
+
+        <section id="invoer">
+          <div class="keuze" id="modus" role="group" aria-label="Soort route">
+            <button type="button" data-modus="route" aria-pressed="true">Van A naar B</button>
+            <button type="button" data-modus="rondje" aria-pressed="false">Rondje</button>
+          </div>
+          <p class="hint" id="hint"></p>
+          <ol class="punten" id="punten"></ol>
+          <div class="knoppen">
+            <button type="button" id="locatie">Mijn locatie</button>
+            <button type="button" id="keerom">Keer om</button>
+            <button type="button" id="wis">Wis punten</button>
+          </div>
+
+          <label class="veld" id="kmveld" hidden>
+            <span>Lengte van het rondje</span>
+            <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
+          </label>
+          <label class="veld">
+            <span>LAW-paden (landelijke wandelroutes)</span>
+            <select id="law">
+              <option value="1">Geen voorkeur</option>
+              <option value="0.6">Lichte voorkeur</option>
+              <option value="0.3">Sterke voorkeur</option>
+            </select>
+          </label>
+          <label class="veld">
+            <span>Controle met de BGT</span>
+            <select id="grondig">
+              <option value="2">Normaal: 2 alternatieven vergelijken</option>
+              <option value="4">Grondig: 4 alternatieven vergelijken</option>
+              <option value="1">Snel: alleen de route controleren</option>
+              <option value="0">Uit: alleen OpenStreetMap</option>
+            </select>
+          </label>
+
+          <button type="button" class="hoofd" id="plan">Plan route</button>
+          <div id="bezig" hidden>
+            <div class="balkje"><i id="voortgang"></i></div>
+            <p id="status" role="status"></p>
+            <button type="button" id="stop">Stop</button>
+          </div>
+          <p class="fout" id="fout" role="alert" hidden></p>
+        </section>
+
+        <section id="resultaat" hidden>
+          <div class="kern" id="kern"></div>
+          <div class="knoppen">
+            <button type="button" class="hoofd" id="gpx">Download GPX</button>
+            <button type="button" id="deel">Kopieer link</button>
+          </div>
+          <div id="meldingen"></div>
+
+          <h2>Kleur de route naar</h2>
+          <div class="keuze" id="bron" role="group" aria-label="Kleur de route naar">
+            <button type="button" data-bron="eind" aria-pressed="true">Eindoordeel</button>
+            <button type="button" data-bron="bgt" aria-pressed="false">BGT</button>
+            <button type="button" data-bron="osm" aria-pressed="false">OSM</button>
+          </div>
+
+          <h2>Ondergrond per bron</h2>
+          <div id="balken"></div>
+          <ul class="legenda" id="legenda"></ul>
+
+          <h2>Kilometers en procenten</h2>
+          <table id="tabel"></table>
+          <p class="noot" id="noot"></p>
+
+          <h2>Langste zachte stukken</h2>
+          <table id="zacht"></table>
+
+          <h2 id="twijfelkop">Twijfelstukken</h2>
+          <ul class="twijfels" id="twijfels"></ul>
+          <p class="noot" id="twijfelnoot"></p>
+
+          <div id="planblok"></div>
+        </section>
+
+        <section>
+          <h2>Goed om te weten</h2>
+          <p class="noot">Eindoordeel = BGT als die iets weet, anders OpenStreetMap. De BGT is zo actueel als de gemeente of andere bronhouder haar bijhoudt; smalle graspaden staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
+          <p class="noot">Een route van 18 km kost met "Normaal" ongeveer 9 MB aan BGT-tegels van PDOK en is in 10 tot 20 seconden klaar ("Snel" 5 MB, "Grondig" 15 MB). Plan je binnen een uur opnieuw in dezelfde buurt, dan komen de tegels uit het geheugen van je browser.</p>
+          <p class="noot">Bronnen: route © OpenStreetMap-bijdragers via BRouter · ondergrond: BGT via PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar BRouter en PDOK.</p>
+        </section>
+      </main>
+    </div>
+    <div class="tip" id="tip"></div>
+    <dialog id="foto"><form method="dialog"><button aria-label="Sluiten">Sluiten</button></form><img alt="" /><p></p></dialog>
+
+    <script src="vendor/leaflet.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

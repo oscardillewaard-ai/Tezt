@@ -15,6 +15,7 @@
     ]
   },
   "ignorePatterns": [
-    "public/parken/vendor/**"
+    "public/parken/vendor/**",
+    "public/onverhard/vendor/**"
   ]
 }

@@ -25,6 +25,9 @@ Dat levert:
 
 Met `--json` komt er ook een `route.json` met alle cijfers.
 
+Er is ook een **webversie** die op je telefoon werkt, zonder installatie:
+zie [Webversie](#webversie) hieronder.
+
 ## Installatie
 
 Python 3.10 of nieuwer.
@@ -270,10 +273,64 @@ veranderen mee met OSM en de BGT):
 | Zelfde met `--law 0.3` | 23,32 km | 40,6% | 35,2% | 35,4% | 77% |
 | `--rondje 12` vanaf de Pijperring | 11,64 km | 52,8% | 58,9% | 58,9% | 0% |
 
+## Webversie
+
+In `public/onverhard/` van deze repo staat dezelfde planner als webapp (na
+deploy: `https://oscardillewaard-ai.github.io/Tezt/onverhard/`). Je tikt
+punten op de kaart of kiest "Rondje", en krijgt dezelfde kaart, tabel,
+twijfelstukken met luchtfoto en een GPX om te downloaden. Alles draait in je
+browser; er is geen eigen server.
+
+De rekenkern (`kern.js`) is een vertaling van `onverhard.py`: hetzelfde
+routeprofiel, dezelfde klassen, dezelfde regels voor het BGT-oordeel en de
+twijfelstukken, dezelfde ronde 2 en hetzelfde rondje. Wat anders is:
+
+| | Python-tool | Webversie |
+|---|---|---|
+| BGT ophalen | OGC API Features (GeoJSON per bbox) | **vectortegels** van PDOK (zoomniveau 12, tegels van 215 × 215 m) |
+| Omrekenen naar RD | pyproj | benaderingsformules (binnen 0,3 m van pyproj) |
+| Kleurindicatie luchtfoto | kleur + textuur | alleen kleur |
+| Cache | map `cache/` op schijf | de browser bewaart BGT-tegels een uur |
+| Uitvoer | GPX, HTML, PNG's, terminal, JSON | kaart en tabel in de app, GPX-download, deellink |
+
+**Waarom vectortegels:** een bbox-vraag aan de OGC API stuurt elk vlak dat de
+bbox raakt in zijn geheel terug, als tekst, met 31 velden. Bij een route van
+18 km was dat 27 tot 109 MB, en het geheugen van de browser liep op tot bijna
+400 MB. Dat is te veel voor een telefoon. De vectortegels bevatten dezelfde vlakken
+(gecontroleerd: dezelfde `lokaal_id`'s in drie tegels, randen binnen 5 cm),
+maar compact gecodeerd. De tool leest ze met een eigen kleine lezer (`leesTegel`
+in `kern.js`). Gemeten in Chromium, Delft → Rotterdam via de Slinksloot (18 km):
+
+| Controle met de BGT | Alternatieven per deel | Data | Klaar in | Piekgeheugen |
+|---|---|---|---|---|
+| Snel | 1 | 5 MB | 7 s | 15 MB |
+| Normaal (standaard) | 2 | 9 MB | 11–13 s | 33 MB |
+| Grondig | 4 | 15 MB | 21 s | 31 MB |
+
+**Zelfde uitkomst:** op de vier testroutes van hieronder geeft de webversie
+dezelfde lengte, dezelfde gekozen alternatieven en hetzelfde aantal
+twijfelstukken als de Python-tool. Per ondergrondklasse scheelt het hooguit
+29 m (Delft → Rotterdam, 18 km). Bij `--law 0.3` (23 km) is het 97 m, maar
+alleen tussen open en gesloten verharding; onverhard en half verhard zijn daar
+tot op de meter gelijk.
+
+Testen van de webversie:
+
+```
+node --test tools/onverhard/test_web_kern.mjs          # offline, rekenkern en tegellezer
+NODE_USE_ENV_PROXY=1 node tools/onverhard/vergelijk_web.mjs uit/test.json "51.9921,4.3481" ...   # naast Python leggen
+(cd public && python3 -m http.server 8765) &
+node tools/onverhard/test_web_e2e.mjs <map> uit/test.json 'p=51.9921,4.3481;51.9255,4.4679'   # in een echte browser
+```
+
+`NODE_USE_ENV_PROXY=1` is alleen nodig achter een proxy. De end-to-end-test
+gebruikt Playwright uit de `node_modules` van de repo; zet `CHROMIUM_PAD` als
+die geen eigen browser heeft.
+
 ## Bronnen
 
 - Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL).
-- Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0).
+- Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0): OGC API Features in de Python-tool, vectortegels in de webversie.
 - Luchtfoto: PDOK luchtfoto RGB, Het Waterschapshuis / Beeldmateriaal Nederland (CC BY 4.0).
 
 De tool gebruikt de publieke servers van BRouter en PDOK. Wees er zuinig op:

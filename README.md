@@ -144,3 +144,38 @@ tegels van OpenStreetMap; die laadt de browser zelf en worden niet in de
 service worker opgeslagen. Bij een release `APP_VERSION` in `app.js` en
 `CACHE` in `sw.js` ophogen en bovenaan `CHANGELOG` een regel toevoegen.
 Iconen: `node scripts/gen-parken-icons.mjs`.
+
+## Onverhard (losse app)
+
+In `public/onverhard/` staat Onverhard, een vierde losstaande PWA zonder
+build-stap: plan een hardlooproute over zo veel mogelijk onverharde paden en
+laat de ondergrond controleren met de BGT (Basisregistratie Grootschalige
+Topografie) en de luchtfoto van PDOK. Tik punten op de kaart (start, eventuele
+tussenpunten, eind) of kies "Rondje" met een lengte; de app laat de route per
+stuk kleuren naar ondergrond (OSM, BGT of het eindoordeel), geeft km en % per
+klasse, de langste zachte stukken en de twijfelstukken met een luchtfoto-
+uitsnede, en een GPX om te downloaden.
+
+Het is de browserversie van de Python-tool in `tools/onverhard/`; daar staat
+ook de uitleg van de methode, de keuzes en de beperkingen (README). Alles
+draait in de browser: routes komen van de publieke BRouter-server, de BGT als
+vectortegels en de luchtfoto's van PDOK. Er is geen eigen server en er zijn
+geen sleutels nodig.
+
+- `kern.js`: rekenkern zonder netwerk (vertaling van `onverhard.py`, plus een
+  kleine lezer voor de vectortegels); getest met
+  `node --test tools/onverhard/test_web_kern.mjs`.
+- `bronnen.js`: BRouter, PDOK en de planner (route, alternatieven, rondje).
+- `app.js`: de interface.
+
+Na deploy staat hij op `https://<user>.github.io/Tezt/onverhard/`. Afspraken
+zoals bij de andere losse apps: geen trek-omlaag-om-te-verversen en een
+network-first service worker (`CACHE` in `sw.js` ophogen bij een release).
+Een "Wat is er nieuw?"-melding en blijvende opslag zijn er nog niet; er valt
+weinig te verliezen, want alleen de laatste punten en instellingen staan in
+`localStorage` (sleutel `onverhard.v1`). Een route delen gaat met "Kopieer
+link" (punten in het `#`-deel van de link).
+
+De kaart gebruikt Leaflet (meegeleverd in `public/onverhard/vendor/`, BSD-2)
+met tegels van OpenStreetMap en de PDOK-luchtfoto. Iconen:
+`node scripts/gen-onverhard-icons.mjs`.
