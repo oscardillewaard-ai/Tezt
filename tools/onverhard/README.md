@@ -284,9 +284,10 @@ draait in je browser; er is geen eigen server.
 - **Van A naar B**: zoek een plek (adres, straat, postcode, plaats; via de
   PDOK Locatieserver) of tik op de kaart. Elk volgend punt wordt het nieuwe
   eindpunt; de punten ertussen zijn tussenpunten.
-- **Rondje**: kies een startpunt en een lengte. De app probeert acht
-  richtingen en houdt de rondjes binnen ±10% van de lengte. Je krijgt er
-  minstens twee die echt van elkaar verschillen.
+- **Rondje**: kies een startpunt en een lengte. De app probeert ronde rondjes
+  in 12 richtingen en langgerekte (2,5 keer zo lang als breed) in 6
+  richtingen; die laatste passen in een smalle strook natuur, zoals de duinen
+  langs de kust. Je krijgt er minstens twee die echt van elkaar verschillen.
 - **Rondje via een keerpunt**: tik in de modus Rondje een tweede punt. Heen en
   terug gaan dan via verschillende paden. De app probeert terugwegen opzij en
   voorbij het keerpunt (zodat je doorloopt in plaats van omkeert) en biedt
@@ -317,13 +318,29 @@ draait in je browser; er is geen eigen server.
 - *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
   kaart.
 
-**Rondjes en doodlopende paden**: de tussenpunten van een rondje liggen op
-een cirkel. Valt er een op een doodlopend pad, dan zou je daar heen en weer
-lopen. De app herkent dat (de route valt voor en na het punt samen), legt het
-tussenpunt op de plek waar het doodlopende stuk begint en vraagt de route
-opnieuw op, vóór de lengte wordt beoordeeld. Richtingen waarvan een
-tussenpunt meer dan 300 m van de route ligt (in zee, of geen pad in de buurt)
-vallen af.
+**Hoe een rondje gezocht wordt**: per vorm en richting liggen drie
+tussenpunten op een cirkel of ellips door het startpunt.
+
+1. *Verkennen*: elke vorm één route. Een tussenpunt in zee (volgens de
+   officiële kaart) schuift eerst richting de start. Valt een punt op een
+   "eilandje" (paden die alleen via afgesloten wegen bereikbaar zijn, zoals in
+   waterwingebieden), dan meldt BRouter "target island" en schuift dat punt
+   ook. De omweg ten opzichte van hemelsbreed (op kronkelige duinpaden groot)
+   leert de app van de vorige routes, zodat de lengte meteen ongeveer klopt.
+2. *Bijstellen*: alleen de zes kansrijkste brengt hij op lengte. Doodlopende
+   stukjes haalt hij weg: komt de route bij een tussenpunt een pad in en over
+   hetzelfde pad terug, dan schuift dat punt naar het begin van dat stukje. Die
+   zes gaan langs de officiële kaart.
+3. *Kiezen*: eerst rondjes binnen ±10% van de lengte, met hooguit 12% heen en
+   terug en (bij "Strand overslaan") hooguit 300 m strand. Daarbinnen wint
+   het hoogste aandeel onverhard, met extra punten voor smalle paadjes.
+
+De publieke BRouter-server antwoordt bij te veel verzoeken tegelijk met
+"probeer later". Daarom stuurt de app één verzoek tegelijk (minstens 0,7 s
+ertussen) en houdt hij het aantal klein: een rondje kost zo'n 40 tot 70
+verzoeken en 40 tot 75 seconden. Vergelijking met Komoot, vanaf hetzelfde
+startpunt in Meijendel (15 km, "jogging"): langs de officiële kaart 67%
+onverhard tegen 63% bij Komoot, en 58% van de route over dezelfde paden.
 
 **Verschillen met de Python-tool**
 

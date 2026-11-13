@@ -664,6 +664,7 @@ export function geojsonVlakken(geometrie) {
 }
 
 const CEL = 40 // meters; zoekrooster voor de vlakken
+const BOERENLAND = new Set(['grasland agrarisch', 'bouwland', 'fruitteelt', 'boomteelt', 'houtwal'])
 
 /** De BGT-vlakken rond een route, met een zoekrooster om snel op te zoeken. */
 export class BgtVlakken {
@@ -694,6 +695,31 @@ export class BgtVlakken {
       }
     }
     this.zee.push({ polygonen, bbox: [minX, minY, maxX, maxY] })
+  }
+
+  /**
+   * Hoe 'natuurlijk' is de omgeving van een punt (0..1)? We prikken een raster
+   * van 5×5 punten in een vierkant van 200 m: duin, bos, heide, natuurgras en
+   * onverharde paden tellen als natuur (1), boerenland half, verharding,
+   * bebouwing (geen vlak in onze lagen) en zee niet.
+   */
+  natuur(x, y) {
+    let som = 0
+    let n = 0
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        const px = x + i * 50
+        const py = y + j * 50
+        n += 1
+        const hier = this.kandidaten(px, py).filter(([d]) => d <= 0.01).map(([, v]) => v)
+        if (!hier.length) continue
+        hier.sort((a, b) => BGT_COLLECTIES.indexOf(a.collectie) - BGT_COLLECTIES.indexOf(b.collectie))
+        const v = hier[0]
+        if (v.collectie === 'begroeidterreindeel') som += BOERENLAND.has(v.fysiek) ? 0.5 : 1
+        else if (groep(v.klasse) === 'zacht' && !(v.fysiek === 'zand' && this.bijZee(px, py))) som += 1
+      }
+    }
+    return som / n
   }
 
   /** Ligt dit punt binnen 'afstand' meter van de zee? */
@@ -1154,17 +1180,29 @@ export function verplaats(punt, peiling, meters) {
   return [punt[0] + meters * Math.sin(h), punt[1] + meters * Math.cos(h)]
 }
 
-/** De drie tussenpunten (lat, lon) van een rondje door start, in een richting. */
-export function rondjePunten(start, peiling, straal) {
+/**
+ * De drie tussenpunten (lat, lon) van een rondje door start, in een richting.
+ * 'straal' is de halve lengte van het rondje in die richting; 'rek' maakt het
+ * langgerekt (2,5 = een ellips die 2,5 keer zo lang als breed is). Dat past
+ * beter in een smalle strook natuur, zoals de duinen langs de kust.
+ */
+export function rondjePunten(start, peiling, straal, rek = 1) {
   const s = naarRd(start[1], start[0])
   const midden = verplaats(s, peiling, straal)
-  const via = [90, 180, 270].map((hoek) => {
-    const [x, y] = verplaats(midden, peiling + 180 + hoek, straal)
+  const breed = straal / rek
+  const via = [
+    verplaats(midden, peiling - 90, breed),
+    verplaats(midden, peiling, straal),
+    verplaats(midden, peiling + 90, breed),
+  ].map(([x, y]) => {
     const [lon, lat] = naarWgs(x, y)
     return [lat, lon]
   })
   return [start, ...via, start]
 }
+
+/** Omtrek (hemelsbreed, langs de tussenpunten) van zo'n rondje. */
+export const rondjeOmtrek = (straal, rek = 1) => 4 * Math.hypot(straal, straal / rek)
 
 // ---------- GPX ----------
 const xmlVeilig = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
