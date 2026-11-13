@@ -299,6 +299,7 @@ async function planNu() {
       },
     })
     plan = resultaat
+    stopBezig() // eerst de voortgangsbalk weg, dan pas naar het resultaat scrollen (anders schuift het weg)
     toonResultaat()
   } catch (fout) {
     if (fout.name === 'AbortError') toonFout('Gestopt. Er is geen route gemaakt.')
@@ -308,10 +309,14 @@ async function planNu() {
       console.error(fout)
     }
   } finally {
-    stopper = null
-    el('plan').hidden = false
-    el('bezig').hidden = true
+    stopBezig()
   }
+}
+
+function stopBezig() {
+  stopper = null
+  el('plan').hidden = false
+  el('bezig').hidden = true
 }
 el('plan').addEventListener('click', planNu)
 el('stop').addEventListener('click', () => stopper && stopper.abort())

@@ -3,6 +3,8 @@
 //   (cd public && python3 -m http.server 8765) &
 //   node tools/onverhard/test_web_e2e.mjs <map voor screenshots> [python.json] '<hash>' [naam] [mobiel]
 //
+// Met ONVERHARD_URL=<adres> test je een andere plek dan de lokale server, bv. de live site.
+//
 // De hash is wat er achter # in de link staat, bv. 'p=51.9921,4.3481;51.9255,4.4679'.
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -41,7 +43,9 @@ page.on('requestfinished', async (r) => {
   }
 })
 const t0 = Date.now()
-await page.goto(`http://localhost:8765/onverhard/#${hash}&plan=1`)
+// ONVERHARD_URL=https://oscardillewaard-ai.github.io/Tezt/onverhard/ test de live site
+const basis = process.env.ONVERHARD_URL || 'http://localhost:8765/onverhard/'
+await page.goto(`${basis}#${hash}&plan=1`)
 await page.screenshot({ path: path.join(map, naam + '_bezig.png') })
 await page.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden,
   null, { timeout: 600000 })
