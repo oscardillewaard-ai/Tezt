@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITEL__ · onverhard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root {
+    color-scheme: light;
+    --vlak: #fcfcfb;
+    --vlak-2: #f3f2ef;
+    --rand: #dddbd5;
+    --inkt: #0b0b0b;
+    --inkt-2: #52514e;
+    --inkt-3: #7a7974;
+    /* ondergrondklassen: gevalideerd op kleurenblindheid (alle paren) */
+    --onverhard: #008300;
+    --half: #eda100;
+    --open: #e87ba4;
+    --gesloten: #6250d6;
+    --onbekend: #8a8985;
+    --twijfel: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--vlak); color: var(--inkt);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: 100%; }
+  #kaart { height: 100%; background: #e9e8e4; }
+  aside { overflow-y: auto; border-left: 1px solid var(--rand); padding: 18px 18px 28px; min-width: 0; }
+  h1 { font-size: 20px; margin: 0 0 2px; overflow-wrap: anywhere; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--inkt-2);
+       margin: 22px 0 8px; font-weight: 600; }
+  p { margin: 0 0 8px; }
+  .sub { color: var(--inkt-2); }
+  .kern { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .kern div { background: var(--vlak-2); border-radius: 8px; padding: 8px 10px; }
+  .kern b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .kern span { color: var(--inkt-2); font-size: 12px; }
+  .keuze { display: flex; gap: 0; border: 1px solid var(--rand); border-radius: 8px; overflow: hidden; }
+  .keuze button { flex: 1; border: 0; background: var(--vlak); color: var(--inkt-2); padding: 7px 4px;
+                  font: inherit; cursor: pointer; border-right: 1px solid var(--rand); }
+  .keuze button:last-child { border-right: 0; }
+  .keuze button[aria-pressed="true"] { background: var(--inkt); color: #fff; }
+  .balkrij { display: grid; grid-template-columns: 86px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+  .balkrij > span { color: var(--inkt-2); font-size: 13px; }
+  .balk { display: flex; gap: 2px; height: 18px; }
+  .balk i { display: block; border-radius: 3px; min-width: 2px; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; padding: 0; list-style: none;
+             color: var(--inkt-2); font-size: 13px; }
+  .legenda i, td i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px;
+                     vertical-align: -1px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 0 4px 8px; border-bottom: 1px solid var(--rand); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; white-space: normal; }
+  th { font-weight: 600; color: var(--inkt-2); font-size: 12px; }
+  td small { color: var(--inkt-3); display: block; font-size: 12px; }
+  td:first-child small { margin-left: 17px; }
+  tr.som td { font-weight: 600; border-bottom: 0; }
+  .noot { color: var(--inkt-2); font-size: 12.5px; margin-top: 8px; }
+  .twijfels { list-style: none; margin: 0; padding: 0; }
+  .twijfels li { display: grid; grid-template-columns: 26px 1fr 84px; gap: 10px; padding: 10px 0;
+                 border-bottom: 1px solid var(--rand); cursor: pointer; }
+  .twijfels li:hover { background: var(--vlak-2); }
+  .nr { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 2px solid var(--twijfel);
+        color: var(--twijfel); font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+  .twijfels img { width: 84px; height: 84px; object-fit: cover; object-position: top; border-radius: 6px;
+                  border: 1px solid var(--rand); }
+  .twijfels .kop { font-weight: 600; }
+  .twijfels .ind { color: var(--inkt-2); font-size: 12.5px; }
+  .tip { position: fixed; pointer-events: none; background: var(--inkt); color: #fff; padding: 5px 8px;
+         border-radius: 6px; font-size: 12.5px; z-index: 2000; display: none; white-space: nowrap; }
+  .leaflet-popup-content { font: 13px/1.45 system-ui, sans-serif; margin: 12px 14px; }
+  .leaflet-popup-content b { font-weight: 600; }
+  .leaflet-popup-content code { font-size: 11.5px; color: var(--inkt-2); overflow-wrap: anywhere; }
+  .leaflet-popup-content img { width: 100%; margin-top: 8px; border-radius: 6px; display: block; }
+  .punt { width: 22px; height: 22px; border-radius: 50%; background: var(--inkt); color: #fff;
+          border: 2px solid #fff; font: 700 11px/18px system-ui, sans-serif; text-align: center;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+  .punt.via { width: 14px; height: 14px; margin: 4px; font-size: 0; }
+  .punt.tw { background: #fff; color: var(--twijfel); border-color: var(--twijfel); }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--rand); overflow: visible; padding: 16px 16px 28px; }
+    .twijfels li { grid-template-columns: 26px 1fr 64px; }
+    .twijfels img { width: 64px; height: 64px; }
+    th, td { padding-left: 6px; }
+    #planblok { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="kaart"></div>
+  <aside>
+    <h1 id="titel"></h1>
+    <p class="sub" id="ondertitel"></p>
+    <div class="kern" id="kern"></div>
+
+    <h2>Kleur de route naar</h2>
+    <div class="keuze" id="keuze" role="group" aria-label="Kleur de route naar">
+      <button data-bron="eind" aria-pressed="true">Eindoordeel</button>
+      <button data-bron="bgt" aria-pressed="false">BGT</button>
+      <button data-bron="osm" aria-pressed="false">OSM</button>
+    </div>
+
+    <h2>Ondergrond per bron</h2>
+    <div id="balken"></div>
+    <ul class="legenda" id="legenda"></ul>
+
+    <h2>Kilometers en procenten</h2>
+    <table id="tabel"></table>
+    <p class="noot" id="noot"></p>
+
+    <h2>Langste zachte stukken</h2>
+    <table id="zacht"></table>
+
+    <h2 id="twijfelkop">Twijfelstukken</h2>
+    <ul class="twijfels" id="twijfels"></ul>
+    <p class="noot" id="twijfelnoot"></p>
+
+    <div id="planblok"></div>
+
+    <h2>Goed om te weten</h2>
+    <p class="noot">Eindoordeel = BGT als die iets weet, anders OpenStreetMap. De BGT is zo actueel als de
+      gemeente of andere bronhouder haar bijhoudt; smalle graspaden staan er vaak niet als pad in. Geen
+      enkele bron zegt iets over modder. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
+    <p class="noot">Bronnen: route © OpenStreetMap-bijdragers via BRouter · ondergrond: BGT via PDOK ·
+      luchtfoto: PDOK / Het Waterschapshuis.</p>
+  </aside>
+</div>
+<div class="tip" id="tip"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const D = /*__DATA__*/null;
+const KLASSEN = ["onverhard", "half verhard", "open verharding", "gesloten verharding", "onbekend"];
+const TOELICHTING = {
+  "onverhard": "gras, zand, aarde, bospad",
+  "half verhard": "schelpen, grind",
+  "open verharding": "klinkers, tegels",
+  "gesloten verharding": "asfalt, beton",
+  "onbekend": "geen gegevens"
+};
+const stijl = getComputedStyle(document.documentElement);
+const KLEUR = {
+  "onverhard": stijl.getPropertyValue("--onverhard").trim(),
+  "half verhard": stijl.getPropertyValue("--half").trim(),
+  "open verharding": stijl.getPropertyValue("--open").trim(),
+  "gesloten verharding": stijl.getPropertyValue("--gesloten").trim(),
+  "onbekend": stijl.getPropertyValue("--onbekend").trim()
+};
+const BRONNAAM = { eind: "Eindoordeel", bgt: "BGT", osm: "OSM" };
+const nl = (x, d = 2) => Number(x).toFixed(d).replace(".", ",");
+const km = m => nl(m / 1000) + " km";
+const veilig = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const el = id => document.getElementById(id);
+
+// ---- zijpaneel ----------------------------------------------------------
+el("titel").textContent = D.meta.naam;
+el("ondertitel").textContent =
+  (D.meta.rondje_km ? "Rondje van ongeveer " + nl(D.meta.rondje_km, 1) + " km" : "Route langs " + D.punten.length + " punten") +
+  " · LAW-factor " + nl(D.meta.law, 1) + " · " + nl(D.law_pct, 0) + "% over een LAW · gemaakt " + D.meta.gemaakt;
+el("kern").innerHTML =
+  "<div><b>" + nl(D.lengte_km) + " km</b><span>totale afstand</span></div>" +
+  "<div><b>" + nl(D.zacht_pct.eind, 0) + "%</b><span>onverhard + half verhard</span></div>" +
+  "<div><b>" + D.twijfels.length + "</b><span>twijfelstukken</span></div>";
+
+const tip = el("tip");
+function toonTip(e, tekst) { tip.textContent = tekst; tip.style.display = "block"; verplaatsTip(e); }
+function verplaatsTip(e) {
+  const b = tip.offsetWidth;
+  tip.style.left = Math.max(6, Math.min(window.innerWidth - b - 6, e.clientX - b / 2)) + "px";
+  tip.style.top = (e.clientY - 34) + "px";
+}
+function balken() {
+  const doos = el("balken");
+  doos.innerHTML = "";
+  for (const bron of ["eind", "bgt", "osm"]) {
+    const rij = document.createElement("div");
+    rij.className = "balkrij";
+    rij.innerHTML = "<span>" + BRONNAAM[bron] + "</span>";
+    const balk = document.createElement("div");
+    balk.className = "balk";
+    balk.setAttribute("role", "img");
+    balk.setAttribute("aria-label", BRONNAAM[bron] + ": " +
+      D.tabel.map(r => r.klasse + " " + nl(r[bron].pct, 1) + "%").join(", "));
+    for (const r of D.tabel) {
+      if (r[bron].km <= 0) continue;
+      const deel = document.createElement("i");
+      deel.style.flex = r[bron].pct + " 0 0";
+      deel.style.background = KLEUR[r.klasse];
+      const tekst = BRONNAAM[bron] + " · " + r.klasse + ": " + nl(r[bron].km) + " km (" + nl(r[bron].pct, 1) + "%)";
+      deel.addEventListener("mouseenter", e => toonTip(e, tekst));
+      deel.addEventListener("mousemove", verplaatsTip);
+      deel.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+      balk.appendChild(deel);
+    }
+    rij.appendChild(balk);
+    doos.appendChild(rij);
+  }
+  el("legenda").innerHTML = KLASSEN.map(k =>
+    '<li><i style="background:' + KLEUR[k] + '"></i>' + k + "</li>").join("");
+}
+function tabel() {
+  let h = "<tr><th>Ondergrond</th><th>OSM</th><th>BGT</th><th>Eindoordeel</th></tr>";
+  const cel = c => nl(c.km) + " km<small>" + nl(c.pct, 1) + "%</small>";
+  for (const r of D.tabel) {
+    h += '<tr><td><i style="background:' + KLEUR[r.klasse] + '"></i>' + r.klasse +
+      "<small>" + TOELICHTING[r.klasse] + "</small></td><td>" +
+      cel(r.osm) + "</td><td>" + cel(r.bgt) + "</td><td>" + cel(r.eind) + "</td></tr>";
+  }
+  h += '<tr class="som"><td>Onverhard + half verhard</td><td>' + nl(D.zacht_pct.osm, 1) + "%</td><td>" +
+    nl(D.zacht_pct.bgt, 1) + "%</td><td>" + nl(D.zacht_pct.eind, 1) + "%</td></tr>";
+  el("tabel").innerHTML = h;
+  let noot = D.bgt_gebruikt ? "" : "De BGT was niet beschikbaar: het eindoordeel is alleen op OSM gebaseerd. ";
+  const gok = D.stukken.filter(s => !s.osm_zeker && s.osm !== "onbekend").reduce((a, s) => a + s.tot - s.van, 0);
+  noot += "In de OSM-kolom is " + km(gok) + " een aanname op basis van het wegtype (geen surface-tag).";
+  if (D.dubbel_pct > 2) noot += " Ongeveer " + nl(D.dubbel_pct, 0) + "% van de route gaat heen en terug over hetzelfde pad.";
+  el("noot").textContent = noot;
+}
+
+// ---- kaart --------------------------------------------------------------
+const kaart = L.map("kaart", { maxZoom: 21 });
+const lagen = {
+  "OpenStreetMap": L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap-bijdragers" }),
+  "Luchtfoto (PDOK)": L.tileLayer(
+    "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg",
+    { maxZoom: 21, maxNativeZoom: 21, attribution: "Luchtfoto: PDOK / Het Waterschapshuis" })
+};
+// De BGT-kaart van PDOK bestaat pas vanaf zoomniveau 17: daarom een aan/uit-laag bovenop de ondergrond.
+const bgtLaag = L.tileLayer(
+  "https://service.pdok.nl/lv/bgt/wmts/v1_0/standaardvisualisatie/EPSG:3857/{z}/{x}/{y}.png",
+  { minZoom: 17, maxZoom: 21, maxNativeZoom: 20, opacity: 0.8, attribution: "BGT: Kadaster / PDOK" });
+const start = new URLSearchParams(location.hash.slice(1));
+const beginlaag = Object.keys(lagen).find(n => n.toLowerCase().startsWith(start.get("laag") || "open")) || "OpenStreetMap";
+lagen[beginlaag].addTo(kaart);
+if (start.get("bgt")) bgtLaag.addTo(kaart);
+L.control.layers(lagen, { "BGT-vlakken (zichtbaar vanaf zoom 17)": bgtLaag }, { collapsed: false }).addTo(kaart);
+L.control.scale({ imperial: false }).addTo(kaart);
+
+let bron = ["eind", "bgt", "osm"].includes(start.get("kleur")) ? start.get("kleur") : "eind";
+const alles = [].concat(...D.stukken.map(s => s.lijn));
+L.polyline(alles, { color: "#fff", weight: 9, opacity: .9, interactive: false }).addTo(kaart);
+const lijnen = [];
+function popup(s) {
+  let h = "<b>km " + nl(s.van / 1000) + "–" + nl(s.tot / 1000) + "</b> · " + Math.round(s.tot - s.van) + " m<br>" +
+    "Eindoordeel: <b>" + s.eind + "</b><br>" +
+    "OSM: " + s.osm + (s.osm_zeker ? "" : " (aanname)") + "<br><code>" + veilig(s.tags.join(" | ")) + "</code><br>" +
+    "BGT: " + s.bgt + "<br><code>" + veilig(s.bgt_uitleg) + "</code>";
+  if (s.twijfel) h += '<br><b style="color:var(--twijfel)">Twijfel' + (s.nr ? " #" + s.nr : "") + ":</b> " + veilig(s.twijfel_tekst);
+  if (s.indicatie) h += "<br>Kleurindicatie luchtfoto: " + veilig(s.indicatie);
+  if (s.foto) h += '<a href="' + s.foto + '" target="_blank" rel="noopener"><img src="' + s.foto + '" alt="Luchtfoto van dit stuk"></a>';
+  return h;
+}
+for (const s of D.stukken) {
+  const lijn = L.polyline(s.lijn, { color: KLEUR[s[bron]], weight: 5, opacity: 1, lineCap: "butt" }).addTo(kaart);
+  lijn.bindPopup(() => popup(s), { maxWidth: 320 });
+  lijn.bindTooltip(() => "km " + nl(s.van / 1000) + "–" + nl(s.tot / 1000) + " · " + s[bron] +
+    (s.twijfel ? " · twijfel" : ""), { sticky: true });
+  lijnen.push([lijn, s]);
+  if (s.twijfel) // twijfel: dunne stippellijn eroverheen, zodat het niet alleen aan kleur hangt
+    L.polyline(s.lijn, { color: "#111", weight: 1.5, dashArray: "3 6", interactive: false }).addTo(kaart);
+}
+function kleurRoute() {
+  for (const [lijn, s] of lijnen) lijn.setStyle({ color: KLEUR[s[bron]] });
+  for (const b of el("keuze").children) b.setAttribute("aria-pressed", b.dataset.bron === bron);
+}
+el("keuze").addEventListener("click", e => {
+  if (e.target.dataset.bron) { bron = e.target.dataset.bron; kleurRoute(); }
+});
+const icoon = (tekst, klasse) => L.divIcon({ className: "", html: '<div class="punt ' + klasse + '">' + tekst + "</div>",
+  iconSize: [22, 22], iconAnchor: [11, 11] });
+const rond = D.punten.length > 1 && D.punten[0][0] === D.punten[D.punten.length - 1][0] &&
+  D.punten[0][1] === D.punten[D.punten.length - 1][1];
+D.punten.forEach((p, i) => {
+  const laatste = i === D.punten.length - 1;
+  if (laatste && rond) return;
+  const tekst = i === 0 ? "S" : laatste ? "F" : String(i);
+  L.marker(p, { icon: icoon(tekst, i === 0 || laatste ? "" : "via"), keyboard: false })
+    .bindTooltip(i === 0 ? (rond ? "Start en finish" : "Start") : laatste ? "Finish" : "Tussenpunt " + i).addTo(kaart);
+});
+const twLijn = {};
+for (const [lijn, s] of lijnen) if (s.nr) twLijn[s.nr] = lijn;
+for (const t of D.twijfels)
+  L.marker([t.lat, t.lon], { icon: icoon(t.nr, "tw"), keyboard: false })
+    .on("click", () => twLijn[t.nr].openPopup([t.lat, t.lon])).addTo(kaart);
+kaart.fitBounds(L.latLngBounds(alles).pad(0.06));
+const zoomNaar = start.get("twijfel");
+
+// ---- twijfelstukken -----------------------------------------------------
+function twijfels() {
+  el("twijfelkop").textContent = "Twijfelstukken (" + D.twijfels.length + ")";
+  const lijst = el("twijfels");
+  for (const t of D.twijfels) {
+    const li = document.createElement("li");
+    li.innerHTML = '<div class="nr">' + t.nr + "</div><div><div class=\"kop\">km " + nl(t.van / 1000) + "–" +
+      nl(t.tot / 1000) + " · " + t.lengte + " m</div><div>" + veilig(t.tekst) + "</div>" +
+      '<div class="ind">Eindoordeel: ' + t.eind + (t.indicatie ? " · luchtfoto (indicatie): " + veilig(t.indicatie) : "") +
+      "</div></div>" + (t.foto ? '<a href="' + t.foto + '" target="_blank" rel="noopener"><img loading="lazy" src="' +
+      t.foto + '" alt="Luchtfoto twijfelstuk ' + t.nr + '"></a>' : "<span></span>");
+    li.addEventListener("click", e => {
+      if (e.target.tagName === "IMG") return;
+      kaart.once("moveend", () => twLijn[t.nr].openPopup([t.lat, t.lon]));
+      kaart.fitBounds(twLijn[t.nr].getBounds().pad(0.6), { maxZoom: 19, animate: false });
+    });
+    lijst.appendChild(li);
+  }
+  let noot = D.twijfels.length ? "Klik op een regel om erheen te zoomen; klik op de foto voor de volledige uitsnede. " : "Geen twijfelstukken van " + D.meta.min_twijfel + " m of langer. ";
+  if (D.twijfel_kort.aantal) noot += "Daarnaast " + D.twijfel_kort.aantal + " korte stukjes (samen " +
+    D.twijfel_kort.meter + " m) die niet apart genoemd zijn; op de kaart herken je ze aan de stippellijn.";
+  el("twijfelnoot").textContent = noot;
+}
+function zachteStukken() {
+  const t = el("zacht");
+  if (!D.zachte_stukken.length) { t.outerHTML = '<p class="noot">Geen zachte stukken gevonden.</p>'; return; }
+  t.innerHTML = "<tr><th>Waar</th><th>Lengte</th><th>Ondergrond</th></tr>";
+  for (const z of D.zachte_stukken) {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.innerHTML = "<td>km " + nl(z.van / 1000) + "–" + nl(z.tot / 1000) + "</td><td>" + km(z.tot - z.van) +
+      "</td><td>" + z.klassen.join(" + ") + "</td>";
+    tr.addEventListener("click", () => {
+      const pts = [].concat(...D.stukken.filter(s => s.tot > z.van && s.van < z.tot).map(s => s.lijn));
+      if (pts.length) kaart.fitBounds(L.latLngBounds(pts).pad(0.15));
+    });
+    t.appendChild(tr);
+  }
+}
+function planlog() {
+  const log = D.meta.planlog || [];
+  if (!log.length) return;
+  const pct = x => x === null || x === undefined ? "–" : nl(100 * x, 1) + "%";
+  let h;
+  if (D.meta.rondje_km) {
+    h = "<h2>Kandidaten voor het rondje</h2><table><tr><th>Richting</th><th>km</th><th>Zacht OSM</th><th>Zacht BGT</th><th>Dubbel</th></tr>";
+    for (const k of log) {
+      if (k.fout) { h += "<tr><td>" + Math.round(k.richting) + "° (mislukt)</td><td colspan=4>" + veilig(k.fout) + "</td></tr>"; continue; }
+      h += "<tr" + (k.gekozen ? ' class="som"' : "") + "><td>" + Math.round(k.richting) + "°" + (k.gekozen ? " ← gekozen" : "") +
+        "</td><td>" + nl(k.km) + "</td><td>" + pct(k.osm) + "</td><td>" + pct(k.eind) + "</td><td>" + pct(k.dubbel) + "</td></tr>";
+    }
+    h += '</table><p class="noot">Zacht = onverhard + half verhard. Alleen de beste kandidaten volgens OSM zijn langs de BGT gelegd.</p>';
+  } else {
+    h = "<h2>Ronde 2: alternatieven langs de BGT</h2><table><tr><th>Deel · alt.</th><th>km</th><th>Zacht OSM</th><th>Zacht eind</th><th>LAW</th><th>Kosten</th></tr>";
+    for (const k of log)
+      h += "<tr" + (k.gekozen ? ' class="som"' : "") + "><td>" + k.deel + " · " + k.alt + (k.gekozen ? " ← gekozen" : "") +
+        "</td><td>" + nl(k.km) + "</td><td>" + pct(k.osm) + "</td><td>" + pct(k.eind) + "</td><td>" + pct(k.law) +
+        "</td><td>" + nl(k.kosten, 1) + "</td></tr>";
+    h += '</table><p class="noot">Zacht = onverhard + half verhard. Kosten = gewogen kilometers volgens het routeprofiel, met de ondergrond van het eindoordeel (BGT) ingevuld. Per deeltraject wint het BRouter-alternatief met de laagste kosten.</p>';
+  }
+  el("planblok").innerHTML = h;
+}
+balken(); tabel(); zachteStukken(); twijfels(); planlog(); kleurRoute();
+if (zoomNaar && twLijn[zoomNaar]) kaart.fitBounds(twLijn[zoomNaar].getBounds().pad(0.6), { maxZoom: 19 });
+</script>
+</body>
+</html>

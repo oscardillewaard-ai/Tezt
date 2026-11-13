@@ -1,0 +1,9 @@
+cache/
+__pycache__/
+.pytest_cache/
+# uitvoer van de planner
+*.gpx
+*.json
+*_luchtfoto/
+/*.html
+!rapport_sjabloon.html
