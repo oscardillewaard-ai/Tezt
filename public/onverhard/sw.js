@@ -1,7 +1,7 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent. Plannen zelf heeft internet nodig
 // (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v9'
+const CACHE = 'onverhard-v10'
 const SHELL = [
   './',
   'index.html',
@@ -17,6 +17,11 @@ const SHELL = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
+  'fonts/barlow-condensed-latin-600-normal.woff2',
+  'fonts/barlow-condensed-latin-700-normal.woff2',
+  'fonts/ibm-plex-mono-latin-500-normal.woff2',
+  'thema/trail.svg',
+  'thema/contours.svg',
 ]
 
 self.addEventListener('install', (event) => {
