@@ -239,6 +239,29 @@ test('doodlopend stuk en overlap tussen routes', () => {
   assert.ok(K.overlap(heen, [[200, 0], [200, 300], [0, 300], [0, 0]]) < 0.2)
 })
 
+test('object uit losse delen: elke tegel brengt alleen zijn eigen delen mee, alles telt (strand Voornes Duin)', () => {
+  // Echt gezien: het strand van Voornes Duin is één BGT-object van meerdere stukken; de tegel in
+  // het noorden had alleen het noordelijke stuk, die in het zuiden alleen het zuidelijke.
+  const v = new K.BgtVlakken()
+  const a = K.tegelGebied(1613, 2173)
+  const b = K.tegelGebied(1613, 2183)
+  const deelA = K.geojsonVlakken(vierkant(a[0] + 20, a[1] + 20, a[0] + 180, a[1] + 180))
+  const deelB = K.geojsonVlakken(vierkant(b[0] + 20, b[1] + 20, b[0] + 180, b[1] + 180))
+  const p = { lokaal_id: 'L0002.strand', fysiek_voorkomen: 'zand', status: 'bestaand' }
+  v.voegToeVlak('onbegroeidterreindeel', p, deelA, a)
+  v.voegToeVlak('onbegroeidterreindeel', p, deelB, b)
+  v.voegToeVlak('onbegroeidterreindeel', p, deelB, b) // nog een keer: niet dubbel bewaren
+  assert.equal(v.lijst.length, 1)
+  assert.equal(v.lijst[0].polygonen.length, 2)
+  assert.equal(v.zoek(a[0] + 100, a[1] + 100, 0, null).klasse, K.ONVERHARD)
+  assert.equal(v.zoek(b[0] + 100, b[1] + 100, 0, null).klasse, K.ONVERHARD)
+  // zee net zo: het tweede stuk zee maakt het tweede stuk zand tot strand
+  v.voegToeZee('zee1', K.geojsonVlakken(vierkant(a[0] - 300, a[1], a[0] - 10, a[3])))
+  v.voegToeZee('zee1', K.geojsonVlakken(vierkant(b[0] - 300, b[1], b[0] - 10, b[3])))
+  assert.equal(v.zee.length, 1)
+  assert.equal(v.zoek(b[0] + 100, b[1] + 100, 0, null).strand, true)
+})
+
 test('strand = zandvlak zonder pad vlak bij de zee; verderop is het een zandverstuiving', () => {
   const v = new K.BgtVlakken()
   v.voegToe('onbegroeidterreindeel', feature('zand', 'zand', vierkant(0, 0, 2000, 100)))

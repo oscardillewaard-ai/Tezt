@@ -658,6 +658,83 @@ function afstandTotRing(x, y, r) {
   return beste
 }
 
+/**
+ * Vereenvoudig een ring (plat [x, y, x, y, ...]) met Douglas-Peucker: geen
+ * punt van de oorspronkelijke ring ligt verder dan 'tolerantie' meter van de
+ * vereenvoudigde. Geeft [[x, y], ...] (eerste punt niet herhaald).
+ */
+export function vereenvoudigRing(r, tolerantie = 15) {
+  const n = r.length / 2 - (r[0] === r[r.length - 2] && r[1] === r[r.length - 1] ? 1 : 0)
+  if (n <= 4) return Array.from({ length: n }, (_, i) => [r[2 * i], r[2 * i + 1]])
+  const houd = new Uint8Array(n + 1)
+  houd[0] = 1
+  houd[n] = 1 // index n = het eerste punt nog een keer (ring dicht)
+  const p = (i) => (i === n ? [r[0], r[1]] : [r[2 * i], r[2 * i + 1]])
+  // splits eerst bij het punt het verst van het startpunt, dan werkt een gesloten ring goed
+  let ver = 1
+  let verD = -1
+  for (let i = 1; i < n; i++) {
+    const d = Math.hypot(r[2 * i] - r[0], r[2 * i + 1] - r[1])
+    if (d > verD) { verD = d; ver = i }
+  }
+  houd[ver] = 1
+  const stapel = [[0, ver], [ver, n]]
+  while (stapel.length) {
+    const [a, b] = stapel.pop()
+    const [ax, ay] = p(a)
+    const [bx, by] = p(b)
+    const dx = bx - ax
+    const dy = by - ay
+    const l2 = dx * dx + dy * dy
+    let beste = -1
+    let besteD = tolerantie
+    for (let i = a + 1; i < b; i++) {
+      const [x, y] = p(i)
+      let t = l2 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const d = Math.hypot(x - (ax + t * dx), y - (ay + t * dy))
+      if (d > besteD) { besteD = d; beste = i }
+    }
+    if (beste >= 0) {
+      houd[beste] = 1
+      stapel.push([a, beste], [beste, b])
+    }
+  }
+  const uit = []
+  for (let i = 0; i < n; i++) if (houd[i]) uit.push(p(i))
+  return uit
+}
+
+/** [minX, minY, maxX, maxY] van de buitenringen. */
+function bboxVan(polygonen, b = [Infinity, Infinity, -Infinity, -Infinity]) {
+  for (const poly of polygonen) {
+    const r = poly[0]
+    for (let i = 0; i < r.length; i += 2) {
+      if (r[i] < b[0]) b[0] = r[i]
+      if (r[i] > b[2]) b[2] = r[i]
+      if (r[i + 1] < b[1]) b[1] = r[i + 1]
+      if (r[i + 1] > b[3]) b[3] = r[i + 1]
+    }
+  }
+  return b
+}
+
+/** Zelfde polygoondeel? (Zelfde aantal punten en eerste punt binnen een halve meter.) */
+function zelfdeDeel(a, b) {
+  const ra = a[0]
+  const rb = b[0]
+  return ra.length === rb.length && Math.abs(ra[0] - rb[0]) < 0.5 && Math.abs(ra[1] - rb[1]) < 0.5
+}
+
+/** Voeg de delen die het vlak nog niet had toe, en vergroot de bbox. */
+function voegDelenToe(vlak, polygonen) {
+  for (const poly of polygonen) {
+    if (vlak.polygonen.some((q) => zelfdeDeel(q, poly))) continue
+    vlak.polygonen.push(poly)
+    bboxVan([poly], vlak.bbox)
+  }
+}
+
 /** Afstand van een punt tot een vlak (polygonen met Float64Array-ringen); 0 als het erin ligt. */
 export function afstandTotVlak(x, y, polygonen) {
   let beste = Infinity
@@ -691,27 +768,20 @@ export class BgtVlakken {
     this.index = new Map() // 'collectie|lokaal_id' -> plaats in lijst
     this.rooster = new Map()
     this.zee = [] // watervlakken van het type 'zee': om het strand te herkennen
-    this.zeeIds = new Set()
+    this.zeeIds = new Map() // lokaal_id -> zeevlak
+    this.stranden = new Set() // zandvlakken die een route als strand heeft herkend (de planner mijdt ze daarna)
   }
 
-  /** Bewaar een zeevlak (BGT waterdeel, type zee). */
+  /** Bewaar een zeevlak (BGT waterdeel, type zee); losse delen uit andere tegels komen erbij. */
   voegToeZee(id, polygonen) {
-    if (this.zeeIds.has(id)) return
-    this.zeeIds.add(id)
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-    for (const poly of polygonen) {
-      const r = poly[0]
-      for (let i = 0; i < r.length; i += 2) {
-        if (r[i] < minX) minX = r[i]
-        if (r[i] > maxX) maxX = r[i]
-        if (r[i + 1] < minY) minY = r[i + 1]
-        if (r[i + 1] > maxY) maxY = r[i + 1]
-      }
+    const z = this.zeeIds.get(id)
+    if (z) {
+      voegDelenToe(z, polygonen)
+      return
     }
-    this.zee.push({ polygonen, bbox: [minX, minY, maxX, maxY] })
+    const nieuw = { polygonen: polygonen.slice(), bbox: bboxVan(polygonen) }
+    this.zeeIds.set(id, nieuw)
+    this.zee.push(nieuw)
   }
 
   /**
@@ -768,20 +838,11 @@ export class BgtVlakken {
     if (!polygonen.length) return false
     const sleutel = p.lokaal_id ? collectie + '|' + p.lokaal_id : null
     let plek = sleutel ? this.index.get(sleutel) : undefined
-    if (plek === undefined) {
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const poly of polygonen) {
-        const r = poly[0]
-        for (let i = 0; i < r.length; i += 2) {
-          if (r[i] < minX) minX = r[i]
-          if (r[i] > maxX) maxX = r[i]
-          if (r[i + 1] < minY) minY = r[i + 1]
-          if (r[i + 1] > maxY) maxY = r[i + 1]
-        }
-      }
+    if (plek !== undefined) {
+      // Hetzelfde object uit een buurtegel. Een object kan uit losse delen bestaan (een strand in
+      // stukken) en een tegel bevat alleen de delen die erin vallen: voeg nieuwe delen toe.
+      voegDelenToe(this.lijst[plek], polygonen)
+    } else {
       plek = this.lijst.push({
         collectie,
         fysiek: p.fysiek_voorkomen || '',
@@ -789,8 +850,8 @@ export class BgtVlakken {
         functie: p.functie || '',
         niveau: Number(p.relatieve_hoogteligging) || 0,
         klasse: bgtKlasse(collectie, p.fysiek_voorkomen),
-        polygonen,
-        bbox: [minX, minY, maxX, maxY],
+        polygonen: polygonen.slice(),
+        bbox: bboxVan(polygonen),
       }) - 1
       if (sleutel) this.index.set(sleutel, plek)
     }
@@ -873,6 +934,7 @@ export class BgtVlakken {
     if (direct) {
       // het strand: een zandvlakte zonder pad erin, vlak bij de zee (anders is het een zandverstuiving)
       const strand = direct.collectie === 'onbegroeidterreindeel' && direct.fysiek === 'zand' && this.bijZee(x, y)
+      if (strand) this.stranden.add(direct)
       return { klasse: direct.klasse, uitleg: `geen pad geregistreerd; lijn ligt in ${vlakUitleg(direct)}`, bron: 'terrein', strand }
     }
     return leeg

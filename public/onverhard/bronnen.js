@@ -145,12 +145,38 @@ export class BRouter {
   }
 
   /**
+   * Stranden die eerdere routes raakten, als verboden vlakken voor BRouter
+   * (die zelf niet weet wat strand is: in OpenStreetMap is een strandpad
+   * gewoon een zandpad). Niet als een routepunt erin of vlakbij ligt: dan
+   * weigert BRouter ('wpt in restricted area'). Hooguit 15 km van de start.
+   */
+  verbodenVlakken(punten) {
+    if (!this.strandMijden || !this.bgt || !this.bgt.vlakken.stranden.size) return ''
+    const rd = punten.map(([lat, lon]) => K.naarRd(lon, lat))
+    const uit = []
+    for (const v of this.bgt.vlakken.stranden) {
+      for (const poly of v.polygonen) {
+        if (!poly.tekst) {
+          poly.tekst = K.vereenvoudigRing(poly[0], 15)
+            .map(([x, y]) => K.naarWgs(x, y).map((g) => g.toFixed(5)).join(','))
+            .join(',')
+        }
+        const d = rd.map(([x, y]) => K.afstandTotVlak(x, y, [poly]))
+        if (Math.min(...d) < 150 || Math.min(...d) > 15000) continue
+        uit.push(poly.tekst)
+      }
+    }
+    return uit.join('|')
+  }
+
+  /**
    * Route langs punten [[lat, lon], ...]. Let op: BRouter wil lon voor lat.
    * 'nogos' zijn cirkels die de route moet mijden: ['lon,lat,straal', ...].
    */
   async route(punten, alternatief = 0, nogos = []) {
     const lonlats = punten.map(([lat, lon]) => `${lon.toFixed(6)},${lat.toFixed(6)}`).join('|')
-    const sleutel = `${this.profiel}|${lonlats}|${alternatief}|${nogos.join('|')}`
+    const verboden = this.verbodenVlakken(punten)
+    const sleutel = `${this.profiel}|${lonlats}|${alternatief}|${nogos.join('|')}|${verboden}`
     if (routeCache.has(sleutel)) return routeCache.get(sleutel)
     for (const poging of [0, 1]) {
       const pid = await this.profielId(poging === 1)
@@ -158,6 +184,7 @@ export class BRouter {
       this.verzoeken += 1
       let url = `${BROUTER_URL}?lonlats=${encodeURIComponent(lonlats)}&profile=${pid}&alternativeidx=${alternatief}&format=geojson`
       if (nogos.length) url += `&nogos=${encodeURIComponent(nogos.join('|'))}`
+      if (verboden) url += `&polygons=${encodeURIComponent(verboden)}`
       const r = await vraag('BRouter', url, { signal: this.signal })
       const tekst = (await r.text()).trim()
       if (r.ok && tekst.startsWith('{')) {
@@ -478,12 +505,15 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
         ...Array.from({ length: kandidaten / 2 }, (_, n) => [15 + (720 * n) / kandidaten, 2.5]),
       ]
   const lijst = []
+  const verkenBgt = br.strandMijden ? bgt : null
   for (const [n, [peiling, rek]] of vormen.entries()) {
     meld(`Rondjes verkennen: ${n + 1} van ${vormen.length}`)
     try {
       const k = await probeer(peiling, doel / (K.rondjeOmtrek(1, rek) * omweg), rek)
       k.afwijking = afwijkingVan(k.t, k.punten)
-      const an = await analyseerRoute(k.t, null)
+      // met 'strand overslaan' al hier de officiële kaart: dan leert BRouter de stranden meteen mijden
+      const an = await analyseerRoute(k.t, verkenBgt)
+      k.strand = K.strandMeter(an)
       // ver van de gevraagde lengte kost punten: dat is in fase 2 niet altijd goed te maken
       k.osm = waardering(an, br, 'osm') - 0.5 * Math.abs(k.lengte - doel) / doel
       lijst.push(k)
@@ -501,7 +531,8 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
       const nieuw = await probeer(k.peiling, k.straal * Math.max(0.5, Math.min(2, doel / k.lengte)), k.rek)
       if (Math.abs(nieuw.lengte - doel) >= Math.abs(k.lengte - doel)) continue
       nieuw.afwijking = afwijkingVan(nieuw.t, nieuw.punten)
-      const an = await analyseerRoute(nieuw.t, null)
+      const an = await analyseerRoute(nieuw.t, verkenBgt)
+      nieuw.strand = K.strandMeter(an)
       nieuw.osm = waardering(an, br, 'osm') - 0.5 * Math.abs(nieuw.lengte - doel) / doel
       Object.assign(k, nieuw)
     } catch (fout) {
@@ -515,6 +546,15 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   const kansrijk = (bruikbaar.length ? bruikbaar : lijst).sort((a, b) => b.osm - a.osm).slice(0, Math.max(6, aantalOpties + 2))
   for (const [i, k] of kansrijk.entries()) {
     meld(`Rondje ${i + 1} van ${kansrijk.length} op lengte brengen`)
+    if (k.strand > 0) {
+      // gevonden voordat dat strand bekend was: nu opnieuw, BRouter mijdt het inmiddels
+      try {
+        const r = await routeMetUitwijk(k.punten, br)
+        Object.assign(k, { t: r.traject, punten: r.punten, lengte: K.lijnLengte(K.trajectXy(r.traject)), strand: 0 })
+      } catch (fout) {
+        if (afgebroken(fout)) throw fout
+      }
+    }
     for (let ronde = 0; ronde < 3; ronde++) {
       const schoon = await zonderDoodlopend(k.t, k.punten, k.punten.slice(1, -1).map((_, i) => i + 1), br)
       k.t = schoon.traject
@@ -891,6 +931,7 @@ export async function maakPlan(opties) {
     trail: opties.trail ?? true, strandMijden: opties.strandMijden ?? true, kaartje: opties.kaartje ?? false,
   })
   const bgt = opties.metBgt === false ? null : new Bgt({ signal: opties.signal, voortgang: opties.voortgang })
+  br.bgt = bgt // zodat BRouter de stranden kan mijden die de officiële kaart aanwijst
   const alternatieven = Math.max(1, opties.alternatieven ?? 2)
   let plan
   if (opties.rondjeKm && opties.punten.length > 1) plan = await planLus(opties.punten[0], opties.punten[1], br, bgt, alternatieven, meld)
@@ -918,6 +959,16 @@ export async function maakPlan(opties) {
       strand: K.strandMeter(o.an),
       kaartje: K.kaartjeMeter(o.an),
     })
+  }
+  // Een andere route die veel minder onverhard is dan de beste helpt niemand (zoals een rondje
+  // door de polder naast een rondje door de duinen): laat die weg en zeg dat erbij.
+  const zwak = lijst.filter((o, i) => i > 0 && o.zacht < lijst[0].zacht - 0.2)
+  if (zwak.length) {
+    for (const o of zwak) lijst.splice(lijst.indexOf(o), 1)
+    meldingen.push(
+      `${zwak.length === 1 ? 'Een andere route was' : `${zwak.length} andere routes waren`} veel minder onverhard ` +
+        `(${zwak.map((o) => Math.round(100 * o.zacht) + '%').join(', ')}) en ${zwak.length === 1 ? 'staat' : 'staan'} er daarom niet bij.`,
+    )
   }
   lijst.forEach((o, i) => {
     o.naam = LETTERS[i]
