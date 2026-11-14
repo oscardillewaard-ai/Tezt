@@ -1271,6 +1271,7 @@ el('bron').addEventListener('click', (e) => {
   if (e.target.dataset.bron) {
     bron = e.target.dataset.bron
     kleurRoute()
+    if (plan) tekenBalken()
   }
 })
 
@@ -1309,44 +1310,21 @@ function tekenOpties() {
 }
 
 const tip = el('tip')
-function verplaatsTip(e) {
-  const b = tip.offsetWidth
-  tip.style.left = Math.max(6, Math.min(window.innerWidth - b - 6, e.clientX - b / 2)) + 'px'
-  tip.style.top = e.clientY - 34 + 'px'
-}
 
+/** Overzicht van de ondergrond voor de gekozen bron: per soort een balk met km en procent. */
 function tekenBalken() {
   const doos = el('balken')
-  doos.innerHTML = ''
-  for (const b of ['eind', 'bgt', 'osm']) {
-    const rij = document.createElement('div')
-    rij.className = 'balkrij'
-    rij.innerHTML = `<span>${BRONNAAM[b]}</span>`
-    const balk = document.createElement('div')
-    balk.className = 'balk'
-    balk.setAttribute('role', 'img')
-    balk.setAttribute('aria-label', `${BRONNAAM[b]}: ` + plan.tabel.map((r) => `${r.klasse} ${nl(r[b].pct, 1)}%`).join(', '))
-    for (const r of plan.tabel) {
-      if (r[b].km <= 0) continue
-      const deel = document.createElement('i')
-      deel.style.flex = `${r[b].pct} 0 0`
-      deel.style.background = KLEUR[r.klasse]
-      const tekst = `${BRONNAAM[b]} · ${r.klasse}: ${nl(r[b].km)} km (${nl(r[b].pct, 1)}%)`
-      deel.addEventListener('pointerenter', (e) => {
-        tip.textContent = tekst
-        tip.style.display = 'block'
-        verplaatsTip(e)
-      })
-      deel.addEventListener('pointermove', verplaatsTip)
-      deel.addEventListener('pointerleave', () => {
-        tip.style.display = 'none'
-      })
-      balk.appendChild(deel)
-    }
-    rij.appendChild(balk)
-    doos.appendChild(rij)
+  const zacht = plan.zacht[bron]
+  let h = `<p class="ondergrondkop"><b>${pct(zacht)}</b> onverhard of half verhard <small>volgens ${BRONNAAM[bron].toLowerCase()}</small></p><ul class="ondergrondlijst">`
+  for (const r of plan.tabel) {
+    const c = r[bron]
+    if (c.km <= 0.005) continue
+    h += `<li><span class="ondergrondnaam"><i style="background:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></span>` +
+      `<span class="ondergrondbalk"><i style="width:${Math.max(2, c.pct)}%;background:${KLEUR[r.klasse]}"></i></span>` +
+      `<span class="ondergrondgetal"><b>${nl(c.km, 1)} km</b><small>${nl(c.pct, 0)}%</small></span></li>`
   }
-  el('legenda').innerHTML = K.KLASSEN.map((k) => `<li><i style="background:${KLEUR[k]}"></i>${k}</li>`).join('')
+  doos.innerHTML = h + '</ul>'
+  el('legenda').innerHTML = ''
 }
 
 function tekenTabel() {
