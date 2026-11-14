@@ -766,35 +766,9 @@ export async function planRondjeLussen(start, km, br, bgt, aantalOpties, meld = 
   }
   if (!lijst.length) throw new BronFout('BRouter', 'geen enkel rondje gevonden: ' + fouten.join('; '))
   const voldoet = (k) => k.an.dubbel <= 0.12 && (!br.strandMijden || K.strandMeter(k.an) <= 300)
-  // heen en terug en strand zitten al in de score; elke procent naast de gevraagde lengte kost
-  // een beetje, buiten ±10% kost het veel
-  const waarde = (k) => {
-    const af = Math.abs(k.lengte - doel) / doel
-    return k.score - af - 3 * Math.max(0, af - 0.1)
-  }
+  // heen en terug en strand zitten al in de score; een lengte buiten ±10% kost veel punten
+  const waarde = (k) => k.score - 3 * Math.max(0, Math.abs(k.lengte - doel) / doel - 0.1)
   const lus = (k) => k.an.dubbel <= 0.15 // Komoot-rondjes gaan hooguit 6% heen en terug
-  lijst.sort((a, b) => lus(b) - lus(a) || waarde(b) - waarde(a))
-  // De beste rondjes kwamen in de vergelijking met Komoot steeds 8 tot 10% te kort uit. Geef de
-  // beste (bij "1 route" alleen de allerbeste) nog één kans met een keerpunt op de juiste afstand.
-  for (const k of lijst.slice(0, snel ? 1 : 2)) {
-    if (!lus(k) || Math.abs(k.lengte - doel) / doel <= 0.05) continue
-    meld('Rondjes zoeken: lengte bijstellen')
-    const kr = K.naarRd(k.keer[1], k.keer[0])
-    const dk = Math.hypot(kr[0] - s[0], kr[1] - s[1]) || 1
-    let keer = naarLatLon(K.verplaats(s, k.peiling, dk * Math.max(0.8, Math.min(1.4, doel / k.lengte))))
-    keer = (await opLand([start, keer, start], bgt))[1]
-    let o
-    try {
-      o = await bredeLus(start, keer, br, bgt, doel, snel)
-    } catch (fout) {
-      if (afgebroken(fout)) throw fout
-      continue
-    }
-    if (K.doodlopend(o.an.xy, K.naarRd(keer[1], keer[0])).lengte >= 25) continue
-    const nieuw = { ...k, traject: o.traject, an: o.an, keer, lengte: o.an.lengte }
-    nieuw.score = waardering(o.an, br, bgt ? 'eind' : 'osm')
-    if (lus(nieuw) && waarde(nieuw) > waarde(k)) Object.assign(k, nieuw)
-  }
   lijst.sort((a, b) => lus(b) - lus(a) || waarde(b) - waarde(a))
   const opties = []
   for (const k of lijst) {
