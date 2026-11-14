@@ -5,6 +5,8 @@ import assert from 'node:assert/strict'
 import * as K from '../../public/onverhard/kern.js'
 import * as G from '../../public/onverhard/graaf.js'
 import * as T from '../../public/onverhard/osmtegels.js'
+import * as H from '../../public/onverhard/hoogte.js'
+import zlib from 'node:zlib'
 
 const vierkant = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] })
 const feature = (id, fysiek, geometry, niveau = 0) => ({
@@ -502,4 +504,92 @@ test('route langs een tekening volgt de lijn, ook als rondje', () => {
   assert.ok(rondje.rond)
   assert.equal(rondje.knopen[0], rondje.knopen[rondje.knopen.length - 1])
   assert.ok(Math.abs(rondje.meter - 1200) < 150, `${rondje.meter}`)
+})
+
+// een GeoTIFF zoals PDOK hem maakt: float32, zlib, floating point predictor, strips
+function maakAhnTiff(breedte, hoogte, x0, y1, cel, waarde, rijenPerStrip = 4) {
+  const strips = []
+  for (let s = 0; s * rijenPerStrip < hoogte; s++) {
+    const rijen = Math.min(rijenPerStrip, hoogte - s * rijenPerStrip)
+    const ruw = new Uint8Array(rijen * breedte * 4)
+    for (let r = 0; r < rijen; r++) {
+      const y = s * rijenPerStrip + r
+      const rij = new Uint8Array(breedte * 4)
+      const dv = new DataView(new ArrayBuffer(4))
+      for (let x = 0; x < breedte; x++) {
+        dv.setFloat32(0, waarde(x, y), false) // groot-endiaans: hoogste byte eerst
+        for (let k = 0; k < 4; k++) rij[x + k * breedte] = dv.getUint8(k)
+      }
+      for (let i = rij.length - 1; i > 0; i--) rij[i] = (rij[i] - rij[i - 1]) & 0xff
+      ruw.set(rij, r * breedte * 4)
+    }
+    strips.push(zlib.deflateSync(ruw))
+  }
+  const tags = [] // [tag, type, waarden]
+  tags.push([256, 3, [breedte]], [257, 3, [hoogte]], [258, 3, [32]], [259, 3, [8]], [262, 3, [1]], [277, 3, [1]], [278, 3, [rijenPerStrip]], [317, 3, [3]], [339, 3, [3]])
+  const kop = 8
+  const ifdGrootte = 2 + 12 * 14 + 4
+  let extra = kop + ifdGrootte
+  const extraBytes = []
+  const zetExtra = (bytes) => {
+    const plek = extra
+    extraBytes.push(bytes)
+    extra += bytes.length
+    return plek
+  }
+  const f64 = (lijst) => { const b = new Uint8Array(8 * lijst.length); const d = new DataView(b.buffer); lijst.forEach((v, i) => d.setFloat64(8 * i, v, true)); return b }
+  const u32 = (lijst) => { const b = new Uint8Array(4 * lijst.length); const d = new DataView(b.buffer); lijst.forEach((v, i) => d.setUint32(4 * i, v, true)); return b }
+  const schaal = zetExtra(f64([cel, cel, 0]))
+  const punt = zetExtra(f64([0, 0, 0, x0, y1, 0]))
+  const nodata = zetExtra(new TextEncoder().encode('3.4028234663852886e+38\0'))
+  const lengtesPlek = zetExtra(u32(strips.map((s) => s.length)))
+  const offsetsPlek = extra // de offsets zelf, daarna de strips
+  extra += 4 * strips.length
+  const offsets = []
+  let o = extra
+  for (const st of strips) { offsets.push(o); o += st.length }
+  tags.push([273, 4, offsetsPlek], [279, 4, lengtesPlek], [33550, 12, schaal], [33922, 12, punt], [42113, 2, nodata])
+  tags.sort((a, b) => a[0] - b[0])
+  const uit = new Uint8Array(o)
+  const d = new DataView(uit.buffer)
+  d.setUint16(0, 0x4949, true); d.setUint16(2, 42, true); d.setUint32(4, kop, true)
+  d.setUint16(kop, tags.length, true)
+  tags.forEach(([tag, type, w], i) => {
+    const e = kop + 2 + 12 * i
+    d.setUint16(e, tag, true); d.setUint16(e + 2, type, true)
+    if (tag === 273 || tag === 279) { d.setUint32(e + 4, strips.length, true); d.setUint32(e + 8, w, true) }
+    else if (type === 12) { d.setUint32(e + 4, tag === 33550 ? 3 : 6, true); d.setUint32(e + 8, w, true) }
+    else if (type === 2) { d.setUint32(e + 4, 23, true); d.setUint32(e + 8, w, true) }
+    else { d.setUint32(e + 4, 1, true); d.setUint16(e + 8, w[0], true) }
+  })
+  let plek = kop + ifdGrootte
+  for (const b of extraBytes) { uit.set(b, plek); plek += b.length }
+  uit.set(u32(offsets), offsetsPlek)
+  strips.forEach((st, i) => uit.set(st, offsets[i]))
+  return uit.buffer
+}
+
+test('AHN-GeoTIFF lezen (float32, zlib, floating point predictor) en hoogtemeters tellen', async () => {
+  // een duin: 50 x 50 pixels van 10 m, oplopend van 0 naar 20 m in het midden en weer terug, met water (geen hoogte)
+  const duin = (x) => 20 - Math.abs(x - 25) * 0.8
+  const buffer = maakAhnTiff(50, 50, 82000, 452000, 10, (x, y) => (y === 40 && x < 5 ? 3.4028234663852886e38 : duin(x)))
+  const r = await H.leesAhnTiff(buffer)
+  assert.equal(r.breedte, 50)
+  assert.equal(r.cel, 10)
+  assert.equal(r.x0, 82000)
+  assert.ok(Math.abs(r.waarden[10 * 50 + 25] - 20) < 1e-4)
+  assert.ok(Math.abs(r.waarden[10 * 50 + 5] - duin(5)) < 1e-4)
+  assert.ok(Number.isNaN(r.waarden[40 * 50 + 2]))
+  // hoogte op een punt: midden van pixel (25, 10)
+  assert.ok(Math.abs(H.hoogteOp(r, 82255, 451895) - 20) < 0.5)
+  // een route van west naar oost over het duin: 20 m omhoog, 20 m omlaag (minus wat gladstrijken)
+  const rasters = new Map([['82000,451500', r]])
+  const xy = [[82005, 451800], [82495, 451800]]
+  const p = H.hoogteprofiel(xy, rasters)
+  assert.ok(p.stijgen > 17 && p.stijgen < 21, `stijgen ${p.stijgen}`)
+  assert.ok(p.dalen > 17 && p.dalen < 21, `dalen ${p.dalen}`)
+  assert.ok(Math.abs(p.afstand[p.afstand.length - 1] - 490) < 11)
+  // de blokken van 500 m die een route raakt
+  assert.deepEqual(H.blokkenVoor([[82005, 451800], [82600, 451800]]), [[82000, 451500], [82500, 451500]])
+  assert.ok(H.ahnUrl(82000, 451500).includes('SUBSET=x(82000,82500)') && H.ahnUrl(82000, 451500).includes('SCALESIZE=x(50),y(50)'))
 })

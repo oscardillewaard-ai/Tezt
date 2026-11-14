@@ -264,13 +264,11 @@ function tekenPuntenlijst() {
     const t = tekening()
     let hint
     if (tekenen) {
-      hint = staat.modus === 'tekenen' ? 'Trek met je vinger (of muis) de route op de kaart. Eindig bij het begin voor een rondje.'
-        : tekenen === 'rechthoek' ? 'Sleep van de ene hoek naar de andere.' : 'Omcirkel met je vinger (of muis) het gebied op de kaart.'
+      hint = staat.modus === 'tekenen' ? 'Trek de route op de kaart.' : tekenen === 'rechthoek' ? 'Sleep van hoek naar hoek.' : 'Omcirkel het gebied.'
     } else if (!t) {
-      hint = staat.modus === 'tekenen' ? 'Tik op "Teken" en trek de route die je wilt lopen.'
-        : `Tik op "Teken" en omcirkel het gebied${staat.modus === 'gebied' ? ', bijvoorbeeld een bos' : ''}, of kies "Rechthoek".`
-    } else if (staat.modus === 'tekenen') hint = 'Klaar: plan de route. Opnieuw tekenen vervangt de lijn.'
-    else hint = n ? 'Klaar om te plannen. Tik op de kaart om de start te verplaatsen.' : 'Tik eventueel een startpunt; anders begint de route midden in het gebied.'
+      hint = staat.modus === 'tekenen' ? 'Tik op Teken en trek je route.' : 'Tik op Teken en omcirkel het gebied.'
+    } else if (staat.modus === 'tekenen') hint = ''
+    else hint = n ? '' : 'Tik eventueel een startpunt.'
     el('hint').textContent = hint
     el('keerom').hidden = true
     el('wis').hidden = n === 0
@@ -284,11 +282,11 @@ function tekenPuntenlijst() {
   let hint
   if (rondje) {
     if (n === 0) hint = 'Zoek of tik het startpunt.'
-    else if (n === 1) hint = 'Kies hieronder de lengte, of tik een keerpunt: dan gaan heen en terug via verschillende paden.'
-    else hint = 'Heen en terug gaan via verschillende paden. Tik opnieuw om het keerpunt te verplaatsen.'
+    else if (n === 1) hint = 'Kies de lengte, of tik een keerpunt.'
+    else hint = ''
   } else if (n === 0) hint = 'Zoek of tik het startpunt.'
   else if (n === 1) hint = 'Zoek of tik het eindpunt.'
-  else hint = 'Elk volgend punt wordt het nieuwe eindpunt; de punten ertussen zijn tussenpunten. Zo dwing je een mooi pad af.'
+  else hint = ''
   el('hint').textContent = hint
   el('keerom').hidden = rondje || n < 2
   el('wis').hidden = n === 0
@@ -777,6 +775,7 @@ function tekenOpties() {
     kies.setAttribute('aria-pressed', String(i === gekozen))
     let regel = `${nl(o.km)} km · ${pct(o.zacht)} onverhard · ${pct(o.paadjes)} smalle paadjes`
     if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
+    if (o.stijgen !== null && o.stijgen !== undefined) regel += ` · ↗ ${Math.round(o.stijgen)} m`
     if (o.ronden > 1) regel += ` · ${o.ronden} rondjes`
     else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
@@ -850,18 +849,17 @@ function tekenTabel() {
     `<td>${nl(100 * plan.zacht.bgt, 1)}%</td><td>${nl(100 * plan.zacht.eind, 1)}%</td></tr>`
   el('tabel').innerHTML = h
   const a = plan.analyse
-  const gok = a.stukken.filter((s) => !s.osmZeker && s.osm !== K.ONBEKEND).reduce((som, s) => som + s.tot - s.van, 0)
-  let noot = a.bgtGebruikt ? '' : 'De officiële kaart is niet gebruikt: het eindoordeel komt alleen van OpenStreetMap. '
-  noot += `Bij OpenStreetMap is ${km(gok)} een aanname op basis van het soort weg (geen ondergrond ingevuld). `
-  noot += `${pct(K.paadjesAandeel(a))} van de route gaat over smalle onverharde paadjes`
-  noot += plan.law > 0.005 ? `, ${pct(plan.law)} over een landelijke wandelroute (LAW).` : '.'
+  const delen = []
+  if (!a.bgtGebruikt) delen.push('zonder officiële kaart')
   const strand = K.strandMeter(a)
-  if (strand > 50) noot += ` Over het strand: ${km(strand)}.`
+  if (strand > 50) delen.push(`${km(strand)} strand`)
   const kaartje = K.kaartjeMeter(a)
-  if (kaartje > 50) noot += ` ${km(kaartje)} gaat over paden die in OpenStreetMap afgesloten zijn: daar heb je een toegangskaart nodig (koop die bij de ingang, vaak via een QR-code) en let op de borden.`
+  if (kaartje > 50) delen.push(`${km(kaartje)} met toegangskaart`)
+  if (plan.law > 0.005) delen.push(`${pct(plan.law)} LAW`)
   const ronden = uitslag.opties[gekozen] && uitslag.opties[gekozen].ronden
-  if (ronden > 1) noot += ` De route bestaat uit ${ronden} rondjes achter elkaar.`
-  else if (a.dubbel > 0.02) noot += ` Ongeveer ${pct(a.dubbel)} ${staat.modus === 'straten' ? 'loop je dubbel (doodlopende straten en verbindingsstukjes)' : 'gaat heen en terug over hetzelfde pad'}.`
+  if (ronden > 1) delen.push(`${ronden} rondjes`)
+  else if (a.dubbel > 0.02) delen.push(`${pct(a.dubbel)} dubbel`)
+  const noot = delen.join(' · ')
   el('noot').textContent = noot
 }
 
@@ -1012,14 +1010,7 @@ function tekenTwijfels() {
     })
     lijst.appendChild(li)
   }
-  let noot = plan.twijfels.length
-    ? `Stukken waar de bronnen het oneens zijn. Tik op een regel om erheen te zoomen${staat.luchtfoto ? '; tik op de foto om hem te vergroten' : ''}. `
-    : `Geen twijfelstukken van ${MIN_TWIJFEL} m of langer. `
-  if (plan.twijfelKort.aantal) {
-    noot += `Daarnaast ${plan.twijfelKort.aantal} ${plan.twijfelKort.aantal === 1 ? 'kort stukje' : 'korte stukjes'} ` +
-      `(samen ${plan.twijfelKort.meter} m) die niet apart genoemd zijn; op de kaart herken je ze aan de stippellijn.`
-  }
-  el('twijfelnoot').textContent = noot
+  el('twijfelnoot').textContent = plan.twijfels.length ? 'Bronnen oneens. Tik om te zoomen.' : 'Geen twijfelstukken.'
 }
 
 function tekenKern() {
@@ -1027,8 +1018,122 @@ function tekenKern() {
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
     `<div><b>${pct(plan.zacht.eind)}</b><span>onverhard + half verhard</span></div>` +
     `<div><b>${pct(K.paadjesAandeel(plan.analyse))}</b><span>smalle paadjes</span></div>` +
-    `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`
+    (keuze().hoogte
+      ? `<div><b>↗ ${Math.round(keuze().hoogte.stijgen)} m</b><span>hoogte&shy;meters</span></div>`
+      : `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`)
 }
+
+/** De gekozen route zoals maakPlan hem gaf (met hoogte en rondjes). */
+const keuze = () => uitslag.opties[gekozen] || {}
+
+// ---------- Hoogteprofiel ----------
+const profielLaag = L.layerGroup().addTo(kaart)
+let profielMeting = null
+
+/** RD-punt op 'd' meter langs de route (voor de stip op de kaart). */
+function puntOpAfstand(xy, opgeteld, d) {
+  let lo = 0
+  let hi = opgeteld.length - 1
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1
+    if (opgeteld[m] <= d) lo = m
+    else hi = m
+  }
+  const l = opgeteld[hi] - opgeteld[lo] || 1
+  const t = Math.max(0, Math.min(1, (d - opgeteld[lo]) / l))
+  return [xy[lo][0] + t * (xy[hi][0] - xy[lo][0]), xy[lo][1] + t * (xy[hi][1] - xy[lo][1])]
+}
+
+function mooieStap(totaal, doel) {
+  const ruw = totaal / doel
+  const macht = 10 ** Math.floor(Math.log10(ruw))
+  return [1, 2, 5, 10].map((f) => f * macht).find((s) => s >= ruw) || 10 * macht
+}
+
+function tekenProfiel() {
+  const h = keuze().hoogte
+  const blok = el('profiel')
+  profielLaag.clearLayers()
+  if (!h || h.afstand.length < 3) {
+    blok.hidden = true
+    return
+  }
+  blok.hidden = false
+  el('profielkop').textContent = `Hoogteprofiel · ↗ ${Math.round(h.stijgen)} m · ↘ ${Math.round(h.dalen)} m`
+  el('profielnoot').textContent = `${Math.round(h.min)}–${Math.round(h.max)} m · ${h.bron === 'AHN' ? 'AHN' : 'SRTM (grof)'}`
+  const vlak = el('profielvlak')
+  const W = Math.max(200, vlak.clientWidth)
+  const Hh = vlak.clientHeight || 128
+  const links = 36
+  const onder = 18
+  const boven = 6
+  const totaal = h.afstand[h.afstand.length - 1]
+  const lo = Math.min(...h.hoogte)
+  const hi = Math.max(...h.hoogte)
+  const span = Math.max(10, hi - lo)
+  const yMin = Math.floor((lo - 0.08 * span) / 5) * 5
+  const yMax = Math.ceil((lo + 1.08 * span) / 5) * 5
+  const sx = (d) => links + ((W - links - 4) * d) / totaal
+  const sy = (z) => boven + ((Hh - onder - boven) * (yMax - z)) / (yMax - yMin)
+  const stap = Math.max(1, Math.ceil(h.afstand.length / (W - links)))
+  let pad = ''
+  for (let i = 0; i < h.afstand.length; i += stap) pad += `${pad ? 'L' : 'M'}${sx(h.afstand[i]).toFixed(1)},${sy(h.hoogte[i]).toFixed(1)}`
+  pad += `L${sx(totaal).toFixed(1)},${sy(h.hoogte[h.hoogte.length - 1]).toFixed(1)}`
+  const vlakPad = `${pad}L${sx(totaal).toFixed(1)},${sy(yMin).toFixed(1)}L${sx(0).toFixed(1)},${sy(yMin).toFixed(1)}Z`
+  let assen = ''
+  const yStap = mooieStap(yMax - yMin, 3)
+  for (let z = Math.ceil(yMin / yStap) * yStap; z <= yMax; z += yStap) {
+    assen += `<line class="raster" x1="${links}" x2="${W - 4}" y1="${sy(z)}" y2="${sy(z)}"/><text x="${links - 5}" y="${sy(z) + 3.5}" text-anchor="end">${z}</text>`
+  }
+  const kmStap = mooieStap(totaal / 1000, 5)
+  for (let k = 0; k <= totaal / 1000 + 1e-9; k += kmStap) {
+    assen += `<text x="${sx(k * 1000)}" y="${Hh - 4}" text-anchor="middle">${nl(k, kmStap < 1 ? 1 : 0)}</text>`
+  }
+  vlak.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Hoogteprofiel: ${Math.round(h.stijgen)} meter stijgen en ${Math.round(h.dalen)} meter dalen over ${nl(totaal / 1000, 1)} km, tussen ${Math.round(h.min)} en ${Math.round(h.max)} meter.">
+    ${assen}<line class="as" x1="${links}" x2="${W - 4}" y1="${sy(yMin)}" y2="${sy(yMin)}"/>
+    <path class="vlak" d="${vlakPad}"/><path class="lijn" d="${pad}"/>
+    <g class="wijzer" visibility="hidden"><line class="draad" y1="${boven}" y2="${sy(yMin)}"/><circle class="stip" r="4.5"/></g>
+  </svg><div class="profieltip" hidden></div>`
+  // kruisdraad: de dichtstbijzijnde meting onder de vinger, met een stip op de kaart
+  const xy = plan.analyse.xy
+  const opgeteld = [0]
+  for (let i = 1; i < xy.length; i++) opgeteld.push(opgeteld[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
+  const schaalD = opgeteld[opgeteld.length - 1] / totaal
+  const svg = vlak.querySelector('svg')
+  const wijzer = svg.querySelector('.wijzer')
+  const tip = vlak.querySelector('.profieltip')
+  const stip = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 3, fillColor: getComputedStyle(document.documentElement).getPropertyValue('--hoogtelijn').trim() || '#a8661c', fillOpacity: 1, interactive: false })
+  profielMeting = (clientX) => {
+    const r = svg.getBoundingClientRect()
+    const x = ((clientX - r.left) / r.width) * W
+    const d = Math.max(0, Math.min(totaal, ((x - links) / (W - links - 4)) * totaal))
+    let i = Math.round(d / (h.afstand[1] - h.afstand[0] || 10))
+    i = Math.max(0, Math.min(h.afstand.length - 1, i))
+    const px = sx(h.afstand[i])
+    const py = sy(h.hoogte[i])
+    wijzer.setAttribute('visibility', 'visible')
+    wijzer.querySelector('line').setAttribute('x1', px)
+    wijzer.querySelector('line').setAttribute('x2', px)
+    wijzer.querySelector('circle').setAttribute('cx', px)
+    wijzer.querySelector('circle').setAttribute('cy', py)
+    tip.hidden = false
+    tip.style.left = `${Math.max(14, Math.min(86, (px / W) * 100))}%`
+    tip.textContent = `${nl(h.afstand[i] / 1000, 1)} km · ${Math.round(h.hoogte[i])} m`
+    const [lon, lat] = K.naarWgs(...puntOpAfstand(xy, opgeteld, h.afstand[i] * schaalD))
+    stip.setLatLng([lat, lon])
+    if (!profielLaag.hasLayer(stip)) stip.addTo(profielLaag)
+  }
+  svg.addEventListener('pointermove', (e) => profielMeting(e.clientX))
+  svg.addEventListener('pointerdown', (e) => profielMeting(e.clientX))
+  svg.addEventListener('pointerleave', () => {
+    wijzer.setAttribute('visibility', 'hidden')
+    tip.hidden = true
+    profielLaag.clearLayers()
+  })
+}
+window.addEventListener('resize', () => {
+  if (plan && !el('profiel').hidden) tekenProfiel()
+})
 
 /** Alles opnieuw tekenen in de huidige kleuren (na een themawissel), zonder de kaart te verschuiven. */
 function herteken() {
@@ -1044,6 +1149,7 @@ function toonResultaat(nieuw) {
   tekenKern()
   el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
   tekenOpties()
+  tekenProfiel()
   tekenAlternatieven()
   tekenRoute(nieuw)
   tekenBalken()

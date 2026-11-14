@@ -312,6 +312,18 @@ draait in je browser; er is geen eigen server.
 - **Tekenen**: trek met je vinger de route die je wilt lopen. De app zoekt de
   paden die de lijn volgen: een pad binnen 20 m van de lijn is bijna gratis,
   op 60 m tien keer zo duur. Eindig bij het begin voor een rondje.
+- **Hoogtemeters**: bij elke route het aantal meters stijgen en dalen, een
+  hoogteprofiel (wijs het aan en een stip op de kaart laat zien waar je bent)
+  en de hoogte in de GPX. Bron: het AHN (maaiveld) via de WCS-dienst van PDOK,
+  in blokken van 500 × 500 m met 10 m per pixel (zo'n 9 kB per blok), alleen
+  de blokken waar de route doorheen gaat. De app leest het GeoTIFF zelf
+  (32-bits kommagetallen, zlib, floating point predictor). Langs de route om
+  de 10 m een hoogte, licht gladgestreken; stijgingen onder 2 m tellen niet
+  (ruis van sloten en wallen). Komoot noemt duidelijk minder (Veluwezoom 131
+  m, Schoorl 116 m, Loonse Duinen 17 m) dan het AHN langs dezelfde routes (264,
+  254 en 45 m): Komoot gebruikt een grove hoogtekaart die duinen afvlakt. Bij
+  heel lange routes (meer dan 160 blokken) gebruikt de app de hoogtes van
+  BRouter (SRTM) en zegt dat erbij.
 - **Routes vergelijken**: je krijgt routes A, B, … (A is de aanbevolen). Tik
   een route om hem te kiezen. Met "op kaart" zet je routes gestippeld naast
   elkaar; tik op zo'n stippellijn om die route te kiezen.
@@ -510,6 +522,8 @@ een eerder opgehaald antwoord (handig als Overpass druk is).
 - Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL); in de webversie rondjes zelf berekend op OpenStreetMap-data uit de kaarttegels van [OpenFreeMap](https://openfreemap.org) (OpenMapTiles-indeling) of via de [Overpass API](https://overpass-api.de).
 - Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0): OGC API Features in de Python-tool, vectortegels in de webversie.
 - Luchtfoto: PDOK luchtfoto RGB, Het Waterschapshuis / Beeldmateriaal Nederland (CC BY 4.0).
+- Hoogte: Actueel Hoogtebestand Nederland (AHN, maaiveld 0,5 m), Rijkswaterstaat / Het Waterschapshuis, via [PDOK](https://www.pdok.nl) (CC0).
+- Kaartstijl en lettertypes van de webversie: overgenomen van de Tarapp in deze repo (Barlow Condensed en IBM Plex Mono, SIL Open Font License).
 
 De tool gebruikt de publieke servers van BRouter en PDOK. Wees er zuinig op:
 laat de cache aan en draai geen grote aantallen routes achter elkaar.

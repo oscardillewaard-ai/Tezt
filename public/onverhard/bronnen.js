@@ -5,6 +5,7 @@
 import * as K from './kern.js'
 import * as G from './graaf.js'
 import * as T from './osmtegels.js'
+import * as H from './hoogte.js'
 
 const BROUTER_URL = 'https://brouter.de/brouter'
 const BGT_BRON = 'de officiële kaart (PDOK)'
@@ -364,8 +365,8 @@ async function optiesVoorDeel(a, b, br, bgt, aantal, meld, wat, waarschuwingen) 
       const zwaar = /watchdog|killed|timeout|geen antwoord/i.test(fout.melding || '')
       const wie = wat === 'Route' ? 'deze route' : wat.toLowerCase()
       waarschuwingen.push(zwaar
-        ? `Voor ${wie} kon BRouter maar ${lijst.length} van de ${aantal} gevraagde routes berekenen: de gratis server stopt zware berekeningen, zoals lange afstanden. Kies "1 route" of plan in kortere stukken.`
-        : `Route ${i + 1} voor ${wie} lukte niet (${fout.melding || fout.message}).`)
+        ? `BRouter: ${lijst.length} van ${aantal} routes voor ${wie} (te zwaar; kies 1 route)`
+        : `Route ${i + 1} voor ${wie} lukte niet`)
       if (zwaar) break
       continue
     }
@@ -600,7 +601,7 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
-      waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: in die richting lukte ${km} km niet`)
+      waarschuwingen.push(`Een rondje is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km`)
     }
   }
   const uitleg = lijst.map((k) => ({
@@ -664,7 +665,7 @@ export async function planLus(start, keer, br, bgt, alternatieven, meld = () => 
   // eerst de echte lussen (terugweg hooguit 15% over de heenweg), daarna de rest
   paren.sort((a, b) => (a.ov > 0.15) - (b.ov > 0.15) || a.kosten - b.kosten)
   if (paren[0].ov > 0.15) {
-    waarschuwingen.push(`er is geen terugweg gevonden die echt anders loopt; ${Math.round(100 * paren[0].ov)}% van de terugweg gaat over de heenweg`)
+    waarschuwingen.push(`Terugweg ${Math.round(100 * paren[0].ov)}% over de heenweg`)
   }
   // alleen echte lussen aanbieden; heen-en-terug alleen als er niets anders is
   const echt = paren.filter((p) => p.ov <= 0.15)
@@ -679,7 +680,7 @@ export async function planLus(start, keer, br, bgt, alternatieven, meld = () => 
     opties.push({ traject, an: null, xy })
   }
   if (echt.length && opties.length < 2) {
-    waarschuwingen.push('er is maar één echte lus via dit keerpunt gevonden; verschuif het keerpunt voor meer keus')
+    waarschuwingen.push('Maar één lus via dit keerpunt')
   }
   return { opties, waarschuwingen }
 }
@@ -824,7 +825,7 @@ export async function planRondjeLussen(start, km, br, bgt, aantalOpties, meld = 
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
-      waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: in die richting lukte ${km} km niet`)
+      waarschuwingen.push(`Een rondje is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km`)
     }
   }
   const uitleg = lijst.map((k) => ({
@@ -952,7 +953,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
       meld('Paden ophalen bij Overpass')
       elementen = await haalPaden(start, straal, signal)
       snap = 0
-      waarschuwingen.push(`De kaarttegels lukten niet (${fout.melding || fout.message}); de paden komen van Overpass.`)
+      waarschuwingen.push('Paden via Overpass (kaarttegels lukten niet)')
     }
   }
   const [sx, sy] = K.naarRd(start[1], start[0])
@@ -1000,7 +1001,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
-      waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: met de paden hier lukte ${km} km niet precies`)
+      waarschuwingen.push(`Een rondje is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km`)
     }
   }
   const uitleg = lijst.map((k) => ({
@@ -1074,7 +1075,7 @@ export async function planGebied(instel, bgt, aantalOpties, meld, signal) {
   }
   const waarschuwingen = []
   if (opties[0].ronden > 1) {
-    waarschuwingen.push(`Eén rondje in dit gebied is hooguit zo'n ${(z.lus / 1000).toFixed(1).replace('.', ',')} km; route A loopt ${opties[0].ronden} rondjes achter elkaar${z.rondjes.length > 1 ? ' (afwisselend twee verschillende)' : ''}.`)
+    waarschuwingen.push(`${opties[0].ronden} rondjes van ca. ${(z.lus / 1000).toFixed(1).replace('.', ',')} km`)
   }
   return { opties, waarschuwingen, doel, eigen: true, uitleg: [] }
 }
@@ -1098,8 +1099,8 @@ export async function planStraten(instel, bgt, meld, signal) {
   const traject = G.maakTraject(g, r.knopen, r.segs, [[g.lat[start], g.lon[start]]])
   const an = await analyseerRoute(traject, bgt)
   const km1 = (m) => (m / 1000).toFixed(1).replace('.', ',')
-  const waarschuwingen = [`${km1(r.vereistMeter)} km ${instel.wegen === 'paden' ? 'paden' : instel.wegen === 'alles' ? 'wegen en paden' : 'straat'}; de route is ${km1(r.meter)} km: ${Math.round((100 * r.extraMeter) / r.meter)}% loop je dubbel of over verbindingsstukjes.`]
-  if (gemist > 50) waarschuwingen.push(`${km1(gemist)} km is niet bereikbaar vanaf de start (achter een hek of afgesloten pad) en zit er niet in.`)
+  const waarschuwingen = []
+  if (gemist > 50) waarschuwingen.push(`${km1(gemist)} km onbereikbaar, zit er niet in`)
   return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
 }
 
@@ -1116,8 +1117,89 @@ export async function planTekening(instel, bgt, meld, signal) {
   const traject = G.maakTraject(g, r.knopen, r.segs, r.via.map((k) => [g.lat[k], g.lon[k]]))
   const an = await analyseerRoute(traject, bgt)
   const waarschuwingen = []
-  if (r.afwijkend > 0.25) waarschuwingen.push(`${Math.round(100 * r.afwijkend)}% van de route ligt meer dan 40 m van je lijn: daar liggen geen paden die dichterbij komen.`)
+  if (r.afwijkend > 0.25) waarschuwingen.push(`${Math.round(100 * r.afwijkend)}% ligt >40 m van je lijn (geen paden dichterbij)`)
   return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+}
+
+// ---------- Hoogtemeters (AHN via PDOK) ----------
+const ahnCache = new Map()
+
+/**
+ * Zet bij elke route een hoogteprofiel en de hoogte in de coördinaten (voor
+ * de GPX). Haalt de AHN-blokken van alle routes in één keer (gedeelde blokken
+ * één keer). Bij heel lange routes (meer dan 160 blokken) slaan we het AHN
+ * over en gebruiken we de hoogtes die BRouter meestuurt (SRTM), als die er zijn.
+ */
+async function voegHoogtesToe(lijst, signal, meld) {
+  const blokken = new Map()
+  for (const o of lijst) for (const b of H.blokkenVoor(o.analyse.xy)) blokken.set(b.join(','), b)
+  const rasters = new Map()
+  if (blokken.size <= 160) {
+    meld('Hoogtes ophalen (AHN)')
+    const nodig = [...blokken.entries()].filter(([k]) => !ahnCache.has(k))
+    let volgende = 0
+    let mislukt = 0
+    const werker = async () => {
+      while (volgende < nodig.length) {
+        const [sleutel, [x0, y0]] = nodig[volgende++]
+        try {
+          const r = await vraag('het AHN (PDOK)', H.ahnUrl(x0, y0), { signal, tijdslimiet: 30000 }, 2)
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          ahnCache.set(sleutel, await H.leesAhnTiff(await r.arrayBuffer()))
+        } catch (fout) {
+          if (afgebroken(fout)) throw fout
+          mislukt += 1
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(6, nodig.length) }, werker))
+    for (const k of blokken.keys()) if (ahnCache.has(k)) rasters.set(k, ahnCache.get(k))
+    if (ahnCache.size > 400) for (const k of [...ahnCache.keys()].slice(0, 200)) ahnCache.delete(k)
+    if (mislukt > 0.2 * blokken.size) rasters.clear()
+  }
+  for (const o of lijst) {
+    let profiel = rasters.size ? H.hoogteprofiel(o.analyse.xy, rasters) : null
+    const coords = o.traject.coords
+    if (profiel) {
+      for (let i = 0; i < coords.length; i++) {
+        const [x, y] = o.analyse.xy[i] || K.naarRd(coords[i][0], coords[i][1])
+        const r = rasters.get(Math.floor(x / H.BLOK_M) * H.BLOK_M + ',' + Math.floor(y / H.BLOK_M) * H.BLOK_M)
+        const h = r ? H.hoogteOp(r, x, y) : NaN
+        coords[i][2] = Number.isNaN(h) ? null : Math.round(h * 10) / 10
+      }
+      profiel.bron = 'AHN'
+    } else if (coords.some((c) => typeof c[2] === 'number')) {
+      // BRouter-hoogtes (SRTM, 90 m): grover, maar beter dan niets
+      profiel = profielUitCoords(o.analyse.xy, coords)
+      if (profiel) profiel.bron = 'SRTM (BRouter)'
+    }
+    o.hoogte = profiel
+  }
+  return rasters.size > 0
+}
+
+/** Hoogteprofiel uit de hoogtes in de coördinaten zelf (BRouter). */
+function profielUitCoords(xy, coords) {
+  const afstand = [0]
+  const hoogte = [coords[0][2]]
+  for (let i = 1; i < xy.length; i++) {
+    afstand.push(afstand[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
+    hoogte.push(coords[i][2])
+  }
+  if (hoogte.some((h) => typeof h !== 'number')) return null
+  let stijgen = 0
+  let dalen = 0
+  let anker = hoogte[0]
+  for (const h of hoogte) {
+    if (h - anker >= 2) {
+      stijgen += h - anker
+      anker = h
+    } else if (anker - h >= 2) {
+      dalen += anker - h
+      anker = h
+    }
+  }
+  return { afstand, hoogte, stijgen, dalen, min: Math.min(...hoogte), max: Math.max(...hoogte) }
 }
 
 const LETTERS = 'ABCDEFGH'
@@ -1241,7 +1323,7 @@ export async function maakPlan(opties) {
       plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang }, bgt, alternatieven, meld, opties.signal)
     } catch (fout) {
       if (afgebroken(fout)) throw fout
-      vooraf.push(`De paden konden niet zelf worden doorgerekend (${fout.melding || fout.message}); daarom via BRouter, dat duurt langer.`)
+      vooraf.push('Paden niet op te halen; via BRouter gerekend')
     }
   }
   if (plan) {
@@ -1280,20 +1362,30 @@ export async function maakPlan(opties) {
   if (zwak.length) {
     for (const o of zwak) lijst.splice(lijst.indexOf(o), 1)
     meldingen.push(
-      `${zwak.length === 1 ? 'Een andere route was' : `${zwak.length} andere routes waren`} veel minder onverhard ` +
-        `(${zwak.map((o) => Math.round(100 * o.zacht) + '%').join(', ')}) en ${zwak.length === 1 ? 'staat' : 'staan'} er daarom niet bij.`,
+      `${zwak.length === 1 ? 'Andere route' : `${zwak.length} andere routes`} weggelaten: veel minder onverhard`,
     )
   }
   lijst.forEach((o, i) => {
     o.naam = LETTERS[i]
   })
+  if (opties.hoogtes !== false && lijst.length) {
+    try {
+      await voegHoogtesToe(lijst, opties.signal, meld)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+    }
+    for (const o of lijst) {
+      o.stijgen = o.hoogte ? o.hoogte.stijgen : null
+      o.dalen = o.hoogte ? o.hoogte.dalen : null
+    }
+    if (lijst.some((o) => !o.hoogte)) meldingen.push('Hoogtemeters onbekend')
+  }
   if (br.strandMijden && lijst.some((o) => o.strand > 300)) {
-    meldingen.push('Niet elk strandstuk is te vermijden zonder grote omweg; bij die routes staat hoeveel strand er nog in zit.')
+    meldingen.push('Strand niet helemaal te vermijden')
   }
   if (bgt && bgt.fouten.length) {
     meldingen.push(
-      `De officiële kaart: ${bgt.fouten.length} van ${bgt.verzoeken} kaarttegels mislukt (bv. ${bgt.fouten[0]}); ` +
-        "die stukken staan daar als 'onbekend'" + (bgt.onbereikbaar ? ' en de routes zijn alleen met OpenStreetMap vergeleken' : ''),
+      `Officiële kaart: ${bgt.fouten.length} van ${bgt.verzoeken} tegels mislukt` + (bgt.onbereikbaar ? ' (alleen OpenStreetMap gebruikt)' : ''),
     )
   }
   return {

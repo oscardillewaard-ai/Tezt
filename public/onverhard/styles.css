@@ -53,7 +53,7 @@
     --fout-inkt: #ffc4bc;
     --let-op-vlak: #362c08;
     --let-op-rand: #8a7120;
-    --hoogtelijn: #e0a35a;
+    --hoogtelijn: #c0823c;
     --half: #c98500;
     --open: #d55181;
     --gesloten: #9085e9;
@@ -76,7 +76,7 @@
   --fout-inkt: #ffc4bc;
   --let-op-vlak: #362c08;
   --let-op-rand: #8a7120;
-  --hoogtelijn: #e0a35a;
+  --hoogtelijn: #c0823c;
   --half: #c98500;
   --open: #d55181;
   --gesloten: #9085e9;
@@ -287,3 +287,17 @@ details.blok > :not(summary) { margin-bottom: 8px; }
 /* tijdens het tekenen: geen kaart verschuiven, een kruisje als cursor */
 .tekent { cursor: crosshair !important; touch-action: none; }
 .tekent .leaflet-interactive { cursor: crosshair !important; }
+
+/* hoogteprofiel: één lijn, rustige assen, een kruisdraad bij aanwijzen */
+.profiel h2 { margin-top: 18px; }
+.profielvlak { position: relative; height: 128px; touch-action: pan-y; }
+.profielvlak svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.profielvlak .vlak { fill: var(--hoogtelijn); opacity: .16; }
+.profielvlak .lijn { fill: none; stroke: var(--hoogtelijn); stroke-width: 2; stroke-linejoin: round; }
+.profielvlak .as { stroke: var(--rand); stroke-width: 1; }
+.profielvlak .raster { stroke: var(--rand); stroke-width: 1; stroke-dasharray: 2 3; opacity: .7; }
+.profielvlak text { fill: var(--inkt-3); font: 500 10.5px var(--mono); }
+.profielvlak .draad { stroke: var(--inkt); stroke-width: 1; }
+.profielvlak .stip { fill: var(--hoogtelijn); stroke: var(--vlak); stroke-width: 2; }
+.profieltip { position: absolute; top: 0; transform: translate(-50%, 0); background: var(--inkt); color: var(--vlak);
+              font: 500 12px var(--mono); padding: 3px 7px; border-radius: 6px; white-space: nowrap; pointer-events: none; }

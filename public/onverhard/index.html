@@ -33,7 +33,7 @@
         <header>
           <div>
             <h1>Onverhard</h1>
-            <p class="sub">Trailrondjes en routes over zo veel mogelijk onverharde paden.</p>
+            <p class="sub">Trailroutes over onverhard</p>
           </div>
           <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
         </header>
@@ -95,7 +95,7 @@
             </select>
           </label>
           <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
-          <label class="vinkje"><input type="checkbox" id="kaartje" /> Ik heb een toegangskaart voor de waterleidingduinen (Dunea, Waternet, PWN)</label>
+          <label class="vinkje"><input type="checkbox" id="kaartje" /> Toegangskaart waterleidingduinen</label>
           <label class="veld">
             <span>Landelijke wandelroutes (LAW)</span>
             <select id="law">
@@ -104,7 +104,7 @@
               <option value="0.3">Sterke voorkeur</option>
             </select>
           </label>
-          <label class="vinkje"><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfelstukken</label>
+          <label class="vinkje"><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
           <label class="veld">
             <span>Hoeveel routes vergelijken</span>
             <select id="grondig">
@@ -132,6 +132,11 @@
 
           <h2>Routes</h2>
           <ul class="opties" id="opties"></ul>
+          <div class="profiel" id="profiel" hidden>
+            <h2 id="profielkop">Hoogteprofiel</h2>
+            <div class="profielvlak" id="profielvlak"></div>
+            <p class="noot" id="profielnoot"></p>
+          </div>
 
           <div class="knoppen">
             <button type="button" class="hoofd" id="gpx">Download GPX</button>
@@ -165,12 +170,9 @@
 
         <details class="blok">
           <summary>Goed om te weten</summary>
-          <p class="noot"><b>Officiële kaart</b> is de BGT (Basisregistratie Grootschalige Topografie): de kaart die gemeenten, provincies en waterschappen bijhouden, met per vlak de ondergrond. <b>OpenStreetMap</b> is de kaart van vrijwilligers; daarop worden ook de routes berekend. <b>Eindoordeel</b>: de officiële kaart als die iets weet, anders OpenStreetMap.</p>
-          <p class="noot"><b>Toegangskaart</b>: in duingebieden van waterbedrijven (zoals Kijfhoek en de Bierlap van Dunea, of de Amsterdamse Waterleidingduinen) staan veel paden in OpenStreetMap als afgesloten, terwijl je er met een dagkaart (vaak via een QR-code bij de ingang) wel mag lopen. Met het vinkje mogen die paden meedoen, maar alleen midden in de natuur; afgesloten stukken bij bebouwing of op een erf blijven verboden. Controleer ter plekke de borden: ook militair terrein en tijdelijk afgesloten natuur kunnen zo op de kaart staan.</p>
-          <p class="noot">De officiële kaart is zo actueel als de beheerder haar bijhoudt, en smalle paadjes staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
-          <p class="noot"><b>In gebied</b>: teken een gebied (bijvoorbeeld een bos) en de app maakt rondjes die erbinnen blijven; is één rondje korter dan je wilt, dan worden het er meer achter elkaar. <b>Elke straat</b>: teken een gebied en je krijgt één route door elke straat (of elk pad) erin, met zo min mogelijk dubbel. <b>Tekenen</b>: trek met je vinger een lijn en de app zoekt de paden die die lijn volgen; eindig bij het begin voor een rondje.</p>
-          <p class="noot"><b>Rondjes</b> rekent de app zelf uit op de paden van OpenStreetMap (een paar seconden). Routes van A naar B, rondjes via een keerpunt en rondjes met voorkeur voor LAW-routes gaan via de routeserver BRouter; dat duurt een paar minuten.</p>
-          <p class="noot">Bronnen: paden © OpenStreetMap-bijdragers, via OpenFreeMap (OpenMapTiles), de Overpass API en BRouter · officiële kaart en zoeken: PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar OpenFreeMap, Overpass, BRouter en PDOK.</p>
+          <p class="noot">Officiële kaart = BGT. Eindoordeel = BGT, anders OpenStreetMap.</p>
+          <p class="noot">Toegangskaart: afgesloten duinpaden doen mee; let ter plekke op de borden.</p>
+          <p class="noot">Bronnen: © OpenStreetMap-bijdragers (OpenFreeMap, Overpass, BRouter) · BGT, AHN, luchtfoto en zoeken: PDOK.</p>
         </details>
       </main>
     </div>
