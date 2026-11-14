@@ -44,7 +44,11 @@ function leesKleuren() {
 leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten' }
+const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
+const tekenModus = () => TEKENMODI.has(staat.modus)
+/** de tekening die bij deze modus hoort: een gebied (vlak) of een lijn */
+const tekening = () => (staat.modus === 'tekenen' ? staat.lijn : staat.vlak)
 let uitslag = null // wat maakPlan teruggaf: alle routes
 let plan = null // de details van de gekozen route
 let gekozen = 0
@@ -86,14 +90,36 @@ function laad() {
     staat.kaartje = hash.get('kaartje') === '1'
     staat.vorm = hash.get('vorm') === 'kronkel' ? 'kronkel' : 'lus'
   }
+  if (TEKENMODI.has(hash.get('modus'))) {
+    staat.modus = hash.get('modus')
+    if (hash.get('t')) {
+      const t = leesPunten(hash.get('t'))
+      if (staat.modus === 'tekenen') staat.lijn = t
+      else staat.vlak = t
+    }
+    if (hash.get('rondje')) staat.km = Number(hash.get('rondje')) || staat.km
+    if (['straten', 'paden', 'alles'].includes(hash.get('wegen'))) staat.wegen = hash.get('wegen')
+    staat.punten = hash.get('p') ? leesPunten(hash.get('p')).slice(0, 1) : []
+  }
   if (!Array.isArray(staat.punten)) staat.punten = []
   // de link uit de adresbalk halen: anders wint hij bij herladen van je nieuwe punten
-  if (hash.get('p')) history.replaceState(null, '', location.pathname + location.search)
+  if (hash.get('p') || hash.get('t')) history.replaceState(null, '', location.pathname + location.search)
   return hash
 }
 
 function deelLink() {
   const p = staat.punten.map(([lat, lon]) => `${lat.toFixed(5)},${lon.toFixed(5)}`).join(';')
+  if (tekenModus()) {
+    const t = (tekening() || []).map(([lat, lon]) => `${lat.toFixed(5)},${lon.toFixed(5)}`).join(';')
+    let hash = `#modus=${staat.modus}&t=${t}`
+    if (p) hash += `&p=${p}`
+    if (staat.modus === 'gebied') hash += `&rondje=${staat.km}`
+    if (staat.modus === 'straten') hash += `&wegen=${staat.wegen}`
+    if (!staat.trail) hash += '&trail=0'
+    if (!staat.strand) hash += '&strand=0'
+    if (staat.kaartje) hash += '&kaartje=1'
+    return location.origin + location.pathname + hash
+  }
   let hash = `#p=${p}`
   if (staat.modus === 'rondje') hash += `&rondje=${staat.km}`
   if (staat.law !== 1) hash += `&law=${staat.law}`
@@ -170,12 +196,14 @@ function inNederland([lat, lon]) {
 
 function puntNaam(i) {
   if (staat.modus === 'rondje') return i === 0 ? 'Start en finish' : 'Keerpunt'
+  if (tekenModus()) return 'Start en finish'
   if (i === 0) return 'Start'
   return i === staat.punten.length - 1 ? 'Eind' : `Tussenpunt ${i}`
 }
 
 function puntLabel(i) {
   if (staat.modus === 'rondje') return i === 0 ? ['S', ''] : ['K', 'via']
+  if (tekenModus()) return ['S', '']
   const laatste = i === staat.punten.length - 1
   if (i === 0) return ['S', '']
   return laatste ? ['F', ''] : [String(i), 'via']
@@ -226,6 +254,33 @@ function tekenPuntenlijst() {
   })
   const rondje = staat.modus === 'rondje'
   const n = staat.punten.length
+  const tm = tekenModus()
+  el('tekenpaneel').hidden = !tm
+  el('wegenveld').hidden = staat.modus !== 'straten'
+  el('tekenVierkant').hidden = staat.modus === 'tekenen'
+  el('tekenWis').hidden = !tekening()
+  el('locatie').hidden = staat.modus === 'tekenen'
+  if (tm) {
+    const t = tekening()
+    let hint
+    if (tekenen) {
+      hint = staat.modus === 'tekenen' ? 'Trek met je vinger (of muis) de route op de kaart. Eindig bij het begin voor een rondje.'
+        : tekenen === 'rechthoek' ? 'Sleep van de ene hoek naar de andere.' : 'Omcirkel met je vinger (of muis) het gebied op de kaart.'
+    } else if (!t) {
+      hint = staat.modus === 'tekenen' ? 'Tik op "Teken" en trek de route die je wilt lopen.'
+        : `Tik op "Teken" en omcirkel het gebied${staat.modus === 'gebied' ? ', bijvoorbeeld een bos' : ''}, of kies "Rechthoek".`
+    } else if (staat.modus === 'tekenen') hint = 'Klaar: plan de route. Opnieuw tekenen vervangt de lijn.'
+    else hint = n ? 'Klaar om te plannen. Tik op de kaart om de start te verplaatsen.' : 'Tik eventueel een startpunt; anders begint de route midden in het gebied.'
+    el('hint').textContent = hint
+    el('keerom').hidden = true
+    el('wis').hidden = n === 0
+    el('kmveld').hidden = staat.modus !== 'gebied'
+    el('vormveld').hidden = true
+    el('plan').disabled = !t || !!tekenen
+    el('plan').textContent = { gebied: 'Plan rondjes in het gebied', straten: 'Plan route door elke straat', tekenen: 'Maak route van tekening' }[staat.modus]
+    if (staat.modus === 'straten') el('plan').textContent = { straten: 'Plan route door elke straat', paden: 'Plan route over elk pad', alles: 'Plan route door elke straat en elk pad' }[staat.wegen]
+    return
+  }
   let hint
   if (rondje) {
     if (n === 0) hint = 'Zoek of tik het startpunt.'
@@ -246,6 +301,8 @@ function tekenPuntenlijst() {
 
 function puntenGewijzigd() {
   if (staat.modus === 'rondje' && staat.punten.length > 2) staat.punten = [staat.punten[0], staat.punten[staat.punten.length - 1]]
+  if (tekenModus() && staat.punten.length > 1) staat.punten = staat.punten.slice(-1)
+  if (staat.modus === 'tekenen') staat.punten = []
   bewaar()
   tekenPunten()
   tekenPuntenlijst()
@@ -257,18 +314,135 @@ function toonFout(tekst) {
 }
 
 function voegPuntToe(p) {
-  if (stopper) return // tijdens het plannen geen punten verzetten
+  if (stopper || tekenen || Date.now() - netGetekend < 400) return // tijdens het plannen of tekenen geen punten zetten
+  if (staat.modus === 'tekenen') return
   if (!inNederland(p)) {
     toonFout('Dat punt ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
   }
   toonFout('')
   if (staat.modus === 'rondje') staat.punten = staat.punten.length ? [staat.punten[0], p] : [p]
+  else if (tekenModus()) staat.punten = [p]
   else staat.punten.push(p)
   puntenGewijzigd()
 }
 
 kaart.on('click', (e) => voegPuntToe([e.latlng.lat, e.latlng.lng]))
+
+// ---------- Tekenen op de kaart (gebied, elke straat, route langs een lijn) ----------
+const tekenLaag = L.layerGroup().addTo(kaart)
+let tekenen = null // 'vrij' of 'rechthoek' terwijl je tekent
+let netGetekend = 0 // de tik waarmee je stopt met tekenen is geen startpunt
+let schets = null // { punten, lijn } tijdens het tekenen
+
+function tekenTekening() {
+  tekenLaag.clearLayers()
+  const t = tekening()
+  if (!t || !t.length) return
+  const stijl = { color: '#ffcb05', weight: 4, opacity: 1, dashArray: '8 6', interactive: false }
+  if (staat.modus === 'tekenen') {
+    L.polyline(t, { ...stijl, color: '#1f3328', weight: 7, dashArray: null, opacity: 0.35 }).addTo(tekenLaag)
+    L.polyline(t, stijl).addTo(tekenLaag)
+  } else {
+    L.polygon(t, { ...stijl, color: '#1f3328', weight: 7, dashArray: null, opacity: 0.35, fill: false }).addTo(tekenLaag)
+    L.polygon(t, { ...stijl, fillColor: '#ffcb05', fillOpacity: 0.08 }).addTo(tekenLaag)
+  }
+}
+
+function startTekenen(soort) {
+  if (stopper) return
+  if (tekenen === soort) {
+    stopTekenen()
+    tekenPuntenlijst()
+    return
+  }
+  tekenen = soort
+  for (const h of [kaart.dragging, kaart.touchZoom, kaart.doubleClickZoom, kaart.boxZoom]) h.disable()
+  kaart.getContainer().classList.add('tekent')
+  el('tekenVrij').setAttribute('aria-pressed', String(soort === 'vrij'))
+  el('tekenVierkant').setAttribute('aria-pressed', String(soort === 'rechthoek'))
+  tekenPuntenlijst()
+}
+
+function stopTekenen() {
+  tekenen = null
+  schets = null
+  for (const h of [kaart.dragging, kaart.touchZoom, kaart.doubleClickZoom, kaart.boxZoom]) h.enable()
+  kaart.getContainer().classList.remove('tekent')
+  el('tekenVrij').setAttribute('aria-pressed', 'false')
+  el('tekenVierkant').setAttribute('aria-pressed', 'false')
+}
+
+function rechthoek(a, b) {
+  return [a, [a[0], b[1]], b, [b[0], a[1]]]
+}
+
+/** Punten die minder dan 'min' meter na het vorige komen, weglaten. */
+function dunUit(punten, min) {
+  const uit = [punten[0]]
+  for (const p of punten.slice(1)) {
+    const q = uit[uit.length - 1]
+    if (kaart.distance(p, q) >= min) uit.push(p)
+  }
+  return uit
+}
+
+const kaartVlak = kaart.getContainer()
+kaartVlak.addEventListener('pointerdown', (e) => {
+  if (!tekenen || e.button > 0) return
+  e.preventDefault()
+  e.stopPropagation()
+  kaartVlak.setPointerCapture(e.pointerId)
+  const p = kaart.mouseEventToLatLng(e)
+  schets = { punten: [[p.lat, p.lng]], lijn: L.polyline([[p.lat, p.lng]], { color: '#ffcb05', weight: 4, dashArray: '8 6', interactive: false }).addTo(tekenLaag) }
+}, { capture: true })
+kaartVlak.addEventListener('pointermove', (e) => {
+  if (!tekenen || !schets) return
+  e.preventDefault()
+  const p = kaart.mouseEventToLatLng(e)
+  if (tekenen === 'rechthoek') {
+    schets.punten = [schets.punten[0], [p.lat, p.lng]]
+    schets.lijn.setLatLngs(rechthoek(schets.punten[0], schets.punten[1]).concat([schets.punten[0]]))
+  } else {
+    schets.punten.push([p.lat, p.lng])
+    schets.lijn.addLatLng([p.lat, p.lng])
+  }
+}, { capture: true })
+function eindeSchets(e) {
+  if (!tekenen || !schets) return
+  e.preventDefault()
+  netGetekend = Date.now()
+  let punten = schets.punten
+  if (tekenen === 'rechthoek') punten = punten.length > 1 ? rechthoek(punten[0], punten[1]) : []
+  else punten = dunUit(punten, 8)
+  const nodig = staat.modus === 'tekenen' ? 2 : 3
+  stopTekenen()
+  if (punten.length >= nodig && (staat.modus === 'tekenen' || kaart.distance(punten[0], punten[2] || punten[1]) > 30)) {
+    if (staat.modus === 'tekenen') staat.lijn = punten
+    else staat.vlak = punten
+    toonFout('')
+  } else toonFout('Die tekening was te klein. Teken nog eens, wat groter.')
+  bewaar()
+  tekenTekening()
+  tekenPuntenlijst()
+}
+kaartVlak.addEventListener('pointerup', eindeSchets, { capture: true })
+kaartVlak.addEventListener('pointercancel', eindeSchets, { capture: true })
+el('tekenVrij').addEventListener('click', () => startTekenen('vrij'))
+el('tekenVierkant').addEventListener('click', () => startTekenen('rechthoek'))
+el('tekenWis').addEventListener('click', () => {
+  stopTekenen()
+  if (staat.modus === 'tekenen') staat.lijn = null
+  else staat.vlak = null
+  bewaar()
+  tekenTekening()
+  tekenPuntenlijst()
+})
+el('wegen').addEventListener('change', () => {
+  staat.wegen = el('wegen').value
+  bewaar()
+  tekenPuntenlijst()
+})
 
 // ---------- Zoeken ----------
 let zoekTimer = null
@@ -331,8 +505,10 @@ document.addEventListener('click', (e) => {
 
 // ---------- Invoer ----------
 function zetModus(modus) {
-  if (modus === 'rondje' && staat.modus !== 'rondje') staat.punten = staat.punten.slice(0, 1) // alleen de start blijft
+  if (modus !== 'route' && staat.modus !== modus) staat.punten = staat.punten.slice(0, 1) // alleen de start blijft
+  stopTekenen()
   staat.modus = modus
+  tekenTekening()
   for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === modus))
   puntenGewijzigd()
 }
@@ -425,6 +601,10 @@ function stopBezig() {
 async function planNu() {
   if (stopper) return
   toonFout('')
+  if (tekenModus() && !(tekening() || []).every(inNederland)) {
+    toonFout('De tekening ligt (deels) buiten Nederland. De officiële kaart dekt alleen Nederland.')
+    return
+  }
   if (!staat.punten.every(inNederland)) {
     toonFout('Een van de punten ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
@@ -440,8 +620,11 @@ async function planNu() {
   try {
     const rondje = staat.modus === 'rondje'
     const resultaat = await maakPlan({
+      modus: tekenModus() ? staat.modus : undefined,
+      tekening: tekenModus() ? tekening() : undefined,
+      wegen: staat.wegen,
       punten: rondje ? staat.punten.slice(0, 2) : staat.punten,
-      rondjeKm: rondje ? staat.km : null,
+      rondjeKm: rondje || staat.modus === 'gebied' ? staat.km : null,
       law: staat.law,
       trail: staat.trail,
       strandMijden: staat.strand,
@@ -594,7 +777,8 @@ function tekenOpties() {
     kies.setAttribute('aria-pressed', String(i === gekozen))
     let regel = `${nl(o.km)} km · ${pct(o.zacht)} onverhard · ${pct(o.paadjes)} smalle paadjes`
     if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
-    if (rondje && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
+    if (o.ronden > 1) regel += ` · ${o.ronden} rondjes`
+    else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
     kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>Route ${o.naam}</b>${i === 0 ? ' · aanbevolen' : ''}<small>${regel}</small></span>`
@@ -675,7 +859,9 @@ function tekenTabel() {
   if (strand > 50) noot += ` Over het strand: ${km(strand)}.`
   const kaartje = K.kaartjeMeter(a)
   if (kaartje > 50) noot += ` ${km(kaartje)} gaat over paden die in OpenStreetMap afgesloten zijn: daar heb je een toegangskaart nodig (koop die bij de ingang, vaak via een QR-code) en let op de borden.`
-  if (a.dubbel > 0.02) noot += ` Ongeveer ${pct(a.dubbel)} gaat heen en terug over hetzelfde pad.`
+  const ronden = uitslag.opties[gekozen] && uitslag.opties[gekozen].ronden
+  if (ronden > 1) noot += ` De route bestaat uit ${ronden} rondjes achter elkaar.`
+  else if (a.dubbel > 0.02) noot += ` Ongeveer ${pct(a.dubbel)} ${staat.modus === 'straten' ? 'loop je dubbel (doodlopende straten en verbindingsstukjes)' : 'gaat heen en terug over hetzelfde pad'}.`
   el('noot').textContent = noot
 }
 
@@ -913,13 +1099,17 @@ el('kaartje').checked = !!staat.kaartje
 el('luchtfoto').checked = !!staat.luchtfoto
 vatSamen()
 el('vorm').value = staat.vorm === 'kronkel' ? 'kronkel' : 'lus'
+el('wegen').value = staat.wegen
 for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
 puntenGewijzigd()
+tekenTekening()
+if (tekenModus() && tekening()) kaart.fitBounds(L.latLngBounds(tekening()).pad(0.2))
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))
 else if (staat.punten.length === 1) kaart.setView(staat.punten[0], 13)
 // een gedeelde link opent terwijl de app al open staat: opnieuw beginnen met die punten
 window.addEventListener('hashchange', () => {
-  if (new URLSearchParams(location.hash.slice(1)).get('p')) location.reload()
+  const h = new URLSearchParams(location.hash.slice(1))
+  if (h.get('p') || h.get('t')) location.reload()
 })
 // #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
 if (hash.get('plan') && !el('plan').disabled) planNu()

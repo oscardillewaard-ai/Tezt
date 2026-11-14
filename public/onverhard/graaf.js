@@ -187,7 +187,7 @@ function verbindLosseEinden(d, snap) {
  * (extraStranden: vlakken {polygonen, bbox} uit de officiële kaart).
  * Knopen zijn de punten van de OSM-wegen (gedeelde punten = kruisingen).
  */
-export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0 } = {}) {
+export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0, gebied = null, buitenFactor = 30 } = {}) {
   const stranden = strandMijden ? strandRingen(elementen).concat(extraStranden) : []
   // te mijden plekken (RD-punten, 20 m eromheen), via een rooster van 50 m
   const mijd = new Set()
@@ -282,6 +282,17 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
     }
     van.length = naar.length = lengte.length = factor.length = segTags.length = j
   }
+  // een getekend gebied: segmenten erbuiten zijn duur (wel bruikbaar om er te komen)
+  const binnenSeg = new Uint8Array(van.length)
+  if (gebied) {
+    const vlak = [[gebied]]
+    for (let i = 0; i < van.length; i++) {
+      const mx = (xs[van[i]] + xs[naar[i]]) / 2
+      const my = (ys[van[i]] + ys[naar[i]]) / 2
+      if (K.afstandTotVlak(mx, my, vlak) === 0) binnenSeg[i] = 1
+      else factor[i] *= buitenFactor
+    }
+  } else binnenSeg.fill(1)
   // buren per knoop (CSR): beide richtingen, met het segmentnummer
   const n = lat.length
   const graad = new Uint32Array(n + 1)
@@ -302,7 +313,8 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
   return {
     n, lat, lon, x: Float64Array.from(xs), y: Float64Array.from(ys),
     begin: graad, buur, buurSeg,
-    lengte: Float64Array.from(lengte), factor: Float64Array.from(factor), segTags: Uint32Array.from(segTags), tagLijst,
+    lengte: Float64Array.from(lengte), factor: Float64Array.from(factor), segTags: Uint32Array.from(segTags), tagLijst, binnenSeg,
+    van: Uint32Array.from(van), naar: Uint32Array.from(naar),
     aantalStrand: factor.filter((f) => f >= STRAND_FACTOR).length,
   }
 }
@@ -361,7 +373,7 @@ export function dichtsteKnoop(g, x, y) {
  * kosten; 1 = geen straf) of null. doel: stop zodra die knoop vast ligt.
  * Geeft {kosten, meter, vorigeSeg, vorigeKnoop}.
  */
-export function dijkstra(g, bron, { straf = null, doel = -1, maxKosten = Infinity } = {}) {
+export function dijkstra(g, bron, { straf = null, doel = -1, maxKosten = Infinity, alleenLengte = false, stop = null } = {}) {
   const kosten = new Float64Array(g.n).fill(Infinity)
   const meter = new Float64Array(g.n)
   const vorigeSeg = new Int32Array(g.n).fill(-1)
@@ -409,18 +421,20 @@ export function dijkstra(g, bron, { straf = null, doel = -1, maxKosten = Infinit
     hn[i] = kn
     return v
   }
-  kosten[bron] = 0
-  duw(0, bron)
+  for (const b of Array.isArray(bron) ? bron : [bron]) {
+    kosten[b] = 0
+    duw(0, b)
+  }
   while (grootte) {
     const u = pak()
     if (vast[u]) continue
     vast[u] = 1
-    if (u === doel || kosten[u] > maxKosten) break
+    if (u === doel || kosten[u] > maxKosten || (stop && stop(u))) break
     for (let j = g.begin[u]; j < g.begin[u + 1]; j++) {
       const v = g.buur[j]
       if (vast[v]) continue
       const s = g.buurSeg[j]
-      const k = kosten[u] + g.lengte[s] * g.factor[s] * (straf ? straf[s] : 1)
+      const k = kosten[u] + g.lengte[s] * (alleenLengte ? 1 : g.factor[s]) * (straf ? straf[s] : 1)
       if (k < kosten[v]) {
         kosten[v] = k
         meter[v] = meter[u] + g.lengte[s]
@@ -520,15 +534,16 @@ export function zonderUitstapjes(knopen, segs) {
  * een grote driehoek, voor kronkelen in een klein gebied.
  * Geeft {rondjes: [{knopen, segs, meter, kosten, dubbel, strand, via}], ...}.
  */
-export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false, strafFactor = 8 } = {}) {
+export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false, strafFactor = 8, ringen: eigenRingen = null, binnen = null, maxAf = 0.3 } = {}) {
   const boom = dijkstra(g, start, { maxKosten: doel * 6 })
   const sx = g.x[start]
   const sy = g.y[start]
-  const ringen = kronkel ? [0.1, 0.15, 0.2, 0.26] : [0.18, 0.26, 0.34, 0.42]
+  const ringen = eigenRingen || (kronkel ? [0.1, 0.15, 0.2, 0.26] : [0.18, 0.26, 0.34, 0.42])
   const beste = new Map()
   for (let i = 0; i < g.n; i++) {
     const m = boom.meter[i]
     if (!Number.isFinite(boom.kosten[i]) || m < (ringen[0] - 0.05) * doel || m > (ringen[3] + 0.05) * doel) continue
+    if (binnen && !binnen[i]) continue
     const hoek = (Math.atan2(g.x[i] - sx, g.y[i] - sy) * 180) / Math.PI
     const sector = Math.floor((((hoek % 360) + 360) % 360) / (360 / sectoren))
     let ring = 0
@@ -551,14 +566,14 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
       if (a === b || dab < 25 || dab > (kronkel ? 120 : 160)) continue
       if (!kronkel) {
         const af = Math.abs(a.meter + 1.35 * afstand(a, b) + b.meter - doel) / doel
-        if (af <= 0.3) combis.push({ hoeken: [a, b], prior: a.waarde + b.waarde + 2 * af })
+        if (af <= maxAf) combis.push({ hoeken: [a, b], prior: a.waarde + b.waarde + 2 * af })
         continue
       }
       for (const c of kand) {
         const dbc = draai(b, c)
         if (c === a || c === b || dbc < 25 || dbc > 120 || dab + dbc > 240) continue
         const af = Math.abs(a.meter + 1.35 * (afstand(a, b) + afstand(b, c)) + c.meter - doel) / doel
-        if (af <= 0.3) combis.push({ hoeken: [a, b, c], prior: (a.waarde + b.waarde + c.waarde) * (2 / 3) + 2 * af })
+        if (af <= maxAf) combis.push({ hoeken: [a, b, c], prior: (a.waarde + b.waarde + c.waarde) * (2 / 3) + 2 * af })
       }
     }
   }
@@ -613,4 +628,324 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
     if (!lijkt) gekozen.push(r)
   }
   return { rondjes: gekozen, kandidaten: kand.length, geprobeerd: Math.min(combis.length, maxProbeer) }
+}
+
+// ---------- Rondjes binnen een getekend gebied ----------
+/** Per knoop: ligt hij binnen het gebied (ring in RD)? */
+export function knopenBinnen(g, ring) {
+  const uit = new Uint8Array(g.n)
+  const vlak = [[ring]]
+  const b = [Infinity, Infinity, -Infinity, -Infinity]
+  for (let i = 0; i < ring.length; i += 2) {
+    b[0] = Math.min(b[0], ring[i])
+    b[2] = Math.max(b[2], ring[i])
+    b[1] = Math.min(b[1], ring[i + 1])
+    b[3] = Math.max(b[3], ring[i + 1])
+  }
+  for (let i = 0; i < g.n; i++) {
+    if (g.x[i] < b[0] || g.x[i] > b[2] || g.y[i] < b[1] || g.y[i] > b[3]) continue
+    if (K.afstandTotVlak(g.x[i], g.y[i], vlak) === 0) uit[i] = 1
+  }
+  return uit
+}
+
+/**
+ * Rondjes die binnen een gebied blijven. De ringen voor de hoekpunten
+ * schalen mee met hoe ver je binnen het gebied kunt komen; is één rondje
+ * korter dan gevraagd, dan worden het meerdere rondjes achter elkaar
+ * (afwisselend verschillende, als die er zijn).
+ * Geeft {rondjes: [{knopen, segs, meter, ronden, ...}], lus: meter van één rondje}.
+ */
+export function zoekRondjesInGebied(g, start, doel, binnen, { aantal = 4 } = {}) {
+  const boom = dijkstra(g, start)
+  let verst = 0
+  for (let i = 0; i < g.n; i++) if (binnen[i] && Number.isFinite(boom.kosten[i])) verst = Math.max(verst, boom.meter[i])
+  if (verst < 50) return { rondjes: [], lus: 0 }
+  // Een rondje binnen een gebied is hooguit zo'n 3 tot 4 keer de verste afstand. We zoeken
+  // rondjes van een paar groottes en houden ze allemaal; de gevraagde lengte is hier geen
+  // harde eis (dan worden het meerdere rondjes).
+  const buiten = (r) => {
+    let m = 0
+    for (const s of r.segs) if (!g.binnenSeg[s]) m += g.lengte[s]
+    return m / r.meter
+  }
+  const alle = []
+  for (const f of [3.5, 2.6, 1.9, 1.3]) {
+    const lusDoel = Math.min(doel, f * verst)
+    if (alle.some((r) => r.lusDoel === lusDoel)) continue
+    const ringen = [0.35, 0.55, 0.75, 0.95].map((q) => (q * verst) / lusDoel)
+    for (const kronkel of [true, false]) {
+      const z = zoekRondjes(g, start, lusDoel, { aantal: 4, ringen, binnen, kronkel, maxProbeer: 120, maxAf: 0.6 })
+      for (const r of z.rondjes) alle.push({ ...r, lusDoel, buiten: buiten(r) })
+    }
+  }
+  if (!alle.length) return { rondjes: [], lus: 0 }
+  // mooi (lage kosten per meter), weinig heen en terug, binnen het gebied, en liever lang
+  const rang = (r) => r.kosten / r.meter + 3 * r.dubbel + 3 * r.buiten - 0.6 * Math.min(1, r.meter / doel)
+  alle.sort((p, q) => rang(p) - rang(q))
+  const lijst = []
+  for (const r of alle) {
+    const set = new Set(r.segs)
+    const lijkt = lijst.some((q) => {
+      let zelfde = 0
+      for (const s of q.segs) if (set.has(s)) zelfde += g.lengte[s]
+      return zelfde / Math.min(q.meter, r.meter) > 0.6
+    })
+    if (!lijkt) lijst.push(r)
+    if (lijst.length >= aantal + 1) break
+  }
+  const uit = []
+  for (const [i, r] of lijst.slice(0, aantal).entries()) {
+    // rondjes erbij (afwisselend een ander rondje, als dat er is) tot de lengte ongeveer klopt
+    let knopen = r.knopen.slice()
+    let segs = r.segs.slice()
+    let meter = r.meter
+    let ronden = 1
+    const ander = lijst[(i + 1) % lijst.length]
+    for (;;) {
+      const volgende = ronden % 2 === 1 && ander !== r ? ander : r
+      if (meter + volgende.meter / 2 > doel || ronden >= 20) break
+      knopen = knopen.concat(volgende.knopen.slice(1))
+      segs = segs.concat(volgende.segs)
+      meter += volgende.meter
+      ronden++
+    }
+    uit.push({ ...r, knopen, segs, meter, ronden })
+  }
+  return { rondjes: uit, lus: lijst[0].meter }
+}
+
+// ---------- Door elke straat (Chinese postbode) ----------
+const STRATEN = new Set(['residential', 'living_street', 'unclassified', 'tertiary', 'tertiary_link', 'secondary', 'secondary_link',
+  'primary', 'primary_link', 'pedestrian', 'road'])
+const PADEN = new Set(['path', 'footway', 'track', 'bridleway', 'cycleway', 'steps'])
+
+/**
+ * Welke segmenten moeten erin: binnen het gebied, en van de gekozen soort
+ * ('straten', 'paden' of 'alles' wat begaanbaar is).
+ */
+export function vereisteSegmenten(g, soort = 'straten') {
+  const highwayVan = g.tagLijst.map((t) => (/(?:^| )highway=(\S+)/.exec(t) || [])[1] || '')
+  const dienstVan = g.tagLijst.map((t) => (/(?:^| )service=(\S+)/.exec(t) || [])[1] || '')
+  const uit = new Uint8Array(g.lengte.length)
+  for (let s = 0; s < uit.length; s++) {
+    if (!g.binnenSeg[s] || g.factor[s] >= STRAND_FACTOR) continue
+    const h = highwayVan[g.segTags[s]]
+    const straat = STRATEN.has(h) || (h === 'service' && !dienstVan[g.segTags[s]])
+    const pad = PADEN.has(h)
+    if (soort === 'straten' ? straat : soort === 'paden' ? pad : straat || pad || h === 'service') uit[s] = 1
+  }
+  return uit
+}
+
+/**
+ * Een rondje vanaf 'start' dat elk vereist segment minstens één keer loopt,
+ * zo kort mogelijk (benadering van het 'Chinese postbode'-probleem):
+ * 1. losse stukken verbinden via de kortste weg (ook over niet-vereiste wegen);
+ * 2. knopen met een oneven aantal lijnen twee aan twee koppelen, dichtstbijzijnde eerst,
+ *    en die verbinding dubbel lopen;
+ * 3. dan heeft elke knoop een even aantal lijnen en is er één rondje dat alles precies
+ *    één keer loopt (Euler, met het algoritme van Hierholzer).
+ * Geeft {knopen, segs, meter, vereistMeter, extraMeter} of null.
+ */
+export function doorElkeStraat(g, start, vereist) {
+  const randen = [] // [a, b, seg]
+  let vereistMeter = 0
+  for (let s = 0; s < vereist.length; s++) {
+    if (!vereist[s]) continue
+    randen.push([g.van[s], g.naar[s], s])
+    vereistMeter += g.lengte[s]
+  }
+  if (!randen.length) return null
+  // 1. samenhang: union-find over de knopen
+  const ouder = new Map()
+  const vind = (x) => {
+    let r = x
+    while (ouder.get(r) !== r) r = ouder.get(r)
+    let y = x
+    while (ouder.get(y) !== r) {
+      const volgende = ouder.get(y)
+      ouder.set(y, r)
+      y = volgende
+    }
+    return r
+  }
+  const zetIn = (x) => {
+    if (!ouder.has(x)) ouder.set(x, x)
+  }
+  const voeg = (a, b) => {
+    zetIn(a)
+    zetIn(b)
+    ouder.set(vind(a), vind(b))
+  }
+  for (const [a, b] of randen) voeg(a, b)
+  zetIn(start)
+  const padToevoegen = (p) => {
+    for (let i = 0; i < p.segs.length; i++) {
+      randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
+      voeg(p.knopen[i], p.knopen[i + 1])
+    }
+  }
+  for (let ronde = 0; ronde < 500; ronde++) {
+    const wortel = vind(start)
+    const groep = [...ouder.keys()].filter((k) => vind(k) === wortel)
+    if (groep.length === ouder.size) break
+    const inGroep = new Set(groep)
+    const boom = dijkstra(g, groep, { alleenLengte: true, stop: (u) => ouder.has(u) && !inGroep.has(u) })
+    let doel = -1
+    let beste = Infinity
+    for (const k of ouder.keys()) if (!inGroep.has(k) && boom.kosten[k] < beste) {
+      beste = boom.kosten[k]
+      doel = k
+    }
+    if (doel < 0) {
+      // onbereikbare stukken: weglaten
+      for (const k of [...ouder.keys()]) if (!inGroep.has(k)) ouder.delete(k)
+      for (let i = randen.length - 1; i >= 0; i--) if (!inGroep.has(randen[i][0])) randen.splice(i, 1)
+      break
+    }
+    padToevoegen(pad(boom, doel))
+  }
+  // 2. oneven knopen koppelen
+  const graad = new Map()
+  for (const [a, b] of randen) {
+    graad.set(a, (graad.get(a) || 0) + 1)
+    graad.set(b, (graad.get(b) || 0) + 1)
+  }
+  const oneven = [...graad.keys()].filter((k) => graad.get(k) % 2 === 1)
+  const onevenSet = new Set(oneven)
+  const paren = []
+  for (const u of oneven) {
+    let gevonden = 0
+    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => v !== u && onevenSet.has(v) && ++gevonden >= 6 })
+    for (const v of oneven) if (v !== u && Number.isFinite(boom.kosten[v])) paren.push([boom.kosten[v], u, v, boom])
+  }
+  paren.sort((p, q) => p[0] - q[0])
+  const gekoppeld = new Set()
+  for (const [, u, v, boom] of paren) {
+    if (gekoppeld.has(u) || gekoppeld.has(v)) continue
+    gekoppeld.add(u)
+    gekoppeld.add(v)
+    const p = pad(boom, v)
+    for (let i = 0; i < p.segs.length; i++) randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
+  }
+  // nog ongekoppelde (zelden): met de dichtstbijzijnde andere ongekoppelde
+  const over = oneven.filter((u) => !gekoppeld.has(u))
+  while (over.length >= 2) {
+    const u = over.shift()
+    const rest = new Set(over)
+    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => rest.has(v) })
+    const v = over.reduce((b, k) => (boom.kosten[k] < boom.kosten[b] ? k : b), over[0])
+    over.splice(over.indexOf(v), 1)
+    const p = pad(boom, v)
+    for (let i = 0; i < p.segs.length; i++) randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
+  }
+  // 3. Euler-rondje (Hierholzer)
+  const buren = new Map()
+  randen.forEach(([a, b], i) => {
+    if (!buren.has(a)) buren.set(a, [])
+    if (!buren.has(b)) buren.set(b, [])
+    buren.get(a).push(i)
+    buren.get(b).push(i)
+  })
+  const gebruikt = new Uint8Array(randen.length)
+  const wijzer = new Map()
+  const begin = buren.has(start) ? start : randen[0][0]
+  const stapel = [[begin, -1]]
+  const kring = []
+  while (stapel.length) {
+    const [v] = stapel[stapel.length - 1]
+    const lijst = buren.get(v) || []
+    let w = wijzer.get(v) || 0
+    while (w < lijst.length && gebruikt[lijst[w]]) w++
+    wijzer.set(v, w)
+    if (w === lijst.length) {
+      kring.push(stapel.pop())
+    } else {
+      const r = lijst[w]
+      gebruikt[r] = 1
+      const [a, b, s] = randen[r]
+      stapel.push([a === v ? b : a, s])
+    }
+  }
+  kring.reverse()
+  const knopen = kring.map(([k]) => k)
+  const segs = kring.slice(1).map(([, s]) => s)
+  let meter = 0
+  for (const s of segs) meter += g.lengte[s]
+  return { knopen, segs, meter, vereistMeter, extraMeter: Math.max(0, meter - vereistMeter), nietGelopen: randen.length - segs.length }
+}
+
+// ---------- Route langs een tekening ----------
+/**
+ * Een route die een getekende lijn (RD-punten [[x, y], ...]) volgt over echte
+ * paden: hoe verder een segment van de lijn, hoe duurder (binnen 20 m bijna
+ * gratis, op 60 m tien keer zo duur). De route gaat via punten om de 250 m
+ * langs de lijn; ligt het eind vlak bij het begin, dan wordt het een rondje.
+ */
+export function volgTekening(g, lijn, { gelijk = 20, stap = 250 } = {}) {
+  // de lijn bemonsteren om de 20 m, in een rooster van 50 m
+  const monsters = []
+  for (let i = 1; i < lijn.length; i++) {
+    const [ax, ay] = lijn[i - 1]
+    const [bx, by] = lijn[i]
+    const l = Math.hypot(bx - ax, by - ay)
+    const n = Math.max(1, Math.ceil(l / 20))
+    for (let k = 0; k < n; k++) monsters.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n])
+  }
+  monsters.push(lijn[lijn.length - 1])
+  const rooster = new Map()
+  for (const [x, y] of monsters) {
+    const k = Math.floor(x / 50) + ',' + Math.floor(y / 50)
+    if (!rooster.has(k)) rooster.set(k, [])
+    rooster.get(k).push([x, y])
+  }
+  const afstand = (x, y) => {
+    let beste = 200
+    const cx = Math.floor(x / 50)
+    const cy = Math.floor(y / 50)
+    for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+      for (const [px, py] of rooster.get(cx + dx + ',' + (cy + dy)) || []) beste = Math.min(beste, Math.hypot(px - x, py - y))
+    }
+    return beste
+  }
+  const straf = new Float32Array(g.lengte.length)
+  for (let s = 0; s < straf.length; s++) {
+    const d = afstand((g.x[g.van[s]] + g.x[g.naar[s]]) / 2, (g.y[g.van[s]] + g.y[g.naar[s]]) / 2)
+    straf[s] = 1 + (d / gelijk) ** 2
+  }
+  // tussenpunten om de 'stap' meter langs de lijn
+  const punten = [monsters[0]]
+  let opgeteld = 0
+  for (let i = 1; i < monsters.length; i++) {
+    opgeteld += Math.hypot(monsters[i][0] - monsters[i - 1][0], monsters[i][1] - monsters[i - 1][1])
+    if (opgeteld >= stap) {
+      punten.push(monsters[i])
+      opgeteld = 0
+    }
+  }
+  const eind = monsters[monsters.length - 1]
+  const rond = Math.hypot(eind[0] - monsters[0][0], eind[1] - monsters[0][1]) < 150 && lijn.length > 2
+  if (!rond) punten.push(eind)
+  const knopenLangs = punten.map(([x, y]) => dichtsteKnoop(g, x, y).knoop)
+  if (rond) knopenLangs.push(knopenLangs[0])
+  const schoon = knopenLangs.filter((k, i) => i === 0 || k !== knopenLangs[i - 1])
+  if (schoon.length < 2) return null
+  let knopen = [schoon[0]]
+  let segs = []
+  for (let i = 1; i < schoon.length; i++) {
+    const b = dijkstra(g, schoon[i - 1], { straf, doel: schoon[i] })
+    if (!Number.isFinite(b.kosten[schoon[i]])) return null
+    const p = pad(b, schoon[i])
+    knopen = knopen.concat(p.knopen.slice(1))
+    segs = segs.concat(p.segs)
+  }
+  ;({ knopen, segs } = zonderUitstapjes(knopen, segs))
+  let meter = 0
+  let ver = 0
+  for (const s of segs) {
+    meter += g.lengte[s]
+    if (straf[s] > 1 + (40 / gelijk) ** 2) ver += g.lengte[s] // meer dan 40 m van de lijn
+  }
+  return { knopen, segs, meter, rond, afwijkend: ver / Math.max(1, meter), via: schoon }
 }

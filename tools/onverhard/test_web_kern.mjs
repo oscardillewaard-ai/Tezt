@@ -442,3 +442,64 @@ test('losse eindjes uit kaarttegels worden aan het netwerk geknoopt', () => {
   assert.equal(G.netwerken(g).grootte.length, 1)
   assert.equal(g.lengte.length, 4) // weg gesplitst in twee, het pad, en het verbindingsstukje; het dubbele segment is weg
 })
+
+test('in een gebied: rondjes blijven binnen het gebied, zo nodig meerdere rondjes', () => {
+  const { el, p } = roosterElementen()
+  // gebied: het blok van kolom 0-4, rij 0-4 (onder de asfaltweg), ruim genomen
+  const hoek = (i, j) => K.naarRd(p(i, j).lon, p(i, j).lat)
+  const ring = Float64Array.from([hoek(-0.3, -0.3), hoek(4.3, -0.3), hoek(4.3, 4.3), hoek(-0.3, 4.3), hoek(-0.3, -0.3)].flat())
+  const g = G.bouwGraaf(el, { trail: true, gebied: ring })
+  const binnen = G.knopenBinnen(g, ring)
+  assert.equal(binnen.reduce((a, b) => a + b, 0), 25)
+  const start = G.dichtsteKnoop(g, ...hoek(0, 0)).knoop
+  const z = G.zoekRondjesInGebied(g, start, 4000, binnen)
+  assert.ok(z.rondjes.length >= 1)
+  const r = z.rondjes[0]
+  for (const s of r.segs) assert.equal(g.binnenSeg[s], 1, 'segment buiten het gebied')
+  assert.equal(r.knopen[0], start)
+  assert.equal(r.knopen[r.knopen.length - 1], start)
+  assert.ok(r.ronden >= 2, `${r.ronden} rondjes voor 4 km in een blok van 400 x 400 m`)
+  assert.ok(Math.abs(r.meter - 4000) < 0.4 * 4000, `${r.meter} m`)
+})
+
+test('door elke straat: elk vereist segment zit erin, begin en eind bij de start', () => {
+  const { el, p } = roosterElementen()
+  const hoek = (i, j) => K.naarRd(p(i, j).lon, p(i, j).lat)
+  const ring = Float64Array.from([hoek(-0.3, 2.7), hoek(6.3, 2.7), hoek(6.3, 7.3), hoek(-0.3, 7.3), hoek(-0.3, 2.7)].flat())
+  const g = G.bouwGraaf(el, { gebied: ring, buitenFactor: 1 })
+  for (const soort of ['straten', 'paden', 'alles']) {
+    const vereist = G.vereisteSegmenten(g, soort)
+    const start = G.dichtsteKnoop(g, ...hoek(3, 5)).knoop
+    const r = G.doorElkeStraat(g, start, vereist)
+    assert.ok(r, soort)
+    const gelopen = new Set(r.segs)
+    for (let s = 0; s < vereist.length; s++) if (vereist[s]) assert.ok(gelopen.has(s), `${soort}: segment ${s} ontbreekt`)
+    assert.equal(r.knopen[0], start)
+    assert.equal(r.knopen[r.knopen.length - 1], start)
+    for (let i = 0; i < r.segs.length; i++) {
+      const s = r.segs[i]
+      const [a, b] = [r.knopen[i], r.knopen[i + 1]]
+      assert.ok((g.van[s] === a && g.naar[s] === b) || (g.van[s] === b && g.naar[s] === a), 'de route springt niet')
+    }
+    assert.ok(r.meter >= r.vereistMeter - 1)
+  }
+  // straten: alleen de asfaltweg (rij 5) tussen kolom 0 en 6 = 600 m
+  const r = G.doorElkeStraat(g, G.dichtsteKnoop(g, ...hoek(3, 5)).knoop, G.vereisteSegmenten(g, 'straten'))
+  assert.ok(Math.abs(r.vereistMeter - 600) < 30, `${r.vereistMeter}`)
+})
+
+test('route langs een tekening volgt de lijn, ook als rondje', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  const rd = (i, j) => K.naarRd(p(i, j).lon, p(i, j).lat)
+  // een L-vorm: langs rij 2 naar rechts, dan omhoog langs kolom 8
+  const r = G.volgTekening(g, [rd(1, 2), rd(8, 2), rd(8, 8)])
+  assert.ok(r && !r.rond)
+  assert.ok(Math.abs(r.meter - 1300) < 150, `${r.meter}`)
+  assert.ok(r.afwijkend < 0.1)
+  // een rondje: terug naar het begin
+  const rondje = G.volgTekening(g, [rd(1, 1), rd(4, 1), rd(4, 4), rd(1, 4), rd(1, 1.05)])
+  assert.ok(rondje.rond)
+  assert.equal(rondje.knopen[0], rondje.knopen[rondje.knopen.length - 1])
+  assert.ok(Math.abs(rondje.meter - 1200) < 150, `${rondje.meter}`)
+})

@@ -292,6 +292,26 @@ draait in je browser; er is geen eigen server.
   terug gaan dan via verschillende paden. De app probeert terugwegen opzij en
   voorbij het keerpunt (zodat je doorloopt in plaats van omkeert) en biedt
   alleen echte lussen aan: hooguit 15% van de terugweg over de heenweg.
+- **In gebied**: teken een gebied op de kaart (met je vinger rondom, of een
+  rechthoek), bijvoorbeeld een bos, en tik eventueel een startpunt. De app
+  maakt rondjes die binnen het gebied blijven: paden erbuiten kosten 30 keer
+  zo veel, en de hoekpunten van een rondje moeten erbinnen liggen. Rondjes
+  worden gezocht in een paar groottes (tot zo'n 3,5 keer de verste afstand
+  die je in het gebied kunt halen). Is één rondje korter dan de gevraagde
+  lengte, dan worden het meerdere rondjes achter elkaar, afwisselend twee
+  verschillende. Elsenburgerbos, 8 km: vier rondjes van 2 tot 2,5 km, 99%
+  onverhard, 0% buiten het bos.
+- **Elke straat**: teken een gebied en kies straten, paden of beide. De app
+  maakt één rondje dat elke straat (of elk pad) in het gebied minstens één
+  keer loopt, zo kort mogelijk: losse stukken verbinden via de kortste weg,
+  knopen met een oneven aantal wegen twee aan twee koppelen (dichtstbijzijnde
+  eerst) en die verbinding dubbel lopen, en dan een Euler-rondje (Hierholzer).
+  Stukken achter een hek of afgesloten pad die vanaf de start niet te bereiken
+  zijn, noemt de app apart. Elsenburgerbos, alle paden: 9,2 km paden, route
+  12,1 km (24% dubbel of verbinding).
+- **Tekenen**: trek met je vinger de route die je wilt lopen. De app zoekt de
+  paden die de lijn volgen: een pad binnen 20 m van de lijn is bijna gratis,
+  op 60 m tien keer zo duur. Eindig bij het begin voor een rondje.
 - **Routes vergelijken**: je krijgt routes A, B, … (A is de aanbevolen). Tik
   een route om hem te kiezen. Met "op kaart" zet je routes gestippeld naast
   elkaar; tik op zo'n stippellijn om die route te kiezen.

@@ -39,9 +39,12 @@
         </header>
 
         <section id="invoer">
-          <div class="keuze" id="modus" role="group" aria-label="Soort route">
-            <button type="button" data-modus="route" aria-pressed="true">Van A naar B</button>
+          <div class="keuze modi" id="modus" role="group" aria-label="Soort route">
+            <button type="button" data-modus="route" aria-pressed="true">A naar B</button>
             <button type="button" data-modus="rondje" aria-pressed="false">Rondje</button>
+            <button type="button" data-modus="gebied" aria-pressed="false">In gebied</button>
+            <button type="button" data-modus="straten" aria-pressed="false">Elke straat</button>
+            <button type="button" data-modus="tekenen" aria-pressed="false">Tekenen</button>
           </div>
 
           <div class="zoek">
@@ -49,6 +52,21 @@
             <ul id="zoekresultaten" role="listbox" hidden></ul>
           </div>
           <p class="hint" id="hint"></p>
+          <div id="tekenpaneel" hidden>
+            <div class="knoppen">
+              <button type="button" id="tekenVrij" aria-pressed="false">✎ Teken</button>
+              <button type="button" id="tekenVierkant" aria-pressed="false">▭ Rechthoek</button>
+              <button type="button" id="tekenWis">Wis tekening</button>
+            </div>
+            <label class="veld" id="wegenveld" hidden>
+              <span>Welke wegen</span>
+              <select id="wegen">
+                <option value="straten">Straten</option>
+                <option value="paden">Paden</option>
+                <option value="alles">Straten én paden</option>
+              </select>
+            </label>
+          </div>
           <ol class="punten" id="punten"></ol>
           <div class="knoppen">
             <button type="button" id="locatie">Mijn locatie</button>
@@ -150,6 +168,7 @@
           <p class="noot"><b>Officiële kaart</b> is de BGT (Basisregistratie Grootschalige Topografie): de kaart die gemeenten, provincies en waterschappen bijhouden, met per vlak de ondergrond. <b>OpenStreetMap</b> is de kaart van vrijwilligers; daarop worden ook de routes berekend. <b>Eindoordeel</b>: de officiële kaart als die iets weet, anders OpenStreetMap.</p>
           <p class="noot"><b>Toegangskaart</b>: in duingebieden van waterbedrijven (zoals Kijfhoek en de Bierlap van Dunea, of de Amsterdamse Waterleidingduinen) staan veel paden in OpenStreetMap als afgesloten, terwijl je er met een dagkaart (vaak via een QR-code bij de ingang) wel mag lopen. Met het vinkje mogen die paden meedoen, maar alleen midden in de natuur; afgesloten stukken bij bebouwing of op een erf blijven verboden. Controleer ter plekke de borden: ook militair terrein en tijdelijk afgesloten natuur kunnen zo op de kaart staan.</p>
           <p class="noot">De officiële kaart is zo actueel als de beheerder haar bijhoudt, en smalle paadjes staan er vaak niet als pad in. Geen enkele bron zegt iets over modder of mul zand. De kleurindicatie bij een luchtfoto is een indicatie, geen meting.</p>
+          <p class="noot"><b>In gebied</b>: teken een gebied (bijvoorbeeld een bos) en de app maakt rondjes die erbinnen blijven; is één rondje korter dan je wilt, dan worden het er meer achter elkaar. <b>Elke straat</b>: teken een gebied en je krijgt één route door elke straat (of elk pad) erin, met zo min mogelijk dubbel. <b>Tekenen</b>: trek met je vinger een lijn en de app zoekt de paden die die lijn volgen; eindig bij het begin voor een rondje.</p>
           <p class="noot"><b>Rondjes</b> rekent de app zelf uit op de paden van OpenStreetMap (een paar seconden). Routes van A naar B, rondjes via een keerpunt en rondjes met voorkeur voor LAW-routes gaan via de routeserver BRouter; dat duurt een paar minuten.</p>
           <p class="noot">Bronnen: paden © OpenStreetMap-bijdragers, via OpenFreeMap (OpenMapTiles), de Overpass API en BRouter · officiële kaart en zoeken: PDOK · luchtfoto: PDOK / Het Waterschapshuis. Alles draait in je browser; je punten gaan alleen naar OpenFreeMap, Overpass, BRouter en PDOK.</p>
         </details>

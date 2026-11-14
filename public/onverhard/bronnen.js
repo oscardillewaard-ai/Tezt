@@ -1010,6 +1010,116 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   return { opties, waarschuwingen, doel, uitleg, eigen: true, gezocht }
 }
 
+// ---------- Tekenen op de kaart: gebied, elke straat, route langs een lijn ----------
+/** Midden en straal (m) die een getekende vorm (lat/lon) helemaal omvatten, plus een marge. */
+function omvang(punten, marge) {
+  const rd = punten.map(([la, lo]) => K.naarRd(lo, la))
+  const xs = rd.map((p) => p[0])
+  const ys = rd.map((p) => p[1])
+  const mx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const my = (Math.min(...ys) + Math.max(...ys)) / 2
+  const straal = Math.max(...rd.map(([x, y]) => Math.hypot(x - mx, y - my))) + marge
+  const [lon, lat] = K.naarWgs(mx, my)
+  return { midden: [lat, lon], straal, rd, mx, my }
+}
+
+/** Een gesloten ring in RD (plat Float64Array) van een getekend gebied. */
+function ringVan(rd) {
+  const ring = rd.concat([rd[0]])
+  return Float64Array.from(ring.flat())
+}
+
+async function padenVoorTekening(punten, marge, instel, signal, meld) {
+  const o = omvang(punten, marge)
+  if (o.straal > 15000) throw new BronFout('Tekening', 'dat is te groot: teken een gebied van hooguit zo’n 20 km doorsnee')
+  meld('Paden in en rond het gebied ophalen (OpenStreetMap)')
+  const elementen = instel.paden || (await haalTegelPaden(o.midden, o.straal, signal, instel.voortgang))
+  return { o, elementen }
+}
+
+/** Startknoop: het getikte startpunt, anders de plek binnen het gebied het dichtst bij het midden. */
+function startVoor(g, startpunt, o, binnen) {
+  if (startpunt) return G.dichtsteKnoop(g, ...K.naarRd(startpunt[1], startpunt[0])).knoop
+  let beste = -1
+  let besteD = Infinity
+  for (let i = 0; i < g.n; i++) {
+    if (binnen && !binnen[i]) continue
+    if (g.begin[i + 1] === g.begin[i]) continue
+    const d = Math.hypot(g.x[i] - o.mx, g.y[i] - o.my)
+    if (d < besteD) {
+      besteD = d
+      beste = i
+    }
+  }
+  return beste >= 0 ? beste : G.dichtsteKnoop(g, o.mx, o.my).knoop
+}
+
+/** Rondjes die binnen een getekend gebied blijven (zo nodig meerdere rondjes achter elkaar). */
+export async function planGebied(instel, bgt, aantalOpties, meld, signal) {
+  const { o, elementen } = await padenVoorTekening(instel.tekening, 400, instel, signal, meld)
+  meld('Rondjes in het gebied zoeken')
+  await wacht(0, signal)
+  const ring = ringVan(o.rd)
+  const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5, gebied: ring })
+  const binnen = G.knopenBinnen(g, ring)
+  const start = startVoor(g, instel.start, o, binnen)
+  const doel = instel.km * 1000
+  const z = G.zoekRondjesInGebied(g, start, doel, binnen, { aantal: Math.max(2, aantalOpties) })
+  if (!z.rondjes.length) throw new BronFout('Tekening', 'geen rondje gevonden binnen dit gebied (te weinig paden, of de start ligt er te ver vanaf)')
+  const opties = []
+  for (const [i, r] of z.rondjes.slice(0, Math.max(2, aantalOpties)).entries()) {
+    meld(`Ondergrond van rondje ${i + 1} controleren`)
+    const traject = G.maakTraject(g, r.knopen, r.segs, [[g.lat[start], g.lon[start]]])
+    opties.push({ traject, an: await analyseerRoute(traject, bgt), ronden: r.ronden })
+  }
+  const waarschuwingen = []
+  if (opties[0].ronden > 1) {
+    waarschuwingen.push(`Eén rondje in dit gebied is hooguit zo'n ${(z.lus / 1000).toFixed(1).replace('.', ',')} km; route A loopt ${opties[0].ronden} rondjes achter elkaar${z.rondjes.length > 1 ? ' (afwisselend twee verschillende)' : ''}.`)
+  }
+  return { opties, waarschuwingen, doel, eigen: true, uitleg: [] }
+}
+
+/** Een route door elke straat (of elk pad) binnen een getekend gebied. */
+export async function planStraten(instel, bgt, meld, signal) {
+  const { o, elementen } = await padenVoorTekening(instel.tekening, 400, instel, signal, meld)
+  meld('Route door elke straat berekenen')
+  await wacht(0, signal)
+  const ring = ringVan(o.rd)
+  const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5, gebied: ring, buitenFactor: 1 })
+  const binnen = G.knopenBinnen(g, ring)
+  const start = startVoor(g, instel.start, o, binnen)
+  const vereist = G.vereisteSegmenten(g, instel.wegen || 'straten')
+  const r = G.doorElkeStraat(g, start, vereist)
+  if (!r || r.segs.length < 2) throw new BronFout('Tekening', `geen ${instel.wegen === 'paden' ? 'paden' : 'straten'} gevonden in dit gebied`)
+  let gemist = 0
+  const gelopen = new Set(r.segs)
+  for (let s = 0; s < vereist.length; s++) if (vereist[s] && !gelopen.has(s)) gemist += g.lengte[s]
+  meld('Ondergrond controleren')
+  const traject = G.maakTraject(g, r.knopen, r.segs, [[g.lat[start], g.lon[start]]])
+  const an = await analyseerRoute(traject, bgt)
+  const km1 = (m) => (m / 1000).toFixed(1).replace('.', ',')
+  const waarschuwingen = [`${km1(r.vereistMeter)} km ${instel.wegen === 'paden' ? 'paden' : instel.wegen === 'alles' ? 'wegen en paden' : 'straat'}; de route is ${km1(r.meter)} km: ${Math.round((100 * r.extraMeter) / r.meter)}% loop je dubbel of over verbindingsstukjes.`]
+  if (gemist > 50) waarschuwingen.push(`${km1(gemist)} km is niet bereikbaar vanaf de start (achter een hek of afgesloten pad) en zit er niet in.`)
+  return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+}
+
+/** Een route over echte paden langs een getekende lijn. */
+export async function planTekening(instel, bgt, meld, signal) {
+  const { elementen } = await padenVoorTekening(instel.tekening, 400, instel, signal, meld)
+  meld('Route langs je tekening zoeken')
+  await wacht(0, signal)
+  const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5 })
+  const lijn = instel.tekening.map(([la, lo]) => K.naarRd(lo, la))
+  const r = G.volgTekening(g, lijn)
+  if (!r) throw new BronFout('Tekening', 'geen route langs deze lijn gevonden (liggen er paden in de buurt?)')
+  meld('Ondergrond controleren')
+  const traject = G.maakTraject(g, r.knopen, r.segs, r.via.map((k) => [g.lat[k], g.lon[k]]))
+  const an = await analyseerRoute(traject, bgt)
+  const waarschuwingen = []
+  if (r.afwijkend > 0.25) waarschuwingen.push(`${Math.round(100 * r.afwijkend)}% van de route ligt meer dan 40 m van je lijn: daar liggen geen paden die dichterbij komen.`)
+  return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+}
+
 const LETTERS = 'ABCDEFGH'
 
 /**
@@ -1119,7 +1229,14 @@ export async function maakPlan(opties) {
   const vooraf = []
   // Een rondje vanaf één punt rekenen we zelf uit op de paden van OpenStreetMap: sneller en
   // beter dan via BRouter. Niet bij een voorkeur voor LAW-routes (die kent alleen BRouter).
-  if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
+  const tekenInstel = {
+    trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, tekening: opties.tekening, start: opties.punten && opties.punten[0],
+    km: opties.rondjeKm || 10, wegen: opties.wegen, paden: opties.paden, voortgang: opties.voortgang,
+  }
+  if (opties.modus === 'gebied') plan = await planGebied(tekenInstel, bgt, alternatieven, meld, opties.signal)
+  else if (opties.modus === 'straten') plan = await planStraten(tekenInstel, bgt, meld, opties.signal)
+  else if (opties.modus === 'tekenen') plan = await planTekening(tekenInstel, bgt, meld, opties.signal)
+  else if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
     try {
       plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang }, bgt, alternatieven, meld, opties.signal)
     } catch (fout) {
@@ -1154,6 +1271,7 @@ export async function maakPlan(opties) {
       paadjes: K.paadjesAandeel(o.an),
       strand: K.strandMeter(o.an),
       kaartje: K.kaartjeMeter(o.an),
+      ronden: o.ronden || 1,
     })
   }
   // Een andere route die veel minder onverhard is dan de beste helpt niemand (zoals een rondje
