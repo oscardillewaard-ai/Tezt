@@ -96,10 +96,12 @@ main { overflow-y: auto; border-left: 2px solid var(--balk); min-width: 0;
 :root[data-theme="dark"] main { background: var(--pagina); }
 header { display: flex; gap: 12px; align-items: center; justify-content: space-between;
          margin: 0 -18px; padding: 14px 18px 12px; color: var(--balk-tekst);
-         background: url('thema/trail.svg') center / cover no-repeat, var(--balk);
+         background: linear-gradient(rgb(20 34 26 / .62), rgb(20 34 26 / .62)), url('thema/trail.svg') center / cover no-repeat, var(--balk);
          border-bottom: 3px solid var(--route); }
 h1 { font: 700 26px/1 var(--kop); text-transform: uppercase; letter-spacing: .1em; margin: 0 0 4px; color: var(--route); }
-header .sub { color: #dfe3cf; margin: 0; font-size: 14px; }
+header .sub { color: #fff; margin: 0; font-size: 14px; font-weight: 500;
+               text-shadow: 0 0 3px #14221a, 0 0 6px #14221a, 0 1px 2px #000; }
+h1 { text-shadow: 0 0 4px #14221a, 0 1px 2px #000; }
 header button.klein { background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .35); color: var(--balk-tekst); }
 h2 { font: 700 15px/1.2 var(--kop); text-transform: uppercase; letter-spacing: .08em; color: var(--inkt);
      margin: 22px 0 8px; }
@@ -275,3 +277,13 @@ details.blok > summary small { font-weight: 400; color: var(--inkt-2); font-size
 details.blok > :not(summary) { margin-bottom: 8px; }
 .keuze.klein button { min-height: 36px; padding: 6px 8px; font-size: 14px; }
 #resultaat .opties { margin-top: 12px; }
+
+/* vijf soorten routes: drie bovenaan, twee eronder */
+.keuze.modi { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1.5px; background: var(--rand); }
+.keuze.modi button { border: 0; background: var(--vlak); grid-column: span 2; font-size: 15px; padding: 8px 4px; }
+.keuze.modi button:nth-child(n+4) { grid-column: span 3; }
+.keuze.modi button[aria-pressed="true"] { background: var(--balk); color: var(--route); }
+#tekenpaneel button[aria-pressed="true"] { background: var(--route); color: var(--route-inkt); border-color: var(--route-inkt); font-weight: 700; }
+/* tijdens het tekenen: geen kaart verschuiven, een kruisje als cursor */
+.tekent { cursor: crosshair !important; touch-action: none; }
+.tekent .leaflet-interactive { cursor: crosshair !important; }
