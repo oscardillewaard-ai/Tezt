@@ -536,7 +536,7 @@ export function zonderUitstapjes(knopen, segs) {
  * een grote driehoek, voor kronkelen in een klein gebied.
  * Geeft {rondjes: [{knopen, segs, meter, kosten, dubbel, strand, via}], ...}.
  */
-export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false, strafFactor = 8, ringen: eigenRingen = null, binnen = null, maxAf = 0.3 } = {}) {
+export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false, strafFactor = 8, ringen: eigenRingen = null, binnen = null, maxAf = 0.3, geenLusjesWeg = false } = {}) {
   const boom = dijkstra(g, start, { maxKosten: doel * 6 })
   const sx = g.x[start]
   const sy = g.y[start]
@@ -610,6 +610,7 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
     }
     if (!gelukt) continue
     ;({ knopen, segs } = zonderUitstapjes(knopen, segs))
+    if (!geenLusjesWeg) ({ knopen, segs } = zonderLusjes(g, knopen, segs))
     const t = tel(g, segs)
     // dubbel: meters over een segment dat al eerder in dit rondje zat
     const gezien = new Set()
@@ -1355,4 +1356,50 @@ export function haalStukWeg(g, knopen, segs, vast, i0, { maxLus = null, venster 
     vast: vast.map((k) => (k >= ib ? k + verschuiving : k)),
     weg: 0,
   }
+}
+
+/**
+ * Haal lusjes weg: komt de route na een omweg (hooguit 'maxLus' meter) weer
+ * binnen 40 m van een eerder punt, en is er tussen die twee een korte
+ * verbinding (hooguit 80 m, of twee keer de afstand hemelsbreed), dan vervangt
+ * die verbinding de omweg. Vaste (versleepte) punten blijven. Geeft {knopen, segs, vast, weg}.
+ */
+export function zonderLusjes(g, knopen, segs, vast = [], { maxLus = null } = {}) {
+  let k = knopen.slice()
+  let s = segs.slice()
+  let v = vast.slice()
+  let weg = 0
+  const totaal = s.reduce((m, x) => m + g.lengte[x], 0)
+  const grens = maxLus ?? Math.min(800, Math.max(300, 0.08 * totaal))
+  for (let a = 0; a < k.length - 2; a++) {
+    // meters vanaf a, tot de grens
+    let m = 0
+    let beste = -1
+    for (let b = a + 1; b < k.length; b++) {
+      m += g.lengte[s[b - 1]]
+      if (m > grens) break
+      if (b === k.length - 1 && a === 0) break // niet het hele rondje
+      const d = Math.hypot(g.x[k[a]] - g.x[k[b]], g.y[k[a]] - g.y[k[b]])
+      if (d < 40 && m > 4 * d + 60 && !v.some((i) => i > a && i < b)) beste = b // de grootste omweg binnen de grens
+    }
+    if (beste < 0) continue
+    const doel = k[beste]
+    let verbinding
+    if (doel === k[a]) verbinding = { knopen: [doel], segs: [] }
+    else {
+      const d = Math.hypot(g.x[k[a]] - g.x[doel], g.y[k[a]] - g.y[doel])
+      const max = Math.max(80, 2 * d)
+      const boom = dijkstra(g, k[a], { alleenLengte: true, doel, maxKosten: max })
+      if (!(boom.kosten[doel] <= max)) continue
+      verbinding = pad(boom, doel)
+    }
+    const oud = s.slice(a, beste).reduce((t, x) => t + g.lengte[x], 0)
+    const nieuw = verbinding.segs.reduce((t, x) => t + g.lengte[x], 0)
+    const verschuiving = verbinding.segs.length - (beste - a)
+    k = [...k.slice(0, a), ...verbinding.knopen, ...k.slice(beste + 1)]
+    s = [...s.slice(0, a), ...verbinding.segs, ...s.slice(beste)]
+    v = v.map((i) => (i >= beste ? i + verschuiving : i))
+    weg += oud - nieuw
+  }
+  return { knopen: k, segs: s, vast: v, weg }
 }

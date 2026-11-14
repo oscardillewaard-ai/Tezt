@@ -712,3 +712,18 @@ test('stukje route weghalen: een lusje verdwijnt, de rest blijft aaneengesloten'
     assert.ok((g.van[s] === a && g.naar[s] === b) || (g.van[s] === b && g.naar[s] === a), 'aaneengesloten')
   }
 })
+
+test('lusjes weghalen: een rondje om een blok onderweg verdwijnt', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  const k = (i, j) => G.dichtsteKnoop(g, ...K.naarRd(p(i, j).lon, p(i, j).lat)).knoop
+  const r = G.routeLangs(g, [k(0, 2), k(3, 2), k(3, 3), k(4, 3), k(4, 2), k(3, 2), k(6, 2)])
+  const meter = (segs) => segs.reduce((m, s) => m + g.lengte[s], 0)
+  const z = G.zonderLusjes(g, r.knopen, r.segs, [], { maxLus: 600 })
+  assert.ok(!z.knopen.includes(k(4, 3)), 'het lusje om het blok is weg')
+  assert.ok(Math.abs(meter(z.segs) - 600) < 30, `${meter(z.segs)} m`)
+  assert.ok(z.weg > 350)
+  // een vast (versleept) punt in het lusje blijft staan
+  const vast = [0, r.knopen.indexOf(k(4, 3)), r.knopen.length - 1]
+  assert.ok(G.zonderLusjes(g, r.knopen, r.segs, vast, { maxLus: 600 }).knopen.includes(k(4, 3)))
+})
