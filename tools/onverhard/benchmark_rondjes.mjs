@@ -58,6 +58,7 @@ for (const [sleutel, g] of Object.entries(GEBIEDEN)) {
       strand: o.strand, overlap: K.overlap(ka.xy, o.analyse.xy), lijn: o.traject.coords.map((c) => [c[1], c[0]]),
     })),
     komootLijn: coords.map((c) => [c[1], c[0]]),
+    uitleg: p.uitleg,
   }
   resultaten.push(rij)
   const f = (x) => (100 * x).toFixed(0).padStart(3) + '%'
