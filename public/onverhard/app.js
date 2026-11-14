@@ -561,6 +561,26 @@ el('vorm').addEventListener('change', () => {
   staat.vorm = el('vorm').value
   bewaar()
 })
+/** Alles leeg: punten, tekening en routes (instellingen blijven). */
+el('opnieuw').addEventListener('click', () => {
+  if (stopper) stopper.abort()
+  stopTekenen()
+  staat.punten = []
+  staat.vlak = null
+  staat.lijn = null
+  uitslag = null
+  plan = null
+  gekozen = 0
+  opKaart.clear()
+  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag]) laag.clearLayers()
+  el('resultaat').hidden = true
+  toonFout('')
+  bewaar()
+  puntenGewijzigd()
+  main.scrollTo?.({ top: 0 })
+  window.scrollTo({ top: 0 })
+})
+const main = document.querySelector('main')
 el('keerom').addEventListener('click', () => {
   staat.punten.reverse()
   puntenGewijzigd()

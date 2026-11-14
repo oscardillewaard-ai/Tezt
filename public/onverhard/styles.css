@@ -301,3 +301,6 @@ details.blok > :not(summary) { margin-bottom: 8px; }
 .profielvlak .stip { fill: var(--hoogtelijn); stroke: var(--vlak); stroke-width: 2; }
 .profieltip { position: absolute; top: 0; transform: translate(-50%, 0); background: var(--inkt); color: var(--vlak);
               font: 500 12px var(--mono); padding: 3px 7px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
+
+.kopknoppen { display: flex; gap: 8px; flex: none; }
+#opnieuw { font: 700 15px/1 var(--kop); text-transform: uppercase; letter-spacing: .06em; padding: 4px 10px; }
