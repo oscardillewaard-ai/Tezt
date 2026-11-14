@@ -539,11 +539,13 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
   const sx = g.x[start]
   const sy = g.y[start]
   const ringen = eigenRingen || (kronkel ? [0.1, 0.15, 0.2, 0.26] : [0.18, 0.26, 0.34, 0.42])
+  const dood = doodlopendeKnopen(g)
   const beste = new Map()
   for (let i = 0; i < g.n; i++) {
     const m = boom.meter[i]
     if (!Number.isFinite(boom.kosten[i]) || m < (ringen[0] - 0.05) * doel || m > (ringen[3] + 0.05) * doel) continue
     if (binnen && !binnen[i]) continue
+    if (dood[i]) continue // geen hoekpunt aan het eind van een doodlopend pad (dan moet je terug)
     const hoek = (Math.atan2(g.x[i] - sx, g.y[i] - sy) * 180) / Math.PI
     const sector = Math.floor((((hoek % 360) + 360) % 360) / (360 / sectoren))
     let ring = 0
@@ -580,10 +582,14 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
   combis.sort((p, q) => p.prior - q.prior)
   const uit = []
   const straf = new Float32Array(g.lengte.length)
+  // de 'steel' van het rondje: de eerste paar honderd meter vanaf de start mag je heen én terug
+  // lopen (anders zoekt de terugweg een omweg om een parkeerplaats of steekt hij twee keer over)
+  const steel = Math.min(400, 0.04 * doel)
+  const inSteel = (s) => Math.hypot(g.x[g.van[s]] - sx, g.y[g.van[s]] - sy) < steel && Math.hypot(g.x[g.naar[s]] - sx, g.y[g.naar[s]] - sy) < steel
   for (const { hoeken } of combis.slice(0, maxProbeer)) {
     straf.fill(1)
     const p1 = pad(boom, hoeken[0].knoop)
-    for (const s of p1.segs) straf[s] = strafFactor
+    for (const s of p1.segs) if (!inSteel(s)) straf[s] = strafFactor
     let knopen = p1.knopen.slice()
     let segs = p1.segs.slice()
     let vorige = hoeken[0].knoop
@@ -595,7 +601,7 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
         break
       }
       const p = pad(b, doelKnoop)
-      for (const s of p.segs) straf[s] = strafFactor
+      for (const s of p.segs) if (!inSteel(s)) straf[s] = strafFactor
       knopen = knopen.concat(p.knopen.slice(1))
       segs = segs.concat(p.segs)
       vorige = doelKnoop
@@ -656,7 +662,23 @@ export function knopenBinnen(g, ring) {
  * (afwisselend verschillende, als die er zijn).
  * Geeft {rondjes: [{knopen, segs, meter, ronden, ...}], lus: meter van één rondje}.
  */
-export function zoekRondjesInGebied(g, start, doel, binnen, { aantal = 4 } = {}) {
+export function zoekRondjesInGebied(g, startpunt, doel, binnen, { aantal = 4 } = {}) {
+  // ligt de start buiten het gebied (een parkeerplaats, een hotel), dan beginnen de rondjes bij
+  // het eerste punt erbinnen; de weg ernaartoe loop je één keer heen en aan het eind terug
+  let start = startpunt
+  let toegang = null
+  if (!binnen[startpunt]) {
+    const b0 = dijkstra(g, startpunt)
+    let ingang = -1
+    for (let i = 0; i < g.n; i++) if (binnen[i] && Number.isFinite(b0.kosten[i]) && (ingang < 0 || b0.kosten[i] < b0.kosten[ingang])) ingang = i
+    if (ingang >= 0) {
+      toegang = pad(b0, ingang)
+      start = ingang
+      let m = 0
+      for (const s of toegang.segs) m += g.lengte[s]
+      doel = Math.max(doel * 0.3, doel - 2 * m)
+    }
+  }
   const boom = dijkstra(g, start)
   let verst = 0
   for (let i = 0; i < g.n; i++) if (binnen[i] && Number.isFinite(boom.kosten[i])) verst = Math.max(verst, boom.meter[i])
@@ -710,6 +732,12 @@ export function zoekRondjesInGebied(g, start, doel, binnen, { aantal = 4 } = {})
       meter += volgende.meter
       ronden++
     }
+    if (toegang) {
+      // de toegang ervoor en (omgekeerd) erachter
+      knopen = [...toegang.knopen, ...knopen.slice(1), ...toegang.knopen.slice(0, -1).reverse()]
+      segs = [...toegang.segs, ...segs, ...toegang.segs.slice().reverse()]
+      for (const s of toegang.segs) meter += 2 * g.lengte[s]
+    }
     uit.push({ ...r, knopen, segs, meter, ronden })
   }
   return { rondjes: uit, lus: lijst[0].meter }
@@ -748,6 +776,21 @@ export function doodlopendeTakken(g) {
     }
   }
   return weg
+}
+
+/** Knopen die alleen aan doodlopende takken liggen (eenmaal berekend per graaf). */
+export function doodlopendeKnopen(g) {
+  if (g.doodKnopen) return g.doodKnopen
+  const takken = doodlopendeTakken(g)
+  const uit = new Uint8Array(g.n)
+  for (let i = 0; i < g.n; i++) {
+    if (g.begin[i + 1] === g.begin[i]) continue
+    let allemaal = true
+    for (let j = g.begin[i]; j < g.begin[i + 1]; j++) if (!takken[g.buurSeg[j]]) allemaal = false
+    uit[i] = allemaal ? 1 : 0
+  }
+  g.doodKnopen = uit
+  return uit
 }
 
 /**

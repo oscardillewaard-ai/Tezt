@@ -657,3 +657,23 @@ test('water onderweg: punten bij de route met hun km, dubbele weg, langste stuk 
   assert.ok(Math.abs(w.punten[0].km - 1) < 0.25 && Math.abs(w.punten[1].km - 4) < 0.25)
   assert.ok(Math.abs(w.langsteZonder - 3000) < 300, `${w.langsteZonder}`)
 })
+
+test('rondjes kiezen geen hoekpunt aan het eind van een doodlopend pad', () => {
+  const { el, p } = roosterElementen()
+  // lange doodlopende paden naar buiten, aan alle kanten
+  const extra = []
+  let id = 9000
+  for (const [i, j, di, dj] of [[0, 5, -1, 0], [10, 5, 1, 0], [5, 0, 0, -1], [5, 10, 0, 1]]) {
+    const geom = []
+    for (let k = 0; k <= 6; k++) geom.push(p(i + di * k, j + dj * k))
+    extra.push({ type: 'way', id: id++, tags: { highway: 'path', surface: 'sand' }, geometry: geom })
+  }
+  const g = G.bouwGraaf([...el, ...extra], { trail: true })
+  const dood = G.doodlopendeKnopen(g)
+  assert.ok(dood.reduce((a, b) => a + b, 0) >= 20)
+  const start = G.dichtsteKnoop(g, ...K.naarRd(p(5, 5).lon, p(5, 5).lat)).knoop
+  for (const kronkel of [false, true]) {
+    const z = G.zoekRondjes(g, start, 3000, { kronkel })
+    for (const r of z.rondjes) for (const v of r.via) assert.equal(dood[v], 0, 'hoekpunt op een doodlopend pad')
+  }
+})
