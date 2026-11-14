@@ -467,3 +467,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 #hulpIntro { margin: 10px 18px 0; font-size: 14px; }
 
 .leaflet-popup-content .weghalen { display: block; width: 100%; margin-top: 8px; min-height: 36px; font-weight: 600; }
+
+/* kopknoppen passen ook op een smalle telefoon */
+header > div:first-child { min-width: 0; }
+@media (max-width: 480px) {
+  .kopknoppen { gap: 6px; }
+  .kopknoppen button.klein { min-width: 36px; padding: 4px 8px; }
+  .kopknoppen .knoptekst { display: none; }
+}
