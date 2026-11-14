@@ -24,10 +24,10 @@ const SERVERS = ['https://overpass.kumi.systems/api/interpreter', 'https://overp
 const [map, uitvoer, ...keuze] = process.argv.slice(2)
 const wacht = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function overpass(sleutel, bbox) {
+async function overpass(sleutel, [lat, lon], straal) {
   const bestand = path.join(map, `overpass_${sleutel}.json`)
   if (fs.existsSync(bestand)) return JSON.parse(fs.readFileSync(bestand, 'utf8'))
-  const vraag = G.overpassVraag(bbox)
+  const vraag = G.overpassVraag(lat, lon, straal)
   for (let poging = 0; poging < 10; poging++) {
     const url = SERVERS[poging % SERVERS.length]
     try {
@@ -46,12 +46,6 @@ async function overpass(sleutel, bbox) {
   throw new Error('Overpass gaf geen antwoord')
 }
 
-export function bboxRond([lat, lon], straalM) {
-  const dLat = straalM / 111320
-  const dLon = straalM / (111320 * Math.cos((lat * Math.PI) / 180))
-  return [lat - dLat, lon - dLon, lat + dLat, lon + dLon]
-}
-
 const resultaten = []
 for (const [sleutel, g] of Object.entries(GEBIEDEN)) {
   if (keuze.length && !keuze.includes(sleutel)) continue
@@ -60,7 +54,7 @@ for (const [sleutel, g] of Object.entries(GEBIEDEN)) {
   const bgt = new Bgt()
   const ka = await analyseerRoute({ coords, segs: [[0, coords.length - 1, '']], punten: [] }, bgt)
   const t0 = Date.now()
-  const data = await overpass(sleutel, bboxRond(g.start, 0.38 * g.km * 1000))
+  const data = await overpass(sleutel, g.start, 0.38 * g.km * 1000)
   const t1 = Date.now()
   const graaf = G.bouwGraaf(data.elements, { trail: true, strandMijden: true })
   const [sx, sy] = K.naarRd(g.start[1], g.start[0])

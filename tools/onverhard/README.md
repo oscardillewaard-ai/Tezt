@@ -399,7 +399,20 @@ seconde ertussen). Een rondje kost daardoor al gauw een paar minuten.
 trailgebieden, elk met een Komoot-hardlooproute als referentie, zelfde start
 en lengte, onverhard gemeten langs de officiële kaart:
 
-TABEL_EIGEN
+| Gebied | Komoot | Eigen planner, route A | Heen en terug (A) | Via BRouter (A) |
+|---|---|---|---|---|
+| Meijendel (15 km) | 63% | 99% (15,7 km) | 3% | 75% |
+| Voornes Duin, Rockanje (13 km) | 96% | 95% (13,8 km), 0 m strand | 1% | 54% zonder strand |
+| N70, Berg en Dal (15 km) | 79% | 95% (14,9 km) | 1% | 86% |
+| Schoorlse Duinen (14 km) | 88% | 95% (14,4 km) | 1% | 94% |
+| Loonse en Drunense Duinen (11 km) | 97% | 99% (11,4 km) | 0% | 92% |
+| Veluwezoom (15 km) | 89% | VELUWEZOOM | | 96% |
+
+Rekentijd 0,4 tot 1,8 seconde per gebied, plus 2 tot 4 seconden voor de
+officiële kaart. De paden voor deze meting zijn opgehaald met een vierkant in
+plaats van een cirkel en mét opritten en stoepen (een iets ruimere download
+dan de app nu doet). Komoot staat hier hoger dan in de eerdere tabel omdat de
+fout in het lezen van de officiële kaart (zie onder) eruit is.
 
 **Eerdere vergelijking, via BRouter** (`benchmark_rondjes.mjs`): zes trailgebieden, elk
 met een Komoot-hardlooproute als referentie, zelfde start en lengte. Onverhard
