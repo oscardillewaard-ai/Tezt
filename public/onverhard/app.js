@@ -297,6 +297,28 @@ function tekenPuntenlijst() {
   el('doodveld').hidden = staat.modus !== 'straten'
   el('tekenVierkant').hidden = staat.modus === 'tekenen'
   el('tekenWis').hidden = !tekening()
+  const getekend = tekening()
+  el('tekenstatus').hidden = !getekend
+  el('tekenVrij').textContent = getekend ? '✎ Opnieuw tekenen' : '✎ Teken'
+  if (getekend) {
+    let maat
+    if (staat.modus === 'tekenen') {
+      let m = 0
+      for (let i = 1; i < getekend.length; i++) m += kaart.distance(getekend[i - 1], getekend[i])
+      maat = `${nl(m / 1000, 1)} km`
+    } else {
+      const rd = getekend.map(([la, lo]) => K.naarRd(lo, la))
+      let opp = 0
+      for (let i = 0; i < rd.length; i++) {
+        const [x1, y1] = rd[i]
+        const [x2, y2] = rd[(i + 1) % rd.length]
+        opp += x1 * y2 - x2 * y1
+      }
+      const km2 = Math.abs(opp) / 2e6
+      maat = km2 >= 0.1 ? `${nl(km2, 1)} km²` : `${Math.round(km2 * 100)} ha`
+    }
+    el('tekenstatus').innerHTML = `<span>✓</span><b>${staat.modus === 'tekenen' ? 'Route getekend' : 'Gebied getekend'}</b><small>${maat}</small>`
+  }
   el('locatie').hidden = staat.modus === 'tekenen'
   if (tm) {
     const t = tekening()
@@ -372,11 +394,11 @@ let tekenen = null // 'vrij' of 'rechthoek' terwijl je tekent
 let netGetekend = 0 // de tik waarmee je stopt met tekenen is geen startpunt
 let schets = null // { punten, lijn } tijdens het tekenen
 
-function tekenTekening() {
+function tekenTekening(vers = false) {
   tekenLaag.clearLayers()
   const t = tekening()
   if (!t || !t.length) return
-  const stijl = { color: '#ffcb05', weight: 4, opacity: 1, dashArray: '8 6', interactive: false }
+  const stijl = { color: '#ffcb05', weight: 4, opacity: 1, dashArray: '8 6', interactive: false, className: vers ? 'tekening-vers' : '' }
   if (staat.modus === 'tekenen') {
     L.polyline(t, { ...stijl, color: '#1f3328', weight: 7, dashArray: null, opacity: 0.35 }).addTo(tekenLaag)
     L.polyline(t, stijl).addTo(tekenLaag)
@@ -481,8 +503,16 @@ function eindeSchets(e) {
     toonFout('')
   } else toonFout('Die tekening was te klein. Teken nog eens, wat groter.')
   bewaar()
-  tekenTekening()
+  tekenTekening(true)
   tekenPuntenlijst()
+  if (tekening()) {
+    const status = el('tekenstatus')
+    status.classList.remove('vers')
+    void status.offsetWidth
+    status.classList.add('vers')
+    const vak = L.latLngBounds(tekening())
+    if (!kaart.getBounds().contains(vak)) kaart.fitBounds(vak.pad(0.15))
+  }
 }
 kaartVlak.addEventListener('pointerup', eindeSchets, { capture: true })
 kaartVlak.addEventListener('pointercancel', eindeSchets, { capture: true })

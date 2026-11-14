@@ -379,3 +379,14 @@ details.blok.stap[open] { padding-bottom: 12px; }
 .toetsen { line-height: 2; }
 kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px solid var(--rand); border-bottom-width: 3px; border-radius: 6px;
       background: var(--vlak); color: var(--inkt); font: 500 12px/1.5 var(--mono); text-align: center; }
+
+/* wat er getekend is: een duidelijke balk in stap 2, en de tekening knippert even op de kaart */
+.tekenstatus { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+               background: var(--balk); color: var(--balk-tekst); font-weight: 600; }
+.tekenstatus b { color: var(--route); font: 700 17px/1 var(--kop); text-transform: uppercase; letter-spacing: .05em; }
+.tekenstatus small { color: #cfd5bf; font: 500 12px var(--mono); margin-left: auto; white-space: nowrap; }
+.tekenstatus.vers { animation: status-in .5s cubic-bezier(.2, .9, .3, 1.3); }
+.tekening-vers { animation: knipper 1.2s ease-out 2; }
+@keyframes status-in { from { transform: scale(.94); opacity: 0; } }
+@keyframes knipper { 0%, 100% { stroke-width: 4px; } 40% { stroke-width: 10px; } }
+@media (prefers-reduced-motion: reduce) { .tekenstatus.vers, .tekening-vers { animation: none; } }
