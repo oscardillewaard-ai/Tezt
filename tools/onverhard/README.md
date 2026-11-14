@@ -344,11 +344,19 @@ draait in je browser; er is geen eigen server.
 **Rondjes rekent de app zelf uit** (sinds november 2026). Een rondje vanaf
 één punt gaat niet meer via de BRouter-server, maar zo:
 
-1. De app haalt alle wegen en paden binnen een cirkel rond de start op uit
-   OpenStreetMap via de [Overpass API](https://overpass-api.de) (straal
-   ongeveer 0,38 × de lengte; opritten, parkeerplaatsen en stoepen niet). In
-   de duinen is dat een paar honderd kB, naast een stad een paar MB
-   (gecomprimeerd over de lijn).
+1. De app haalt alle wegen en paden rond de start op (straal ongeveer
+   0,38 × de lengte) uit de **kaarttegels van
+   [OpenFreeMap](https://openfreemap.org)**: OpenStreetMap-data in de
+   OpenMapTiles-indeling, zoomniveau 14 (in Nederland zo'n 1,5 km per tegel),
+   op een groot CDN zonder limiet of sleutel. De browser bewaart de tegels
+   (het adres verandert met elke kaartversie), dus een tweede rondje in
+   dezelfde buurt kost geen download. Een rondje van 13 km: 50 tot 80 tegels,
+   een paar MB. Tegels zijn gemaakt om te tekenen: soms valt het punt weg waar
+   een pad op een weg aansluit, en aan de tegelrand worden lijnen afgeknipt.
+   Daarom knoopt de app losse eindjes binnen 1,5 m aan het dichtstbijzijnde
+   segment. Lukken de tegels niet, dan haalt hij de paden bij de
+   [Overpass API](https://overpass-api.de) (meer detail, maar de gratis
+   servers zijn vaak overbelast).
 2. Van die paden maakt hij een netwerk (`graaf.js`) met dezelfde kosten als
    het BRouter-profiel: smalle onverharde paadjes het goedkoopst, asfalt het
    duurst. Strand (in OpenStreetMap `natural=beach`) is bijna verboden; een
@@ -362,9 +370,15 @@ draait in je browser; er is geen eigen server.
    afgesloten stukken buiten de natuur die OpenStreetMap niet zo kent, dan
    zoekt hij nog één keer met die plekken verboden.
 
-Een rondje duurt zo een paar seconden in plaats van een paar minuten. Geeft
-Overpass geen antwoord (na 45 seconden per server, twee servers), dan rekent
-de app het rondje via BRouter zoals hieronder en zegt dat erbij. Een voorkeur
+Een rondje duurt zo een paar seconden in plaats van een paar minuten. Lukken
+tegels én Overpass niet, dan rekent de app het rondje via BRouter zoals
+hieronder en zegt dat erbij.
+
+Tegels of Overpass maakt voor de rondjes weinig uit (route A, onverhard
+volgens de officiële kaart, zelfde start): Rockanje 95% / 95%, N70 93% / 94%,
+Schoorl 95% / 95%, Loonse Duinen 97% / 97%, Veluwezoom 98% / 99%. De tegels
+kennen de ondergrond alleen als verhard of onverhard (geen tracktype); de
+officiële kaart vult dat bij de controle aan. Een voorkeur
 voor LAW-routes gaat ook via BRouter: alleen BRouter kent de wandelroutes.
 
 **Via BRouter** (rondje via een keerpunt, van A naar B, of als Overpass niet
@@ -473,7 +487,7 @@ een eerder opgehaald antwoord (handig als Overpass druk is).
 
 ## Bronnen
 
-- Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL); in de webversie rondjes zelf berekend op OpenStreetMap-data via de [Overpass API](https://overpass-api.de).
+- Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL); in de webversie rondjes zelf berekend op OpenStreetMap-data uit de kaarttegels van [OpenFreeMap](https://openfreemap.org) (OpenMapTiles-indeling) of via de [Overpass API](https://overpass-api.de).
 - Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0): OGC API Features in de Python-tool, vectortegels in de webversie.
 - Luchtfoto: PDOK luchtfoto RGB, Het Waterschapshuis / Beeldmateriaal Nederland (CC BY 4.0).
 

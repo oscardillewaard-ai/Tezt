@@ -43,7 +43,7 @@ if (process.env.ONVERHARD_OVERPASS) {
   await page.route('**/api/interpreter', (route) => route.fulfill({ status: 200, body: inhoud, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' } }))
 }
 page.on('requestfinished', async (r) => {
-  if (/brouter|api\.pdok|interpreter/.test(r.url())) {
+  if (/brouter|api\.pdok|interpreter|openfreemap/.test(r.url())) {
     verzoeken += 1
     bytes += (await r.sizes()).responseBodySize // zoals over de lijn (gecomprimeerd)
   }

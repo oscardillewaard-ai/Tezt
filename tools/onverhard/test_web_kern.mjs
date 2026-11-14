@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as K from '../../public/onverhard/kern.js'
 import * as G from '../../public/onverhard/graaf.js'
+import * as T from '../../public/onverhard/osmtegels.js'
 
 const vierkant = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] })
 const feature = (id, fysiek, geometry, niveau = 0) => ({
@@ -377,4 +378,67 @@ test('eigen planner: rondjes zijn echte lussen van ongeveer de gevraagde lengte,
   }
   // uitstapje: 0-1-2-1-3 wordt 0-1-3
   assert.deepEqual(G.zonderUitstapjes([0, 1, 2, 1, 3], [10, 11, 11, 12]), { knopen: [0, 1, 3], segs: [10, 12] })
+})
+
+test('kaarttegels van OpenFreeMap: paden, ondergrond, strand, en buurtegels sluiten aan', () => {
+  // laag 'transportation' met een pad (onverhard) en een spoorlijn (doet niet mee), laag 'landcover' met een strand
+  const waarde = (sv) => bytes(4, tekst(1, sv))
+  const lijn = (punten) => {
+    const c = [0, 0]
+    const uit = []
+    punten.forEach(([x, y], i) => {
+      if (i === 0) uit.push(1 | (1 << 3))
+      if (i === 1) uit.push(2 | ((punten.length - 1) << 3))
+      uit.push(zz(x - c[0]), zz(y - c[1]))
+      c[0] = x
+      c[1] = y
+    })
+    return uit
+  }
+  const feat = (tags, soort, geom) => bytes(2, [...bytes(2, tags.flatMap((t) => varint(t))), ...getal(3, soort), ...bytes(4, geom.flatMap((g) => varint(g)))])
+  const transport = [
+    ...tekst(1, 'transportation'),
+    ...feat([0, 0, 1, 1, 2, 2], 2, lijn([[0, 2048], [4096, 2048]])), // class=path subclass=footway surface=unpaved
+    ...feat([0, 3], 2, lijn([[0, 0], [4096, 4096]])), // class=rail
+    ...tekst(3, 'class'), ...tekst(3, 'subclass'), ...tekst(3, 'surface'),
+    ...waarde('path'), ...waarde('footway'), ...waarde('unpaved'), ...waarde('rail'),
+    ...getal(5, 4096),
+  ]
+  const c = [0, 0]
+  const land = [
+    ...tekst(1, 'landcover'),
+    ...feat([0, 0, 1, 1], 3, ringOpdrachten([[0, 0], [1000, 0], [1000, 1000], [0, 1000]], c)),
+    ...tekst(3, 'class'), ...tekst(3, 'subclass'), ...waarde('sand'), ...waarde('beach'),
+    ...getal(5, 4096),
+  ]
+  const tegel = Uint8Array.from([...bytes(3, transport), ...bytes(3, land)])
+  const [x, y] = T.tegelXY(51.88, 4.04)
+  const el = T.leesOsmTegel(tegel, x, y)
+  const paden = el.filter((e) => e.tags.highway)
+  assert.equal(paden.length, 1)
+  assert.deepEqual(paden[0].tags, { highway: 'footway', surface: 'unpaved' })
+  assert.equal(K.osmKlasse('highway=footway surface=unpaved').klasse, K.ONVERHARD)
+  assert.equal(el.filter((e) => e.tags.natural === 'beach').length, 1)
+  // het rechterpunt van deze tegel is precies het linkerpunt van de buurtegel
+  const buur = T.leesOsmTegel(tegel, x + 1, y)
+  assert.deepEqual(paden[0].geometry[1], buur.find((e) => e.tags.highway).geometry[0])
+  assert.ok(Math.abs(paden[0].geometry[0].lat - 51.88) < 0.02 && Math.abs(paden[0].geometry[0].lon - 4.04) < 0.03)
+  // tegels rond een punt: in Nederland is een tegel op zoom 14 zo'n 1,5 km breed,
+  // dus een cirkel van 3 km (vierkant van 6 km) raakt een blok van 4 x 4 tot 5 x 5 tegels
+  const rond = T.tegelsRond(51.88, 4.04, 3000)
+  assert.ok(rond.length >= 16 && rond.length <= 25, `${rond.length} tegels`)
+})
+
+test('losse eindjes uit kaarttegels worden aan het netwerk geknoopt', () => {
+  // een pad dat 0,4 m naast een weg ophoudt (het aansluitpunt is weggevallen), en een dubbel segment
+  const p = (dx, dy) => ({ lat: 52 + dy / 111320, lon: 5 + dx / 68600 })
+  const el = [
+    { type: 'way', id: 1, tags: { highway: 'residential' }, geometry: [p(0, 0), p(200, 0)] },
+    { type: 'way', id: 2, tags: { highway: 'path' }, geometry: [p(100, 0.4), p(100, 80)] },
+    { type: 'way', id: 3, tags: { highway: 'residential' }, geometry: [p(0, 0), p(200, 0)] },
+  ]
+  assert.equal(G.netwerken(G.bouwGraaf(el)).grootte.length, 2)
+  const g = G.bouwGraaf(el, { snap: 1.5 })
+  assert.equal(G.netwerken(g).grootte.length, 1)
+  assert.equal(g.lengte.length, 4) // weg gesplitst in twee, het pad, en het verbindingsstukje; het dubbele segment is weg
 })

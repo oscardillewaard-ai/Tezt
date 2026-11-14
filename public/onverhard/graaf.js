@@ -73,11 +73,121 @@ function opStrand(x, y, stranden) {
 }
 
 /**
+ * Kaarttegels zijn gemaakt om te tekenen, niet om te routeren: bij het
+ * vereenvoudigen van lijnen verdwijnt soms het punt waar een pad op een weg
+ * aansluit, en aan de tegelrand worden lijnen afgeknipt. Daardoor valt het
+ * netwerk in stukken. Herstel: een los eindje (knoop met één buur) dat binnen
+ * 'snap' meter van een ander segment ligt, verbinden we daarmee; ligt het
+ * aansluitpunt midden op dat segment, dan splitsen we het segment daar.
+ * Werkt op de losse arrays (segmenten met factor -1 zijn weggehaald).
+ */
+function verbindLosseEinden(d, snap) {
+  const { van, naar, lengte, factor, segTags, xs, ys, lat, lon } = d
+  const graad = new Map()
+  for (let i = 0; i < van.length; i++) {
+    if (factor[i] < 0) continue
+    graad.set(van[i], (graad.get(van[i]) || 0) + 1)
+    graad.set(naar[i], (graad.get(naar[i]) || 0) + 1)
+  }
+  const CEL = 10
+  const rooster = new Map()
+  const aantal = van.length
+  for (let i = 0; i < aantal; i++) {
+    if (factor[i] < 0) continue
+    const a = van[i]
+    const b = naar[i]
+    const x0 = Math.floor((Math.min(xs[a], xs[b]) - snap) / CEL)
+    const x1 = Math.floor((Math.max(xs[a], xs[b]) + snap) / CEL)
+    const y0 = Math.floor((Math.min(ys[a], ys[b]) - snap) / CEL)
+    const y1 = Math.floor((Math.max(ys[a], ys[b]) + snap) / CEL)
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) continue // heel lang recht stuk: overslaan
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cy = y0; cy <= y1; cy++) {
+        const k = cx + ',' + cy
+        const lijst = rooster.get(k)
+        if (lijst) lijst.push(i)
+        else rooster.set(k, [i])
+      }
+    }
+  }
+  // per los eindje het dichtstbijzijnde segment (niet het eigen segment)
+  const splitsingen = new Map() // segment -> [{t, x, y, knoop}]
+  const verbindingen = [] // [eindje, segment, t]
+  for (const [knoop, g] of graad) {
+    if (g !== 1) continue
+    const x = xs[knoop]
+    const y = ys[knoop]
+    let beste = -1
+    let besteD = snap
+    let besteT = 0
+    for (const i of rooster.get(Math.floor(x / CEL) + ',' + Math.floor(y / CEL)) || []) {
+      const a = van[i]
+      const b = naar[i]
+      if (a === knoop || b === knoop) continue
+      const dx = xs[b] - xs[a]
+      const dy = ys[b] - ys[a]
+      const l2 = dx * dx + dy * dy
+      let t = l2 ? ((x - xs[a]) * dx + (y - ys[a]) * dy) / l2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const afst = Math.hypot(x - (xs[a] + t * dx), y - (ys[a] + t * dy))
+      if (afst < besteD) {
+        besteD = afst
+        beste = i
+        besteT = t
+      }
+    }
+    if (beste >= 0) verbindingen.push([knoop, beste, besteT])
+  }
+  const nieuweKnoop = (x, y) => {
+    xs.push(x)
+    ys.push(y)
+    // lat/lon terug uit de twee eindpunten (lineair: op een paar meter nauwkeurig genoeg)
+    return xs.length - 1
+  }
+  const segment = (a, b, tags, f) => {
+    van.push(a)
+    naar.push(b)
+    lengte.push(Math.max(0.01, Math.hypot(xs[a] - xs[b], ys[a] - ys[b])))
+    factor.push(f)
+    segTags.push(tags)
+  }
+  for (const [knoop, i, t] of verbindingen) {
+    const a = van[i]
+    const b = naar[i]
+    const l = lengte[i]
+    if (t * l < 0.3) segment(knoop, a, segTags[i], factor[i])
+    else if ((1 - t) * l < 0.3) segment(knoop, b, segTags[i], factor[i])
+    else {
+      if (!splitsingen.has(i)) splitsingen.set(i, [])
+      splitsingen.get(i).push({ t, knoop })
+    }
+  }
+  for (const [i, lijst] of splitsingen) {
+    const a = van[i]
+    const b = naar[i]
+    lijst.sort((p, q) => p.t - q.t)
+    let vorige = a
+    for (const { t, knoop } of lijst) {
+      const x = xs[a] + t * (xs[b] - xs[a])
+      const y = ys[a] + t * (ys[b] - ys[a])
+      const n = nieuweKnoop(x, y)
+      lat.push(lat[a] + t * (lat[b] - lat[a]))
+      lon.push(lon[a] + t * (lon[b] - lon[a]))
+      segment(vorige, n, segTags[i], factor[i])
+      segment(knoop, n, segTags[i], factor[i])
+      vorige = n
+    }
+    segment(vorige, b, segTags[i], factor[i])
+    factor[i] = -1
+  }
+}
+
+/**
  * Bouw de graaf. opties: {trail, kaartje, strandMijden, extraStranden}
  * (extraStranden: vlakken {polygonen, bbox} uit de officiële kaart).
  * Knopen zijn de punten van de OSM-wegen (gedeelde punten = kruisingen).
  */
-export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [] } = {}) {
+export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0 } = {}) {
   const stranden = strandMijden ? strandRingen(elementen).concat(extraStranden) : []
   // te mijden plekken (RD-punten, 20 m eromheen), via een rooster van 50 m
   const mijd = new Set()
@@ -147,6 +257,30 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
       factor.push(f0 * (strand ? STRAND_FACTOR : 1))
       segTags.push(ti)
     }
+  }
+  // dubbele segmenten (zelfde twee knopen, bijvoorbeeld uit de overlap van twee kaarttegels) eruit
+  const gezien = new Set()
+  for (let i = 0; i < van.length; i++) {
+    const k = van[i] < naar[i] ? van[i] + ',' + naar[i] : naar[i] + ',' + van[i]
+    if (gezien.has(k)) factor[i] = -1
+    else gezien.add(k)
+  }
+  if (snap > 0) {
+    verbindLosseEinden({ van, naar, lengte, factor, segTags, xs, ys, lat, lon }, snap)
+  }
+  // weggehaalde segmenten (factor -1) echt weghalen
+  {
+    let j = 0
+    for (let i = 0; i < van.length; i++) {
+      if (factor[i] < 0) continue
+      van[j] = van[i]
+      naar[j] = naar[i]
+      lengte[j] = lengte[i]
+      factor[j] = factor[i]
+      segTags[j] = segTags[i]
+      j++
+    }
+    van.length = naar.length = lengte.length = factor.length = segTags.length = j
   }
   // buren per knoop (CSR): beide richtingen, met het segmentnummer
   const n = lat.length

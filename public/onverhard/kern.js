@@ -426,7 +426,7 @@ export function tegelsVoor(punten, marge = SNAP_M) {
 // Een kleine protobuf-lezer voor Mapbox Vector Tiles: alleen wat we nodig hebben.
 const utf8 = new TextDecoder()
 
-class Lezer {
+export class Lezer {
   constructor(bytes) {
     this.b = bytes
     this.pos = 0
@@ -484,14 +484,14 @@ class Lezer {
   }
 }
 
-function packed(bytes) {
+export function packed(bytes) {
   const l = new Lezer(bytes)
   const uit = []
   while (!l.klaar()) uit.push(l.varint())
   return uit
 }
 
-function leesWaarde(bytes) {
+export function leesWaarde(bytes) {
   const l = new Lezer(bytes)
   let waarde = null
   while (!l.klaar()) {

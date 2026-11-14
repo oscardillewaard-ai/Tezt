@@ -4,6 +4,7 @@
 
 import * as K from './kern.js'
 import * as G from './graaf.js'
+import * as T from './osmtegels.js'
 
 const BROUTER_URL = 'https://brouter.de/brouter'
 const BGT_BRON = 'de officiële kaart (PDOK)'
@@ -12,6 +13,8 @@ const TEGEL_URL = 'https://api.pdok.nl/kadaster/bgt/ogc/v1/tiles/NetherlandsRDNe
 const LUCHTFOTO_WMS = 'https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0'
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
 const OSM_BRON = 'OpenStreetMap (Overpass)'
+const OFM_TILEJSON = 'https://tiles.openfreemap.org/planet'
+const OFM_BRON = 'OpenStreetMap-kaarttegels (OpenFreeMap)'
 
 /** Een externe bron (BRouter of PDOK) gaf een fout. */
 export class BronFout extends Error {
@@ -867,6 +870,63 @@ export async function haalPaden([lat, lon], straal, signal) {
   throw new BronFout(OSM_BRON, laatste)
 }
 
+let ofmSjabloon = null
+
+/** Het adres van de nieuwste kaarttegels van OpenFreeMap (wisselt elke week). */
+async function ofmAdres(signal) {
+  if (ofmSjabloon && Date.now() - ofmSjabloon.tijd < 3600000) return ofmSjabloon.url
+  const r = await vraag(OFM_BRON, OFM_TILEJSON, { signal, tijdslimiet: 20000 }, 2)
+  if (!r.ok) throw new BronFout(OFM_BRON, `HTTP ${r.status}`)
+  const url = ((await r.json()).tiles || [])[0]
+  if (!url || !url.includes('{z}')) throw new BronFout(OFM_BRON, 'onverwachte tegelbeschrijving')
+  ofmSjabloon = { url, tijd: Date.now() }
+  return url
+}
+
+/**
+ * Alle wegen, paden en stranden rond een punt uit de kaarttegels van
+ * OpenFreeMap (zoomniveau 14, in Nederland zo'n 1,5 km per tegel). Die staan op een
+ * groot CDN zonder limiet; de browser bewaart ze (het adres verandert met elke
+ * nieuwe kaartversie), dus een tweede rondje in dezelfde buurt kost niets.
+ */
+export async function haalTegelPaden([lat, lon], straal, signal, voortgang = () => {}) {
+  const sjabloon = await ofmAdres(signal)
+  const tegels = T.tegelsRond(lat, lon, straal)
+  const uit = []
+  let volgende = 0
+  let klaar = 0
+  let mislukt = 0
+  let laatste = ''
+  const werker = async () => {
+    while (volgende < tegels.length) {
+      const i = volgende++
+      const [x, y] = tegels[i]
+      try {
+        const r = await vraag(OFM_BRON, sjabloon.replace('{z}', T.TEGEL_ZOOM).replace('{x}', x).replace('{y}', y), { signal, tijdslimiet: 30000 }, 3)
+        if (r.ok) {
+          let bytes = new Uint8Array(await r.arrayBuffer())
+          if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+            // nog ingepakt (sommige servers sturen geen Content-Encoding mee)
+            bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+          }
+          uit.push(...T.leesOsmTegel(bytes, x, y, i * 1e6))
+        } else if (r.status !== 204 && r.status !== 404) {
+          mislukt += 1
+          laatste = `HTTP ${r.status}`
+        }
+      } catch (fout) {
+        if (afgebroken(fout)) throw fout
+        mislukt += 1
+        laatste = fout.melding || fout.message
+      }
+      voortgang(++klaar, tegels.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(8, tegels.length) }, werker))
+  if (mislukt > 0.1 * tegels.length) throw new BronFout(OFM_BRON, `${mislukt} van ${tegels.length} tegels mislukt (${laatste})`)
+  return uit
+}
+
 /**
  * Een rondje met de eigen routeplanner: haal de paden in de buurt op, zoek
  * honderden rondjes op de graaf (dat kost minder dan een seconde) en leg de
@@ -878,10 +938,25 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   const doel = km * 1000
   const kronkel = instel.vorm === 'kronkel'
   const straal = Math.max(1500, (kronkel ? 0.32 : 0.38) * doel)
-  meld('Paden in de buurt ophalen (OpenStreetMap)')
-  const elementen = instel.paden || (await haalPaden(start, straal, signal)) // paden: alleen voor tests
+  // paden: eerst de kaarttegels (betrouwbaar), anders Overpass (meer detail, maar vaak druk)
+  let elementen = instel.paden // alleen voor tests
+  let snap = instel.paden && instel.paden.some((e) => e.bron === 'tegel') ? 1.5 : 0
+  const waarschuwingen = []
+  if (!elementen) {
+    meld('Paden in de buurt ophalen (OpenStreetMap)')
+    try {
+      elementen = await haalTegelPaden(start, straal, signal, instel.voortgang)
+      snap = 1.5 // kaarttegels: losse eindjes aan het netwerk knopen
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      meld('Paden ophalen bij Overpass')
+      elementen = await haalPaden(start, straal, signal)
+      snap = 0
+      waarschuwingen.push(`De kaarttegels lukten niet (${fout.melding || fout.message}); de paden komen van Overpass.`)
+    }
+  }
   const [sx, sy] = K.naarRd(start[1], start[0])
-  const opbouw = { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [] }
+  const opbouw = { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap }
   let lijst = []
   let gezocht = 0
   for (let ronde = 0; ronde < 2; ronde++) {
@@ -923,7 +998,6 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
     if (opties.length >= Math.max(2, aantalOpties)) break
     if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
   }
-  const waarschuwingen = []
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
       waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: met de paden hier lukte ${km} km niet precies`)
@@ -1047,7 +1121,7 @@ export async function maakPlan(opties) {
   // beter dan via BRouter. Niet bij een voorkeur voor LAW-routes (die kent alleen BRouter).
   if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
     try {
-      plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden }, bgt, alternatieven, meld, opties.signal)
+      plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang }, bgt, alternatieven, meld, opties.signal)
     } catch (fout) {
       if (afgebroken(fout)) throw fout
       vooraf.push(`De paden konden niet zelf worden doorgerekend (${fout.melding || fout.message}); daarom via BRouter, dat duurt langer.`)
