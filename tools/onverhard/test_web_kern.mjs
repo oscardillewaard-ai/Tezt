@@ -614,3 +614,35 @@ test('doodlopende takken: een doodlopende straat (ook met een zijtak) valt af, d
   const r = G.doorElkeStraat(g, G.dichtsteKnoop(g, ...K.naarRd(5, 52)).knoop, zonder)
   assert.ok(Math.abs(r.meter - 800) < 5, `rondje om het blok: ${r.meter} m`)
 })
+
+test('route verslepen: het stuk rond de greep gaat via het nieuwe punt, loslaten herstelt het', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  const rd = (i, j) => K.naarRd(p(i, j).lon, p(i, j).lat)
+  const start = G.dichtsteKnoop(g, ...rd(5, 2)).knoop
+  const r = G.zoekRondjes(g, start, 2400).rondjes[0]
+  const vast = [0, r.knopen.length - 1]
+  const i0 = Math.floor(r.knopen.length / 2)
+  // sleep naar een knoop een eind van de route af
+  const doel = G.dichtsteKnoop(g, ...rd(9, 9)).knoop
+  const v = G.versleep(g, r.knopen, r.segs, vast, i0, doel, { venster: 5000 })
+  assert.ok(v)
+  assert.ok(v.knopen.includes(doel), 'de route gaat via het versleepte punt')
+  assert.equal(v.knopen[0], start)
+  assert.equal(v.knopen[v.knopen.length - 1], start)
+  assert.equal(v.vast.length, 3)
+  assert.equal(v.knopen[v.vast[1]], doel)
+  for (let i = 0; i < v.segs.length; i++) {
+    const s = v.segs[i]
+    const [a, b] = [v.knopen[i], v.knopen[i + 1]]
+    assert.ok((g.van[s] === a && g.naar[s] === b) || (g.van[s] === b && g.naar[s] === a), 'aaneengesloten')
+  }
+  // loslaten: het punt verdwijnt, de route is weer een rondje van redelijke lengte (niet leeg)
+  const l = G.laatLos(g, v.knopen, v.segs, v.vast, v.vast[1], { venster: 5000 })
+  assert.ok(l)
+  assert.deepEqual(l.vast.length, 2)
+  const meter = l.segs.reduce((m, s) => m + g.lengte[s], 0)
+  assert.ok(meter > 1000, `${meter} m na loslaten`)
+  assert.equal(l.knopen[0], start)
+  assert.equal(l.knopen[l.knopen.length - 1], start)
+})

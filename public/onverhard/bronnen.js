@@ -597,7 +597,7 @@ export async function planRondje(start, km, br, bgt, kandidaten, aantalOpties, m
   for (const k of kansrijk) {
     if (opties.length >= Math.max(2, aantalOpties)) break
     if (opties.length && k.an.dubbel > 0.25) continue // een rondje dat vooral heen en terug gaat, alleen als er niets anders is
-    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
+    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an, knopen: k.knopen, segs: k.segs })
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
@@ -821,7 +821,7 @@ export async function planRondjeLussen(start, km, br, bgt, aantalOpties, meld = 
   for (const k of lijst) {
     if (opties.length >= Math.max(2, aantalOpties)) break
     if (opties.length && k.an.dubbel > 0.25) continue
-    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
+    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an, knopen: k.knopen, segs: k.segs })
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
@@ -960,10 +960,12 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   const opbouw = { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap }
   let lijst = []
   let gezocht = 0
+  let graaf = null
   for (let ronde = 0; ronde < 2; ronde++) {
     meld(ronde ? 'Rondjes opnieuw zoeken, nu zonder strand en afgesloten stukken' : 'Rondjes zoeken')
     await wacht(0, signal) // de pagina even laten bijwerken
     const g = G.bouwGraaf(elementen, opbouw)
+    graaf = g
     const s = G.dichtsteKnoop(g, sx, sy)
     if (s.knoop < 0) throw new BronFout(OSM_BRON, 'geen paden in de buurt van de start')
     if (s.afstand > 400) throw new BronFout(OSM_BRON, `het dichtstbijzijnde pad ligt ${Math.round(s.afstand)} m van de start`)
@@ -976,7 +978,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
       const traject = G.maakTraject(g, r.knopen, r.segs, [start, ...r.via.map((v) => [g.lat[v], g.lon[v]]), start])
       const an = await analyseerRoute(traject, bgt)
       const af = Math.abs(an.lengte - doel) / doel
-      lijst.push({ traject, an, lengte: an.lengte, score: waardering(an, instel, bgt ? 'eind' : 'osm') - 3 * Math.max(0, af - 0.1) })
+      lijst.push({ traject, an, lengte: an.lengte, knopen: r.knopen, segs: r.segs, score: waardering(an, instel, bgt ? 'eind' : 'osm') - 3 * Math.max(0, af - 0.1) })
     }
     if (!bgt || ronde === 1) break
     let opnieuw = false
@@ -997,7 +999,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   const opties = []
   for (const k of lijst) {
     if (opties.length >= Math.max(2, aantalOpties)) break
-    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
+    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an, knopen: k.knopen, segs: k.segs })
   }
   for (const o of opties) {
     if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
@@ -1008,7 +1010,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
     richting: null, rek: kronkel ? 'kronkel' : 'lus', km: k.lengte / 1000, afwijking: 0, osm: 0, score: k.score,
     zacht: K.zachtAandeel(k.an, 'eind'), paadjes: K.paadjesAandeel(k.an), strand: K.strandMeter(k.an), dubbel: k.an.dubbel, voldoet: true,
   }))
-  return { opties, waarschuwingen, doel, uitleg, eigen: true, gezocht }
+  return { opties, waarschuwingen, doel, uitleg, eigen: true, gezocht, graaf }
 }
 
 // ---------- Tekenen op de kaart: gebied, elke straat, route langs een lijn ----------
@@ -1077,13 +1079,13 @@ export async function planGebied(instel, bgt, aantalOpties, meld, signal) {
   for (const [i, r] of z.rondjes.slice(0, Math.max(2, aantalOpties)).entries()) {
     meld(`Ondergrond van rondje ${i + 1} controleren`)
     const traject = G.maakTraject(g, r.knopen, r.segs, [[g.lat[start], g.lon[start]]])
-    opties.push({ traject, an: await analyseerRoute(traject, bgt), ronden: r.ronden })
+    opties.push({ traject, an: await analyseerRoute(traject, bgt), ronden: r.ronden, knopen: r.knopen, segs: r.segs })
   }
   const waarschuwingen = []
   if (opties[0].ronden > 1) {
     waarschuwingen.push(`${opties[0].ronden} rondjes van ca. ${(z.lus / 1000).toFixed(1).replace('.', ',')} km`)
   }
-  return { opties, waarschuwingen, doel, eigen: true, uitleg: [] }
+  return { opties, waarschuwingen, doel, eigen: true, uitleg: [], graaf: g }
 }
 
 /** Een route door elke straat (of elk pad) binnen een getekend gebied. */
@@ -1124,7 +1126,7 @@ export async function planTekening(instel, bgt, meld, signal) {
   const an = await analyseerRoute(traject, bgt)
   const waarschuwingen = []
   if (r.afwijkend > 0.25) waarschuwingen.push(`${Math.round(100 * r.afwijkend)}% ligt >40 m van je lijn (geen paden dichterbij)`)
-  return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+  return { opties: [{ traject, an, knopen: r.knopen, segs: r.segs }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [], graaf: g }
 }
 
 // ---------- Hoogtemeters (AHN via PDOK) ----------
@@ -1209,6 +1211,55 @@ function profielUitCoords(xy, coords) {
 }
 
 const LETTERS = 'ABCDEFGH'
+
+/** Eén route zoals de app hem toont. */
+function optieVan(o, naam) {
+  return {
+    naam,
+    traject: o.traject,
+    analyse: o.an,
+    km: o.an.lengte / 1000,
+    zacht: K.zachtAandeel(o.an, 'eind'),
+    law: K.lawAandeel(o.an),
+    dubbel: o.dubbel ?? o.an.dubbel, // bij elke straat: wat je echt dubbel loopt (niet: straten aan twee kanten van een gracht)
+    paadjes: K.paadjesAandeel(o.an),
+    strand: K.strandMeter(o.an),
+    kaartje: K.kaartjeMeter(o.an),
+    ronden: o.ronden || 1,
+  }
+}
+
+/**
+ * Versleep de gekozen route: het stuk rond positie i0 gaat via [lat, lon]
+ * ('punt'), of (met loslaten) een versleept punt verdwijnt weer. Rekent
+ * alleen dat stuk opnieuw op het netwerk dat bij het plannen gebouwd is, en
+ * legt de nieuwe route opnieuw langs de officiële kaart en het AHN.
+ * Geeft een nieuwe optie, of null als het niet lukte.
+ */
+export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null }, signal) {
+  const g = uitslag.graaf
+  if (!g || !optie.knopen) return null
+  let r
+  if (loslaten !== null) r = G.laatLos(g, optie.knopen, optie.segs, optie.vast, loslaten)
+  else {
+    const doel = G.dichtsteKnoop(g, ...K.naarRd(punt[1], punt[0])).knoop
+    r = G.versleep(g, optie.knopen, optie.segs, optie.vast.filter((k) => k !== i0 || k === 0 || k === optie.knopen.length - 1), i0, doel)
+  }
+  if (!r) return null
+  const traject = G.maakTraject(g, r.knopen, r.segs, optie.traject.punten || [])
+  const an = await analyseerRoute(traject, uitslag.bgt)
+  if (uitslag.bgt) await markeerOngewenst(an, uitslag.instel || {}, uitslag.bgt)
+  const nieuw = optieVan({ traject, an, ronden: optie.ronden }, optie.naam)
+  Object.assign(nieuw, { knopen: r.knopen, segs: r.segs, vast: r.vast })
+  try {
+    await voegHoogtesToe([nieuw], signal, () => {})
+    nieuw.stijgen = nieuw.hoogte ? nieuw.hoogte.stijgen : null
+    nieuw.dalen = nieuw.hoogte ? nieuw.hoogte.dalen : null
+  } catch (fout) {
+    if (afgebroken(fout)) throw fout
+  }
+  return nieuw
+}
 
 /**
  * Stukken die een route niet mag hebben: strand (als je dat wilt overslaan),
@@ -1348,19 +1399,14 @@ export async function maakPlan(opties) {
     if ((br.strandMijden || br.kaartje) && bgt && !plan.eigen) await zonderOngewenst(o, br, bgt, meld, LETTERS[i], plan.doel)
     else if (plan.eigen && bgt) await markeerOngewenst(o.an, br, bgt)
     if (lijst.some((x) => K.zelfdeTraject(x.traject, o.traject))) continue
-    lijst.push({
-      naam: LETTERS[i],
-      traject: o.traject,
-      analyse: o.an,
-      km: o.an.lengte / 1000,
-      zacht: K.zachtAandeel(o.an, 'eind'),
-      law: K.lawAandeel(o.an),
-      dubbel: o.dubbel ?? o.an.dubbel, // bij elke straat: wat je echt dubbel loopt (niet: straten aan twee kanten van een gracht)
-      paadjes: K.paadjesAandeel(o.an),
-      strand: K.strandMeter(o.an),
-      kaartje: K.kaartjeMeter(o.an),
-      ronden: o.ronden || 1,
-    })
+    const optie = optieVan(o, LETTERS[i])
+    // versleepbaar: de route op het eigen netwerk (niet bij elke straat), met start en finish vast
+    if (plan.graaf && o.knopen && o.knopen.length === o.traject.coords.length) {
+      optie.knopen = o.knopen
+      optie.segs = o.segs
+      optie.vast = [0, o.knopen.length - 1]
+    }
+    lijst.push(optie)
   }
   // Een andere route die veel minder onverhard is dan de beste helpt niemand (zoals een rondje
   // door de polder naast een rondje door de duinen): laat die weg en zeg dat erbij.
@@ -1399,6 +1445,9 @@ export async function maakPlan(opties) {
     uitleg: plan.uitleg || [],
     meldingen,
     verzoeken: br.verzoeken + (bgt ? bgt.verzoeken : 0),
+    graaf: plan.graaf || null, // om de route te kunnen verslepen
+    bgt,
+    instel: { strandMijden: br.strandMijden, kaartje: br.kaartje },
     vlakken: bgt ? bgt.vlakken.lijst.length : 0,
   }
 }

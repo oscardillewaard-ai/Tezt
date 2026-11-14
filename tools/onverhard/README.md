@@ -328,6 +328,12 @@ draait in je browser; er is geen eigen server.
   254 en 45 m): Komoot gebruikt een grove hoogtekaart die duinen afvlakt. Bij
   heel lange routes (meer dan 160 blokken) gebruikt de app de hoogtes van
   BRouter (SRTM) en zegt dat erbij.
+- **Route verslepen**: pak de route en sleep. Bij Rondje, In gebied en
+  Tekenen rekent de app alleen het stuk rond de greep opnieuw (tot het
+  dichtstbijzijnde vaste punt, hooguit 12% van de route of 1,5 km naar elke
+  kant) op het netwerk van de planning, dus meteen. Het punt wordt een
+  handvat: nog eens slepen, of tikken om weg te halen. Bij A naar B komt er
+  een tussenpunt bij en wordt de route opnieuw gepland.
 - **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
   tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
   "Opnieuw" of na een nieuwe planning).

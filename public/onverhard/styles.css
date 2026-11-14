@@ -390,3 +390,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 @keyframes status-in { from { transform: scale(.94); opacity: 0; } }
 @keyframes knipper { 0%, 100% { stroke-width: 4px; } 40% { stroke-width: 10px; } }
 @media (prefers-reduced-motion: reduce) { .tekenstatus.vers, .tekening-vers { animation: none; } }
+
+/* versleepbare route: handvatten bij versleepte punten, en een wachtcursor tijdens het rekenen */
+.punt.via.sleep { width: 18px; height: 18px; border-radius: 50%; background: var(--route); border: 3px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.rekent, .rekent * { cursor: progress !important; }

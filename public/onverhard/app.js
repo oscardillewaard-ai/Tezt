@@ -2,7 +2,7 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
-import { maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -850,6 +850,7 @@ function tekenRoute(passend) {
     const lijn = L.polyline(pad, { color: KLEUR[s[bron]], weight: 5, opacity: 1, lineCap: 'butt', bubblingMouseEvents: false }).addTo(routeLaag)
     lijn.bindPopup(() => popup(s), { maxWidth: 300 })
     lijn.bindTooltip(() => `km ${nl(s.van / 1000)}–${nl(s.tot / 1000)} · ${s[bron]}${s.twijfel ? ' · twijfel' : ''}`, { sticky: true })
+    maakVersleepbaar(lijn)
     lijnen.push([lijn, s])
     const twijfelsTonen = el('twijfelblok').open
     if (s.twijfel && twijfelsTonen) {
@@ -868,10 +869,136 @@ function tekenRoute(passend) {
       }
     }
   }
+  tekenHandvatten()
   if (passend) {
     const grens = L.latLngBounds(alles)
     for (const i of opKaart) grens.extend(L.latLngBounds(naarLatLon(uitslag.opties[i].analyse.xy)))
     kaart.fitBounds(grens.pad(0.06))
+  }
+}
+
+// ---------- Route verslepen ----------
+let slepen = null // { i0, x, y, bewogen, stip, elastiek }
+let aanpassen = false
+
+function kanSlepen() {
+  if (!uitslag || stopper || tekenen || aanpassen) return false
+  return !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
+}
+
+/** Index van het routepunt het dichtst bij een plek op de kaart. */
+function dichtsteIndex(latlng) {
+  const [x, y] = K.naarRd(latlng.lng, latlng.lat)
+  let beste = 0
+  let besteD = Infinity
+  plan.analyse.xy.forEach(([px, py], i) => {
+    const d = (px - x) ** 2 + (py - y) ** 2
+    if (d < besteD) {
+      besteD = d
+      beste = i
+    }
+  })
+  return beste
+}
+
+function maakVersleepbaar(lijn) {
+  const pak = lijn.getElement && lijn.getElement()
+  if (!pak) return
+  pak.style.cursor = kanSlepen() ? 'grab' : ''
+  pak.addEventListener('pointerdown', (e) => {
+    if (!kanSlepen() || e.button > 0) return
+    e.stopPropagation()
+    kaart.dragging.disable()
+    const ll = kaart.mouseEventToLatLng(e)
+    slepen = { i0: dichtsteIndex(ll), x: e.clientX, y: e.clientY, bewogen: false, van: ll }
+  })
+}
+
+document.addEventListener('pointermove', (e) => {
+  if (!slepen) return
+  if (!slepen.bewogen && Math.hypot(e.clientX - slepen.x, e.clientY - slepen.y) < 8) return
+  e.preventDefault()
+  const ll = kaart.mouseEventToLatLng(e)
+  if (!slepen.bewogen) {
+    slepen.bewogen = true
+    kaart.closePopup()
+    slepen.elastiek = L.polyline([slepen.van, ll], { color: '#1f3328', weight: 3, dashArray: '6 6', interactive: false }).addTo(routeLaag)
+    slepen.stip = L.circleMarker(ll, { radius: 9, color: '#1f3328', weight: 3, fillColor: '#ffcb05', fillOpacity: 1, interactive: false }).addTo(routeLaag)
+  }
+  slepen.elastiek.setLatLngs([slepen.van, ll])
+  slepen.stip.setLatLng(ll)
+})
+
+document.addEventListener('pointerup', (e) => {
+  if (!slepen) return
+  const s = slepen
+  slepen = null
+  kaart.dragging.enable()
+  if (!s.bewogen) return
+  netGetekend = Date.now() // deze tik is geen nieuw punt
+  setTimeout(() => kaart.closePopup(), 0)
+  const ll = kaart.mouseEventToLatLng(e)
+  versleepNaar(s.i0, [ll.lat, ll.lng])
+})
+
+/** Laat de route via een nieuw punt lopen (of, met loslaten, een versleept punt weer vrij). */
+async function versleepNaar(i0, punt, loslaten = null) {
+  if (uitslag.graaf && keuze().knopen) {
+    aanpassen = true
+    kaart.getContainer().classList.add('rekent')
+    try {
+      const nieuw = await pasRouteAan(uitslag, keuze(), { i0, punt, loslaten })
+      if (!nieuw) {
+        toonFout('Daar kan de route niet langs.')
+        tekenRoute(false)
+        return
+      }
+      onthoud()
+      uitslag = { ...uitslag, opties: uitslag.opties.map((o, i) => (i === gekozen ? nieuw : o)) }
+      plan = details(nieuw, MIN_TWIJFEL)
+      toonFout('')
+      toonResultaat(false)
+    } catch (fout) {
+      toonFout(`Aanpassen lukte niet: ${fout.melding || fout.message}`)
+      tekenRoute(false)
+    } finally {
+      aanpassen = false
+      kaart.getContainer().classList.remove('rekent')
+    }
+    return
+  }
+  // van A naar B (via BRouter): een tussenpunt erbij op de juiste plek, en opnieuw plannen
+  const plekken = staat.punten.map((p) => dichtsteIndex(L.latLng(p[0], p[1])))
+  let na = 0
+  for (let k = 0; k < plekken.length - 1; k++) if (plekken[k] <= i0) na = k
+  onthoud()
+  staat.punten.splice(na + 1, 0, punt)
+  puntenGewijzigd()
+  planNu()
+}
+
+/** Versleepte punten als handvat: nog eens slepen, of tikken om weg te halen. */
+function tekenHandvatten() {
+  const o = keuze()
+  if (!o.vast || !uitslag.graaf) return
+  for (const k of o.vast) {
+    if (k === 0 || k === o.knopen.length - 1) continue
+    const c = plan.traject.coords[k]
+    if (!c) continue
+    const handvat = L.divIcon({ className: '', html: '<div class="punt via sleep"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
+    const m = L.marker([c[1], c[0]], { icon: handvat, draggable: true, zIndexOffset: 900, title: 'Sleep, of tik om weg te halen' }).addTo(routeLaag)
+    m.on('dragend', () => {
+      const { lat, lng } = m.getLatLng()
+      versleepNaar(k, [lat, lng])
+    })
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.textContent = 'Haal dit punt weg'
+    knop.addEventListener('click', () => {
+      kaart.closePopup()
+      versleepNaar(k, null, k)
+    })
+    m.bindPopup(knop)
   }
 }
 

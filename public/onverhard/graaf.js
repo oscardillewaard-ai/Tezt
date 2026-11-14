@@ -1024,3 +1024,74 @@ export function volgTekening(g, lijn, { gelijk = 20, stap = 250 } = {}) {
   }
   return { knopen, segs, meter, rond, afwijkend: ver / Math.max(1, meter), via: schoon }
 }
+
+// ---------- Route verslepen ----------
+/**
+ * Versleep een route: het stuk rond positie i0 (index in 'knopen') gaat
+ * voortaan via knoop 'doel'. Alleen een venster rond i0 wordt opnieuw
+ * berekend: tot het dichtstbijzijnde vaste punt (start, finish, eerder
+ * versleepte punten) en hooguit 'venster' meter naar elke kant. De rest van
+ * de route blijft liggen; wat daarin al gelopen wordt, kost extra, zodat het
+ * nieuwe stuk er niet overheen gaat. Geeft {knopen, segs, vast} (vast:
+ * gesorteerde indexen in de nieuwe knopen, met het nieuwe punt erbij) of null.
+ */
+export function versleep(g, knopen, segs, vast, i0, doel, { venster = null } = {}) {
+  const opgeteld = [0]
+  for (let i = 0; i < segs.length; i++) opgeteld.push(opgeteld[i] + g.lengte[segs[i]])
+  const totaal = opgeteld[opgeteld.length - 1]
+  const v = venster ?? Math.max(300, Math.min(1500, 0.12 * totaal))
+  const vastVoor = vast.filter((k) => k < i0)
+  const vastNa = vast.filter((k) => k > i0)
+  let ia = vastVoor.length ? vastVoor[vastVoor.length - 1] : 0
+  let ib = vastNa.length ? vastNa[0] : knopen.length - 1
+  while (ia < i0 - 1 && opgeteld[i0] - opgeteld[ia] > v) ia++
+  while (ib > i0 + 1 && opgeteld[ib] - opgeteld[i0] > v) ib--
+  if (ia >= ib) return null
+  const straf = new Float32Array(g.lengte.length).fill(1)
+  for (let i = 0; i < ia; i++) straf[segs[i]] = 4
+  for (let i = ib; i < segs.length; i++) straf[segs[i]] = 4
+  const been = (van, naar) => {
+    if (van === naar) return { knopen: [van], segs: [] }
+    const b = dijkstra(g, van, { straf, doel: naar })
+    return Number.isFinite(b.kosten[naar]) ? pad(b, naar) : null
+  }
+  const p1 = been(knopen[ia], doel)
+  const p2 = been(doel, knopen[ib])
+  if (!p1 || !p2) return null
+  const nieuweKnopen = [...knopen.slice(0, ia), ...p1.knopen, ...p2.knopen.slice(1), ...knopen.slice(ib + 1)]
+  const nieuweSegs = [...segs.slice(0, ia), ...p1.segs, ...p2.segs, ...segs.slice(ib)]
+  const verschuiving = p1.segs.length + p2.segs.length - (ib - ia)
+  const nieuwVast = [
+    ...vast.filter((k) => k <= ia),
+    ia + p1.segs.length,
+    ...vast.filter((k) => k >= ib).map((k) => k + verschuiving),
+  ]
+  return { knopen: nieuweKnopen, segs: nieuweSegs, vast: [...new Set(nieuwVast)].sort((a, b) => a - b) }
+}
+
+/**
+ * Haal een vast (versleept) punt weg: een venster eromheen (tot de buren en
+ * hooguit 'venster' meter) loopt weer de mooiste weg. Bij een rondje vallen
+ * start en finish samen; daarom nooit van start naar finish rekenen.
+ */
+export function laatLos(g, knopen, segs, vast, index, { venster = null } = {}) {
+  const rest = vast.filter((k) => k !== index)
+  const opgeteld = [0]
+  for (let i = 0; i < segs.length; i++) opgeteld.push(opgeteld[i] + g.lengte[segs[i]])
+  const v = venster ?? Math.max(300, Math.min(1500, 0.12 * opgeteld[opgeteld.length - 1]))
+  let voor = rest.filter((k) => k < index).pop() ?? 0
+  let na = rest.find((k) => k > index) ?? knopen.length - 1
+  while (voor < index - 1 && opgeteld[index] - opgeteld[voor] > v) voor++
+  while (na > index + 1 && opgeteld[na] - opgeteld[index] > v) na--
+  if (knopen[voor] === knopen[na]) return { knopen, segs, vast: rest }
+  const straf = new Float32Array(g.lengte.length).fill(1)
+  for (let i = 0; i < voor; i++) straf[segs[i]] = 4
+  for (let i = na; i < segs.length; i++) straf[segs[i]] = 4
+  const b = dijkstra(g, knopen[voor], { straf, doel: knopen[na] })
+  if (!Number.isFinite(b.kosten[knopen[na]])) return null
+  const p = pad(b, knopen[na])
+  const nieuweKnopen = [...knopen.slice(0, voor), ...p.knopen, ...knopen.slice(na + 1)]
+  const nieuweSegs = [...segs.slice(0, voor), ...p.segs, ...segs.slice(na)]
+  const verschuiving = p.segs.length - (na - voor)
+  return { knopen: nieuweKnopen, segs: nieuweSegs, vast: rest.map((k) => (k >= na ? k + verschuiving : k)) }
+}
