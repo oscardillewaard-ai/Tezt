@@ -532,3 +532,10 @@ details.meer > summary { cursor: pointer; margin-top: 12px; color: var(--inkt-2)
 .ondergrondgetal { text-align: right; font-variant-numeric: tabular-nums; }
 .ondergrondgetal b { display: block; font: 700 16px var(--kop); }
 .ondergrondgetal small { color: var(--inkt-3); font: 500 11px var(--mono); }
+
+/* bewaarde routes */
+.bewaardlijst { list-style: none; margin: 0; padding: 0; }
+.bewaardlijst li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rand); }
+.bewaardlijst b { display: block; font-weight: 600; }
+.bewaardlijst small { display: block; color: var(--inkt-3); font: 500 11px var(--mono); }
+.bewaardlijst button { min-height: 36px; padding: 4px 10px; font-size: 14px; }

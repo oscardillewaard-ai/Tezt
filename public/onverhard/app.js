@@ -2,7 +2,7 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
-import { haalOpeningstijden, importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -1309,7 +1309,6 @@ function tekenOpties() {
   })
 }
 
-const tip = el('tip')
 
 /** Overzicht van de ondergrond voor de gekozen bron: per soort een balk met km en procent. */
 function tekenBalken() {
@@ -1786,6 +1785,109 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault()
 })
 
+// ---------- Bewaarde routes (in de browser) ----------
+const BEWAARD = 'onverhard.routes'
+function bewaardeRoutes() {
+  try {
+    return JSON.parse(localStorage.getItem(BEWAARD) || '[]')
+  } catch {
+    return []
+  }
+}
+function zetBewaardeRoutes(lijst) {
+  try {
+    localStorage.setItem(BEWAARD, JSON.stringify(lijst))
+    return true
+  } catch {
+    toonFout('Bewaren lukte niet: de opslag van de browser is vol of uitgezet.')
+    return false
+  }
+}
+function tekenBewaard() {
+  const lijst = bewaardeRoutes()
+  el('mijnRoutes').hidden = !lijst.length
+  const ul = el('bewaardlijst')
+  ul.innerHTML = ''
+  for (const r of lijst) {
+    const li = document.createElement('li')
+    li.innerHTML = `<span><b>${veilig(r.naam)}</b><small>${nl(r.km, 1)} km · ${pct(r.zacht)} onverhard${r.stijgen ? ` · ↗ ${Math.round(r.stijgen)} m` : ''} · ${veilig(r.datum)}</small></span>`
+    const open = document.createElement('button')
+    open.type = 'button'
+    open.textContent = 'Open'
+    open.addEventListener('click', () => openBewaard(r))
+    const weg = document.createElement('button')
+    weg.type = 'button'
+    weg.className = 'klein'
+    weg.textContent = '✕'
+    weg.setAttribute('aria-label', `Verwijder ${r.naam}`)
+    weg.addEventListener('click', () => {
+      if (!confirm(`"${r.naam}" verwijderen?`)) return
+      zetBewaardeRoutes(bewaardeRoutes().filter((x) => x.id !== r.id))
+      tekenBewaard()
+    })
+    li.append(open, weg)
+    ul.appendChild(li)
+  }
+}
+el('bewaar').addEventListener('click', () => {
+  if (!plan) return
+  const o = keuze()
+  const soort = { route: 'Route', rondje: 'Rondje', gebied: 'Rondjes in gebied', straten: 'Elke straat', tekenen: 'Getekende route' }[staat.modus] || 'Route'
+  const datum = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const naam = prompt('Naam van de route', o.ingelezen ? o.ingelezen : `${soort} ${nl(o.km, 0)} km · ${datum}`)
+  if (!naam) return
+  const r = {
+    id: Date.now().toString(36),
+    naam: naam.slice(0, 80),
+    datum,
+    km: o.km,
+    zacht: o.zacht,
+    stijgen: o.stijgen || null,
+    traject: { coords: o.traject.coords.map((c) => [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6]), segs: o.traject.segs, punten: o.traject.punten || [] },
+    staat: JSON.parse(momentopname().json),
+  }
+  const lijst = [r, ...bewaardeRoutes()].slice(0, 50)
+  if (zetBewaardeRoutes(lijst)) {
+    el('bewaar').textContent = '★ Bewaard'
+    setTimeout(() => {
+      el('bewaar').textContent = '★ Bewaar'
+    }, 2000)
+    tekenBewaard()
+  }
+})
+async function openBewaard(r) {
+  if (stopper) return
+  onthoud()
+  Object.assign(staat, r.staat || {})
+  puntenGewijzigd()
+  tekenTekening()
+  for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
+  toonStap(3)
+  stopper = new AbortController()
+  el('plan').hidden = true
+  el('bezig').hidden = false
+  try {
+    const resultaat = await bekijkRoute({ coords: r.traject.coords.map((c) => [c[0], c[1], null]), segs: r.traject.segs, punten: r.traject.punten || [] }, r.naam, {
+      signal: stopper.signal,
+      metBgt: staat.grondig > 0,
+      meld: (t) => {
+        el('status').textContent = t + '…'
+      },
+    })
+    uitslag = resultaat
+    gekozen = 0
+    opKaart.clear()
+    opKaart.add(0)
+    plan = details(uitslag.opties[0], MIN_TWIJFEL)
+    stopBezig()
+    toonResultaat(true)
+  } catch (fout) {
+    toonFout(fout.name === 'AbortError' ? 'Gestopt.' : `Openen lukte niet: ${fout.melding || fout.message}`)
+  } finally {
+    stopBezig()
+  }
+}
+
 // ---------- GPX inlezen ----------
 async function leesGpxBestand(bestand) {
   if (!bestand || stopper) return
@@ -1956,6 +2058,7 @@ for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.da
 puntenGewijzigd()
 tekenTekening()
 zetTerugKnop()
+tekenBewaard()
 if (tekenModus() && tekening()) kaart.fitBounds(L.latLngBounds(tekening()).pad(0.2))
 toonStap(staat.punten.length || tekening() ? (plaatsKlaar ? 3 : 2) : 1, false)
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))

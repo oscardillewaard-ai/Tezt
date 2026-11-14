@@ -63,6 +63,10 @@
             </div>
             <button type="button" id="gpxOpen" class="tekstknop" title="Of sleep een GPX-bestand op de kaart">📂 Of open een GPX-bestand</button>
             <input type="file" id="gpxBestand" accept=".gpx,application/gpx+xml" hidden />
+            <div id="mijnRoutes" hidden>
+              <h3 class="subkop">Mijn routes</h3>
+              <ul class="bewaardlijst" id="bewaardlijst"></ul>
+            </div>
           </div>
 
           <div class="stapvlak" id="stap2" hidden>
@@ -226,6 +230,7 @@
 
           <div class="knoppen eindknoppen">
             <button type="button" class="hoofd" id="gpx">Download GPX</button>
+            <button type="button" id="bewaar">★ Bewaar</button>
             <button type="button" id="deel">Kopieer link</button>
           </div>
           <div class="stapvoet">

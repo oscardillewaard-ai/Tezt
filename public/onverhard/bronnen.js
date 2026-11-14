@@ -1404,11 +1404,23 @@ export async function importeerGpx(tekst, opties = {}) {
     }
   } else meldingen.push('Route te lang om de paden eronder te herkennen; alleen de officiële kaart')
   const traject = { coords: coords.map((c) => [c[0], c[1], c[2]]), segs, punten: [] }
+  const uit = await bekijkRoute(traject, naam || 'GPX', opties)
+  uit.meldingen.unshift(...meldingen)
+  return uit
+}
+
+/**
+ * Een bekende route (ingelezen of bewaard) laten zien zoals een geplande:
+ * officiële kaart, hoogte en water erbij. Geeft hetzelfde als maakPlan.
+ */
+export async function bekijkRoute(traject, naam, opties = {}) {
+  const meld = opties.meld || (() => {})
+  const meldingen = []
   const bgt = opties.metBgt === false ? null : new Bgt({ signal: opties.signal, voortgang: opties.voortgang })
   meld('Ondergrond controleren')
   const an = await analyseerRoute(traject, bgt)
   const optie = optieVan({ traject, an }, 'A')
-  optie.ingelezen = naam || 'GPX'
+  optie.ingelezen = naam
   const lijst = [optie]
   try {
     await voegHoogtesToe(lijst, opties.signal, meld)
