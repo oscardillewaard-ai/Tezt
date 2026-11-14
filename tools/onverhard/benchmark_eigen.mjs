@@ -31,7 +31,7 @@ async function overpass(sleutel, [lat, lon], straal) {
   for (let poging = 0; poging < 10; poging++) {
     const url = SERVERS[poging % SERVERS.length]
     try {
-      const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: vraag }), headers: { 'User-Agent': 'onverhard-planner/1.0' } })
+      const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: vraag }), headers: { 'User-Agent': 'onverhard-planner/1.0' }, signal: AbortSignal.timeout(90000) })
       if (r.ok) {
         const tekst = await r.text()
         fs.writeFileSync(bestand, tekst)
