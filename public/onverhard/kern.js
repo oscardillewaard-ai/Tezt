@@ -1363,3 +1363,60 @@ export function kleurIndicatie(r, g, b) {
   if (r - b >= 18) return { tekst: 'warm getint: zand, aarde of klinkers (geen richting)', steun: null }
   return { tekst: 'geen duidelijk kleursignaal', steun: null }
 }
+
+// ---------- Openingstijden (OpenStreetMap-notatie, de gangbare gevallen) ----------
+const DAGEN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+/**
+ * Is iets open op moment 'nu' volgens een OSM opening_hours-tekst? Kent de
+ * gangbare vormen: '24/7', 'Mo-Fr 08:00-18:00; Sa 09:00-17:00', 'Mo,We 10:00-12:00,13:00-17:00',
+ * 'Su off'. Geeft {open: bool, tot: 'HH:MM' | null, vanaf: 'HH:MM' | null} of null als de tekst
+ * te ingewikkeld is (feestdagen, maanden, weeknummers).
+ */
+export function isOpen(tekst, nu = new Date()) {
+  if (!tekst) return null
+  const t = tekst.trim()
+  if (t === '24/7') return { open: true, tot: null, vanaf: null }
+  const dag = nu.getDay()
+  const minuut = nu.getHours() * 60 + nu.getMinutes()
+  const tijden = [] // [van, tot] in minuten voor vandaag
+  let vandaagGenoemd = false
+  for (const regel of t.split(';').map((r) => r.trim()).filter(Boolean)) {
+    if (/^PH\b/.test(regel)) continue
+    const m = /^((?:(?:Mo|Tu|We|Th|Fr|Sa|Su)(?:-(?:Mo|Tu|We|Th|Fr|Sa|Su))?)(?:,(?:Mo|Tu|We|Th|Fr|Sa|Su)(?:-(?:Mo|Tu|We|Th|Fr|Sa|Su))?)*)?\s*(.*)$/.exec(regel)
+    if (!m) return null
+    const [, dagdeel, tijddeel] = m
+    let geldt = true
+    if (dagdeel) {
+      geldt = dagdeel.split(',').some((stuk) => {
+        const [a, b] = stuk.split('-').map((d) => DAGEN.indexOf(d))
+        if (b === undefined) return a === dag
+        return a <= b ? dag >= a && dag <= b : dag >= a || dag <= b
+      })
+    }
+    if (!geldt) continue
+    const rest = tijddeel.replace(/,\s*PH\s+\S+/, '').trim()
+    if (/^(off|closed)$/i.test(rest)) {
+      vandaagGenoemd = true
+      tijden.length = 0
+      continue
+    }
+    const stukken = rest.split(',').map((x) => x.trim())
+    const nieuw = []
+    for (const stuk of stukken) {
+      const tm = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/.exec(stuk)
+      if (!tm) return null
+      nieuw.push([+tm[1] * 60 + +tm[2], +tm[3] * 60 + +tm[4]])
+    }
+    vandaagGenoemd = true
+    tijden.length = 0 // een latere regel voor dezelfde dag gaat voor
+    tijden.push(...nieuw)
+  }
+  const hhmm = (x) => `${String(Math.floor((x % 1440) / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`
+  if (!vandaagGenoemd) return { open: false, tot: null, vanaf: null }
+  for (const [van, tot] of tijden) {
+    const eind = tot <= van ? tot + 1440 : tot
+    if (minuut >= van && minuut < eind) return { open: true, tot: hhmm(eind), vanaf: null }
+  }
+  const later = tijden.map(([van]) => van).filter((van) => van > minuut).sort((a, b) => a - b)[0]
+  return { open: false, tot: null, vanaf: later !== undefined ? hhmm(later) : null }
+}

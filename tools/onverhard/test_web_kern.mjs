@@ -677,3 +677,18 @@ test('rondjes kiezen geen hoekpunt aan het eind van een doodlopend pad', () => {
     for (const r of z.rondjes) for (const v of r.via) assert.equal(dood[v], 0, 'hoekpunt op een doodlopend pad')
   }
 })
+
+test('openingstijden: gangbare OSM-notaties, open en dicht, en te ingewikkeld', () => {
+  const op = (dag, uur, min = 0) => new Date(2026, 10, 15 + ((dag - 0 + 7) % 7), uur, min) // 15 nov 2026 is een zondag
+  const t = 'Mo-Sa 08:00-21:00; Su 10:00-18:00'
+  assert.deepEqual(K.isOpen(t, op(1, 12)), { open: true, tot: '21:00', vanaf: null })
+  assert.deepEqual(K.isOpen(t, op(1, 7)), { open: false, tot: null, vanaf: '08:00' })
+  assert.deepEqual(K.isOpen(t, op(0, 9)), { open: false, tot: null, vanaf: '10:00' })
+  assert.equal(K.isOpen(t, op(0, 17, 59)).open, true)
+  assert.equal(K.isOpen('24/7').open, true)
+  assert.equal(K.isOpen('Mo-Fr 07:00-12:00,13:00-17:00; Sa,Su off', op(3, 12, 30)).open, false)
+  assert.equal(K.isOpen('Mo-Fr 07:00-12:00,13:00-17:00; Sa,Su off', op(3, 13, 30)).open, true)
+  assert.equal(K.isOpen('Mo-Fr 07:00-12:00,13:00-17:00; Sa,Su off', op(6, 13)).open, false)
+  assert.equal(K.isOpen('Fr-Sa 18:00-02:00', op(5, 23)).open, true) // over middernacht
+  assert.equal(K.isOpen('Apr-Sep: Mo-Su 10:00-18:00'), null)
+})

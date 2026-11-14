@@ -1217,7 +1217,59 @@ async function voegWaterToe(lijst, signal, meld) {
   if (tegels.size > 250) return
   meld('Water onderweg zoeken')
   const pois = (await haalTegels([...tegels.values()], signal)).filter((e) => e.type === 'poi')
-  for (const o of lijst) o.water = G.waterLangs(o.analyse.xy, pois, 300)
+  for (const o of lijst) o.water = G.waterLangs(o.analyse.xy, pois)
+}
+
+/**
+ * Openingstijden bij de waterpunten, uit OpenStreetMap via Overpass (de
+ * kaarttegels hebben ze niet). Mag mislukken: dan staan er geen tijden bij.
+ * Zet p.open (de opening_hours-tekst) bij elk punt dat een tijd heeft.
+ */
+export async function haalOpeningstijden(punten, signal) {
+  const mogelijk = punten.filter((p) => p.soort !== 'water')
+  if (!mogelijk.length) return 0
+  const lat = mogelijk.map((p) => p.lat)
+  const lon = mogelijk.map((p) => p.lon)
+  const bb = [Math.min(...lat) - 0.002, Math.min(...lon) - 0.003, Math.max(...lat) + 0.002, Math.max(...lon) + 0.003].map((x) => x.toFixed(5)).join(',')
+  const vraagTekst = `[out:json][timeout:20];(nwr["opening_hours"]["shop"~"^(supermarket|convenience|bakery)$"](${bb});` +
+    `nwr["opening_hours"]["amenity"~"^(cafe|restaurant|fast_food|pub|bar|ice_cream|toilets|fuel)$"](${bb}););out center tags;`
+  const body = new URLSearchParams({ data: vraagTekst })
+  let elementen = null
+  for (const url of OVERPASS) {
+    try {
+      const r = await vraag(OSM_BRON, url, { method: 'POST', body, signal, tijdslimiet: 25000 }, 1)
+      if (r.ok) {
+        elementen = (await r.json()).elements
+        break
+      }
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+    }
+  }
+  if (!elementen) return 0
+  let gevonden = 0
+  for (const p of mogelijk) {
+    const [px, py] = K.naarRd(p.lon, p.lat)
+    let beste = null
+    let besteD = 60
+    for (const e of elementen) {
+      const la = e.lat ?? (e.center && e.center.lat)
+      const lo = e.lon ?? (e.center && e.center.lon)
+      if (la === undefined) continue
+      const [x, y] = K.naarRd(lo, la)
+      const d = Math.hypot(x - px, y - py)
+      const zelfdeNaam = p.naam && e.tags.name && p.naam === e.tags.name
+      if (d < besteD || (zelfdeNaam && d < 150)) {
+        besteD = zelfdeNaam ? 0 : d
+        beste = e
+      }
+    }
+    if (beste) {
+      p.open = beste.tags.opening_hours
+      gevonden++
+    }
+  }
+  return gevonden
 }
 
 // ---------- Hoogtemeters (AHN via PDOK) ----------

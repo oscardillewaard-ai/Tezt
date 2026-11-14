@@ -419,3 +419,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 .loper::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; border: 3px solid var(--route); opacity: .6; animation: puls 1.2s ease-out infinite; }
 @keyframes puls { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.3); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .loper::after { animation: none; } }
+
+.waterfilter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.waterfilter button { min-height: 34px; padding: 4px 10px; border-radius: 999px; font-size: 14px; }
+.waterfilter button[aria-pressed="true"] { background: var(--balk); color: var(--route); border-color: var(--balk); }
+.waterlijst .open { color: #2f7a35; font-weight: 600; }
+.waterlijst .dicht { color: var(--fout-inkt); font-weight: 600; }
+:root[data-theme="dark"] .waterlijst .open { color: #7fd38a; }

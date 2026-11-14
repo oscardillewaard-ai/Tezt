@@ -2,7 +2,7 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
-import { importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { haalOpeningstijden, importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -1085,6 +1085,18 @@ el('tempo').addEventListener('click', (e) => {
 const waterLaag = L.layerGroup().addTo(kaart)
 const WATER = { water: ['💧', 'Drinkwater'], horeca: ['☕', 'Horeca'], winkel: ['🛒', 'Winkel'], toilet: ['🚻', 'Toilet'], tank: ['⛽', 'Tankstation'] }
 let waterAlles = false
+const waterAan = new Set(['water', 'winkel']) // standaard alleen drinkwater en winkels; de rest met een tik erbij
+let waterOpKaart = true
+let tijdenGehaald = null // de water-uitslag waarvoor de openingstijden al gehaald zijn
+
+/** Korte tekst over open/dicht, of '' als er geen (bruikbare) tijden zijn. */
+function openTekst(p) {
+  if (!p.open) return ''
+  const o = K.isOpen(p.open)
+  if (!o) return `<small>${veilig(p.open.slice(0, 40))}</small>`
+  if (o.open) return `<small class="open">nu open${o.tot ? ` · tot ${o.tot}` : ''}</small>`
+  return `<small class="dicht">nu dicht${o.vanaf ? ` · open om ${o.vanaf}` : ''}</small>`
+}
 
 function tekenWater() {
   waterLaag.clearLayers()
@@ -1098,13 +1110,42 @@ function tekenWater() {
   const aantalWater = w.punten.filter((p) => p.soort === 'water').length
   el('waterkop').textContent = `Water onderweg · ${aantalWater} tap${aantalWater === 1 ? '' : 'punten'} · langste stuk zonder ${nl(w.langsteZonder / 1000, 1)} km`
   const kanVia = !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
+  // filterknoppen per soort, met aantallen
+  const filter = el('waterfilter')
+  filter.innerHTML = ''
+  for (const [soort, [ico, naam]] of Object.entries(WATER)) {
+    const n = w.punten.filter((p) => p.soort === soort).length
+    if (!n) continue
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.className = 'klein'
+    knop.setAttribute('aria-pressed', String(waterAan.has(soort)))
+    knop.textContent = `${ico} ${naam} ${n}`
+    knop.addEventListener('click', () => {
+      if (waterAan.has(soort)) waterAan.delete(soort)
+      else waterAan.add(soort)
+      tekenWater()
+    })
+    filter.appendChild(knop)
+  }
+  const kaartKnop = document.createElement('button')
+  kaartKnop.type = 'button'
+  kaartKnop.className = 'klein'
+  kaartKnop.setAttribute('aria-pressed', String(waterOpKaart))
+  kaartKnop.textContent = waterOpKaart ? '📍 Op kaart' : '📍 Niet op kaart'
+  kaartKnop.addEventListener('click', () => {
+    waterOpKaart = !waterOpKaart
+    tekenWater()
+  })
+  filter.prepend(kaartKnop)
+  const gefilterd = w.punten.filter((p) => waterAan.has(p.soort))
   const lijst = el('waterlijst')
   lijst.innerHTML = ''
-  const tonen = waterAlles ? w.punten : w.punten.slice(0, 10)
+  const tonen = waterAlles ? gefilterd : gefilterd.slice(0, 10)
   for (const p of tonen) {
     const [ico, soort] = WATER[p.soort]
     const li = document.createElement('li')
-    li.innerHTML = `<span class="ico">${ico}</span><span class="km">km ${nl(p.km, 1)}</span><span>${veilig(p.naam || soort)}<small>${Math.round(p.afstand)} m van de route</small></span>`
+    li.innerHTML = `<span class="ico">${ico}</span><span class="km">km ${nl(p.km, 1)}</span><span>${veilig(p.naam || soort)}<small>${Math.round(p.afstand)} m van de route</small>${openTekst(p)}</span>`
     if (kanVia) {
       const knop = document.createElement('button')
       knop.type = 'button'
@@ -1117,15 +1158,15 @@ function tekenWater() {
     })
     lijst.appendChild(li)
   }
-  el('waterMeer').hidden = waterAlles || w.punten.length <= 10
-  for (const p of w.punten) {
+  el('waterMeer').hidden = waterAlles || gefilterd.length <= 10
+  for (const p of waterOpKaart ? gefilterd : []) {
     const [ico, soort] = WATER[p.soort]
     const m = L.marker([p.lat, p.lon], {
       icon: L.divIcon({ className: '', html: `<div class="waterico ${p.soort}">${ico}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       keyboard: false, zIndexOffset: 500,
     }).addTo(waterLaag)
     const inhoud = document.createElement('div')
-    inhoud.innerHTML = `<b>${veilig(p.naam || soort)}</b><br>${soort} · km ${nl(p.km, 1)} · ${Math.round(p.afstand)} m van de route<br>`
+    inhoud.innerHTML = `<b>${veilig(p.naam || soort)}</b><br>${soort} · km ${nl(p.km, 1)} · ${Math.round(p.afstand)} m van de route${p.open ? `<br>${veilig(p.open)}` : ''}<br>`
     if (kanVia) {
       const knop = document.createElement('button')
       knop.type = 'button'
@@ -1139,6 +1180,17 @@ function tekenWater() {
     m.bindPopup(inhoud)
   }
 }
+async function haalTijdenErbij() {
+  const w = keuze().water
+  if (!w || tijdenGehaald === w || !w.punten.some((p) => p.soort !== 'water')) return
+  tijdenGehaald = w
+  try {
+    if (await haalOpeningstijden(w.punten)) tekenWater()
+  } catch {
+    // geen tijden: dan niet
+  }
+}
+
 el('waterMeer').addEventListener('click', () => {
   waterAlles = true
   tekenWater()
@@ -1555,6 +1607,7 @@ function toonResultaat(nieuw) {
   tekenOpties()
   tekenProfiel()
   tekenWater()
+  haalTijdenErbij()
   tekenAlternatieven()
   tekenRoute(nieuw)
   tekenBalken()

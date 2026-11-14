@@ -1148,7 +1148,8 @@ export function laatLos(g, knopen, segs, vast, index, { venster = null } = {}) {
  * de start: [{soort, naam, lat, lon, km, afstand, index}], plus het langste
  * stuk zonder waterpunt (in meter, start en finish tellen als waterpunt).
  */
-export function waterLangs(xy, pois, max = 300) {
+export function waterLangs(xy, pois, max = { winkel: 500, standaard: 300 }) {
+  const maxVoor = (soort) => (typeof max === 'number' ? max : max[soort] ?? max.standaard)
   const opgeteld = [0]
   for (let i = 1; i < xy.length; i++) opgeteld.push(opgeteld[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
   // segmenten van de route in een rooster van 200 m (een lang recht stuk in alle cellen die het raakt)
@@ -1170,11 +1171,11 @@ export function waterLangs(xy, pois, max = 300) {
     const [x, y] = K.naarRd(p.lon, p.lat)
     if (gezien.some(([s, gx, gy]) => s === p.soort && Math.hypot(gx - x, gy - y) < 15)) continue // zelfde punt uit twee tegels
     let beste = -1
-    let besteD = max
+    let besteD = maxVoor(p.soort)
     let besteKm = 0
     const cx = Math.floor(x / 200)
     const cy = Math.floor(y / 200)
-    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
       for (const i of rooster.get(cx + dx + ',' + (cy + dy)) || []) {
         const [ax, ay] = xy[i - 1]
         const [bx, by] = xy[i]
