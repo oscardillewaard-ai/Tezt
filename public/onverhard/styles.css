@@ -304,3 +304,72 @@ details.blok > :not(summary) { margin-bottom: 8px; }
 
 .kopknoppen { display: flex; gap: 8px; flex: none; }
 #opnieuw { font: 700 15px/1 var(--kop); text-transform: uppercase; letter-spacing: .06em; padding: 4px 10px; }
+
+/* stappen: elke stap een eigen kaart met een nummer; klaar = geel met een vinkje */
+.stap { position: relative; background: var(--vlak); border: 1.5px solid var(--rand); border-radius: 14px;
+        padding: 12px 14px 14px; margin-top: 14px; box-shadow: 0 2px 0 rgb(20 26 18 / .06); }
+.stap:first-child { margin-top: 16px; }
+.stap + .stap::before, .stap + #instellingen::before { content: ''; position: absolute; left: 27px; top: -16px; height: 15px; width: 3px;
+        background: repeating-linear-gradient(to bottom, var(--route) 0 5px, transparent 5px 9px); }
+.stapkop { display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+           font: 700 17px/1 var(--kop); text-transform: uppercase; letter-spacing: .07em; color: var(--inkt); }
+.stapnr { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%;
+          background: var(--balk); color: var(--route); border: 2px solid var(--balk); font: 700 16px/1 var(--kop);
+          transition: background .25s, color .25s, transform .25s; }
+.stapnr::before { content: attr(data-nr); }
+.stap.klaar .stapnr { background: var(--route); color: var(--route-inkt); border-color: var(--route-inkt); }
+.stap.klaar .stapnr::before { content: '✓'; }
+.stap.actief { border-color: var(--inkt); box-shadow: 0 0 0 1.5px var(--inkt), 0 4px 14px rgb(20 26 18 / .12); }
+.stap.actief .stapnr { transform: scale(1.08); }
+.stap > .zoek:first-of-type, .stap > .keuze { margin-top: 0; }
+.stap .hint:empty { display: none; }
+details.blok.stap { border-top: 1.5px solid var(--rand); padding-top: 0; padding-bottom: 0; }
+details.blok.stap > summary { gap: 10px; align-items: center; }
+details.blok.stap[open] { padding-bottom: 12px; }
+#plan { margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) { .stapnr { transition: none; } }
+
+/* ---------- kennismaking ---------- */
+#intro { width: min(92vw, 440px); max-width: none; padding: 0; border-radius: 20px; overflow: hidden; color: var(--balk-tekst);
+         background: linear-gradient(rgb(24 40 31 / .86), rgb(24 40 31 / .86)), url('thema/contours.svg') 0 0 / 360px 240px repeat, #1f3328;
+         box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
+#intro::backdrop { background: rgb(10 18 12 / .7); backdrop-filter: blur(2px); }
+#intro[open] { animation: intro-in .35s cubic-bezier(.2, .9, .3, 1.2); }
+.intro-dia { padding: 18px 22px 6px; text-align: center; }
+.intro-dia:not([hidden]) { animation: dia-in .4s ease-out; }
+.intro-dia svg { width: 100%; height: auto; display: block; margin-bottom: 6px; }
+.intro-dia h2 { font: 700 28px/1.1 var(--kop); text-transform: uppercase; letter-spacing: .08em; color: var(--route); margin: 6px 0 6px; }
+.intro-dia p { color: #f3f1e4; font-size: 16px; margin: 0 0 6px; min-height: 2.9em; }
+.hoogtelijnen path { fill: none; stroke: rgb(255 255 255 / .14); stroke-width: 1.2; }
+.route { fill: none; stroke: #ffcb05; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; }
+.teken { stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken 2.2s .4s ease-in-out forwards; }
+.teken.laat { animation-delay: 1s; }
+.loper { fill: #fff; stroke: #1f3328; stroke-width: 3; }
+.pin circle { fill: #1f3328; stroke: #fff; stroke-width: 3; }
+.pin text, .teller, .hm { fill: #ffcb05; font: 700 15px var(--kop); text-anchor: middle; }
+.teller { font-size: 30px; fill: #fff; opacity: 0; animation: verschijn .4s 1s forwards; }
+.pin { animation: val .6s cubic-bezier(.3, 1.6, .5, 1) both; transform-origin: 160px 150px; }
+.gebied { fill: rgb(255 203 5 / .08); stroke: #ffcb05; stroke-width: 3.5; stroke-dasharray: 1; stroke-linejoin: round; }
+.binnen { fill: none; stroke: #39b54a; stroke-width: 4.5; stroke-linecap: round; opacity: 0; animation: verschijn .6s 2.4s forwards; }
+.pen path { fill: #fff; stroke: #1f3328; stroke-width: 1.5; }
+.seg { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken .7s ease-out forwards; }
+.s1 { stroke: #2fae3a; animation-delay: .3s; } .s2 { stroke: #eda100; animation-delay: 1s; }
+.s3 { stroke: #2fae3a; animation-delay: 1.7s; } .s4 { stroke: #9085e9; animation-delay: 2.4s; }
+.profiel { fill: none; stroke: #e0a35a; stroke-width: 2.5; stroke-linejoin: round; }
+.hm { text-anchor: end; font-size: 18px; opacity: 0; animation: verschijn .4s 2.6s forwards; }
+.intro-voet { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px 18px; }
+.intro-voet .klein { background: transparent; border-color: rgb(255 255 255 / .3); color: #dfe3cf; font-size: 14px; }
+.intro-voet .hoofd { min-width: 120px; min-height: 46px; }
+.intro-stippen { display: flex; gap: 7px; }
+.intro-stippen i { width: 8px; height: 8px; border-radius: 4px; background: rgb(255 255 255 / .3); transition: width .25s, background .25s; }
+.intro-stippen i.aan { width: 22px; background: #ffcb05; }
+@keyframes teken { to { stroke-dashoffset: 0; } }
+@keyframes verschijn { to { opacity: 1; } }
+@keyframes val { 0% { transform: translateY(-60px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes intro-in { from { transform: translateY(24px) scale(.96); opacity: 0; } }
+@keyframes dia-in { from { transform: translateX(18px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #intro[open], .intro-dia:not([hidden]), .pin { animation: none; }
+  .teken, .seg { animation: none; stroke-dashoffset: 0; }
+  .teller, .binnen, .hm { animation: none; opacity: 1; }
+}

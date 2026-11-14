@@ -36,12 +36,15 @@
             <p class="sub">Trailroutes over onverhard</p>
           </div>
           <div class="kopknoppen">
+            <button type="button" id="uitleg" class="klein" aria-label="Uitleg">?</button>
             <button type="button" id="opnieuw" class="klein">↺ Opnieuw</button>
             <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
           </div>
         </header>
 
         <section id="invoer">
+          <div class="stap klaar" id="stap1">
+          <h3 class="stapkop"><span class="stapnr"></span>Soort route</h3>
           <div class="keuze modi" id="modus" role="group" aria-label="Soort route">
             <button type="button" data-modus="route" aria-pressed="true">A naar B</button>
             <button type="button" data-modus="rondje" aria-pressed="false">Rondje</button>
@@ -49,7 +52,10 @@
             <button type="button" data-modus="straten" aria-pressed="false">Elke straat</button>
             <button type="button" data-modus="tekenen" aria-pressed="false">Tekenen</button>
           </div>
+          </div>
 
+          <div class="stap" id="stap2">
+          <h3 class="stapkop"><span class="stapnr"></span><span id="stap2kop">Waar</span></h3>
           <div class="zoek">
             <input type="search" id="zoek" placeholder="Zoek een plek, adres of postcode" autocomplete="off" enterkeyhint="search" aria-label="Zoek een plek" aria-controls="zoekresultaten" />
             <ul id="zoekresultaten" role="listbox" hidden></ul>
@@ -76,7 +82,10 @@
             <button type="button" id="keerom">Keer om</button>
             <button type="button" id="wis">Wis punten</button>
           </div>
+          </div>
 
+          <div class="stap klaar" id="stap3">
+          <h3 class="stapkop"><span class="stapnr"></span>Lengte</h3>
           <label class="veld" id="kmveld" hidden>
             <span>Lengte van het rondje</span>
             <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
@@ -88,8 +97,9 @@
               <option value="kronkel">Kronkelen in de buurt</option>
             </select>
           </label>
-          <details class="blok" id="instellingen">
-            <summary>Instellingen <small id="instSamenvatting"></small></summary>
+          </div>
+          <details class="blok stap klaar" id="instellingen">
+            <summary><span class="stapnr"></span>Instellingen <small id="instSamenvatting"></small></summary>
           <label class="veld">
             <span>Soort paden</span>
             <select id="trail">
@@ -179,6 +189,49 @@
         </details>
       </main>
     </div>
+    <dialog id="intro" aria-label="Kennismaking">
+      <div class="intro-dia" data-dia="0">
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
+          <defs><mask id="m0"><path class="teken" pathLength="1" d="M24,160 C70,120 96,176 140,140 S200,52 248,84 S296,150 300,120" stroke="#fff" stroke-width="12" fill="none"/></mask></defs>
+          <path class="route" mask="url(#m0)" d="M24,160 C70,120 96,176 140,140 S200,52 248,84 S296,150 300,120"/>
+          <circle class="loper" r="7"><animateMotion dur="3.2s" begin="0.4s" fill="freeze" path="M24,160 C70,120 96,176 140,140 S200,52 248,84 S296,150 300,120"/></circle>
+        </svg>
+        <h2>Onverhard</h2><p>Trailroutes over zand, bos en duin.</p>
+      </div>
+      <div class="intro-dia" data-dia="1" hidden>
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
+          <defs><mask id="m1"><path class="teken laat" pathLength="1" d="M160,150 C100,150 70,110 90,75 C110,40 175,30 215,55 C255,80 250,130 215,145 C195,153 180,150 160,150" stroke="#fff" stroke-width="12" fill="none"/></mask></defs>
+          <path class="route" mask="url(#m1)" d="M160,150 C100,150 70,110 90,75 C110,40 175,30 215,55 C255,80 250,130 215,145 C195,153 180,150 160,150"/>
+          <g class="pin"><circle cx="160" cy="150" r="13"/><text x="160" y="155">S</text></g>
+          <text class="teller" x="160" y="102">0 km</text>
+        </svg>
+        <h2>Rondje</h2><p>Kies een start en een lengte. Klaar in seconden.</p>
+      </div>
+      <div class="intro-dia" data-dia="2" hidden>
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
+          <path class="gebied teken" pathLength="1" d="M70,60 C120,25 230,30 260,70 C290,110 250,170 180,165 C110,162 50,140 52,100 C53,80 60,68 70,60"/>
+          <path class="binnen" d="M110,110 C100,85 140,62 175,70 C210,78 225,110 200,128 C175,145 120,135 110,110"/>
+          <g class="pen"><path d="M0,0 l6,-16 l6,4 z" /><animateMotion dur="2.2s" fill="freeze" path="M70,60 C120,25 230,30 260,70 C290,110 250,170 180,165 C110,162 50,140 52,100 C53,80 60,68 70,60"/></g>
+        </svg>
+        <h2>Teken op de kaart</h2><p>Een gebied, elke straat, of je eigen lijn.</p>
+      </div>
+      <div class="intro-dia" data-dia="3" hidden>
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
+          <path class="seg s1" pathLength="1" d="M30,90 C60,70 90,70 120,80"/>
+          <path class="seg s2" pathLength="1" d="M120,80 C150,90 165,60 195,55"/>
+          <path class="seg s3" pathLength="1" d="M195,55 C225,50 245,75 270,70"/>
+          <path class="seg s4" pathLength="1" d="M270,70 C285,67 295,80 300,90"/>
+          <path class="profiel teken laat" pathLength="1" d="M30,180 L60,170 L80,175 L110,150 L130,158 L160,135 L185,150 L215,140 L240,160 L270,150 L300,172"/>
+          <text class="hm" x="300" y="128">↗ 64 m</text>
+        </svg>
+        <h2>Ondergrond en hoogte</h2><p>Per stuk de ondergrond, plus hoogtemeters.</p>
+      </div>
+      <div class="intro-voet">
+        <button type="button" id="introSla" class="klein">Overslaan</button>
+        <div class="intro-stippen" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <button type="button" id="introVerder" class="hoofd">Verder</button>
+      </div>
+    </dialog>
     <div class="tip" id="tip"></div>
     <dialog id="foto"><form method="dialog"><button aria-label="Sluiten">Sluiten</button></form><img alt="" /><p></p></dialog>
 

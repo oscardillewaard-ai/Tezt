@@ -255,6 +255,18 @@ function tekenPuntenlijst() {
   const rondje = staat.modus === 'rondje'
   const n = staat.punten.length
   const tm = tekenModus()
+  // stappen: kop van stap 2, welke stap klaar is, en nummers (stap 3 alleen als er een lengte te kiezen is)
+  el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken het gebied', tekenen: 'Teken je route' }[staat.modus]
+  const plaatsKlaar = tm ? !!tekening() : rondje ? n >= 1 : n >= 2
+  el('stap2').classList.toggle('klaar', plaatsKlaar)
+  el('stap2').classList.toggle('actief', !plaatsKlaar)
+  const metLengte = staat.modus === 'gebied' || (rondje && n <= 1)
+  el('stap3').hidden = !metLengte
+  let nr = 1
+  for (const id of ['stap1', 'stap2', 'stap3', 'instellingen']) {
+    if (el(id).hidden) continue
+    el(id).querySelector('.stapnr').dataset.nr = String(nr++)
+  }
   el('tekenpaneel').hidden = !tm
   el('wegenveld').hidden = staat.modus !== 'straten'
   el('tekenVierkant').hidden = staat.modus === 'tekenen'
@@ -1207,6 +1219,73 @@ el('deel').addEventListener('click', async () => {
   }, 2000)
 })
 
+// ---------- Kennismaking ----------
+const INTRO = 'onverhard.intro'
+let introDia = 0
+function toonDia(i) {
+  introDia = i
+  const dias = [...document.querySelectorAll('.intro-dia')]
+  dias.forEach((d, k) => {
+    d.hidden = k !== i
+    // animaties opnieuw starten: de svg even vervangen door een kopie
+    if (k === i) {
+      const svg = d.querySelector('svg')
+      svg.replaceWith(svg.cloneNode(true))
+    }
+  })
+  document.querySelectorAll('.intro-stippen i').forEach((s, k) => s.classList.toggle('aan', k === i))
+  el('introVerder').textContent = i === dias.length - 1 ? 'Aan de slag' : 'Verder'
+  if (i === 1) telOp(document.querySelector('.intro-dia[data-dia="1"] .teller'))
+}
+function telOp(tekst) {
+  if (!tekst) return
+  const start = performance.now() + 1000
+  const stap = (nu) => {
+    const t = Math.max(0, Math.min(1, (nu - start) / 1600))
+    tekst.textContent = `${Math.round(13 * (1 - (1 - t) ** 3))} km`
+    if (t < 1 && el('intro').open) requestAnimationFrame(stap)
+  }
+  requestAnimationFrame(stap)
+}
+function sluitIntro() {
+  el('intro').close()
+  try {
+    localStorage.setItem(INTRO, '1')
+  } catch {
+    // zonder opslag zie je hem de volgende keer weer
+  }
+}
+function openIntro() {
+  if (!el('intro').open) el('intro').showModal()
+  toonDia(0)
+}
+el('introVerder').addEventListener('click', () => {
+  if (introDia >= document.querySelectorAll('.intro-dia').length - 1) sluitIntro()
+  else toonDia(introDia + 1)
+})
+el('introSla').addEventListener('click', sluitIntro)
+el('intro').addEventListener('cancel', (e) => {
+  e.preventDefault()
+  sluitIntro()
+})
+el('intro').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' && introDia < 3) toonDia(introDia + 1)
+  if (e.key === 'ArrowLeft' && introDia > 0) toonDia(introDia - 1)
+})
+// vegen op de telefoon
+let veegX = null
+el('intro').addEventListener('pointerdown', (e) => {
+  veegX = e.clientX
+})
+el('intro').addEventListener('pointerup', (e) => {
+  if (veegX === null) return
+  const dx = e.clientX - veegX
+  veegX = null
+  if (dx < -40 && introDia < 3) toonDia(introDia + 1)
+  else if (dx > 40 && introDia > 0) toonDia(introDia - 1)
+})
+el('uitleg').addEventListener('click', openIntro)
+
 // ---------- Start ----------
 const hash = laad()
 zetThema(themaKeuze())
@@ -1237,6 +1316,14 @@ window.addEventListener('hashchange', () => {
   const h = new URLSearchParams(location.hash.slice(1))
   if (h.get('p') || h.get('t')) location.reload()
 })
+// de eerste keer (zonder gedeelde link): even kennismaken
+let introGezien = true
+try {
+  introGezien = localStorage.getItem(INTRO) === '1'
+} catch {
+  // geen opslag: niet elke keer lastigvallen
+}
+if (!introGezien && !hash.get('p') && !hash.get('t')) openIntro()
 // #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
 if (hash.get('plan') && !el('plan').disabled) planNu()
 // voor de end-to-end-test
