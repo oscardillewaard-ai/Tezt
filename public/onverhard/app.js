@@ -44,7 +44,7 @@ function leesKleuren() {
 leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten' }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true }
 const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
 const tekenModus = () => TEKENMODI.has(staat.modus)
 /** de tekening die bij deze modus hoort: een gebied (vlak) of een lijn */
@@ -294,6 +294,7 @@ function tekenPuntenlijst() {
   }
   el('tekenpaneel').hidden = !tm
   el('wegenveld').hidden = staat.modus !== 'straten'
+  el('doodveld').hidden = staat.modus !== 'straten'
   el('tekenVierkant').hidden = staat.modus === 'tekenen'
   el('tekenWis').hidden = !tekening()
   el('locatie').hidden = staat.modus === 'tekenen'
@@ -409,6 +410,17 @@ function stopTekenen() {
   el('tekenVierkant').setAttribute('aria-pressed', 'false')
 }
 
+/** Ligt een punt [lat, lon] binnen (of hooguit 150 m buiten) een getekend vlak? */
+function binnenVlak(p, vlak) {
+  let binnen = false
+  for (let i = 0, j = vlak.length - 1; i < vlak.length; j = i++) {
+    const [ai, bi] = vlak[i]
+    const [aj, bj] = vlak[j]
+    if (bi > p[1] !== bj > p[1] && p[0] < ((aj - ai) * (p[1] - bi)) / (bj - bi) + ai) binnen = !binnen
+  }
+  return binnen || vlak.some((q) => kaart.distance(p, q) < 150)
+}
+
 function rechthoek(a, b) {
   return [a, [a[0], b[1]], b, [b[0], a[1]]]
 }
@@ -458,7 +470,14 @@ function eindeSchets(e) {
   if (punten.length >= nodig && omvang > 30) {
     onthoud()
     if (staat.modus === 'tekenen') staat.lijn = punten
-    else staat.vlak = punten
+    else {
+      staat.vlak = punten
+      // een startpunt van eerder dat buiten het nieuwe gebied ligt, hoort er niet meer bij
+      if (staat.punten.length && !binnenVlak(staat.punten[0], punten)) {
+        staat.punten = []
+        tekenPunten()
+      }
+    }
     toonFout('')
   } else toonFout('Die tekening was te klein. Teken nog eens, wat groter.')
   bewaar()
@@ -477,6 +496,10 @@ el('tekenWis').addEventListener('click', () => {
   bewaar()
   tekenTekening()
   tekenPuntenlijst()
+})
+el('dood').addEventListener('change', () => {
+  staat.dood = el('dood').checked
+  bewaar()
 })
 el('wegen').addEventListener('change', () => {
   onthoud()
@@ -690,6 +713,7 @@ async function planNu() {
       modus: tekenModus() ? staat.modus : undefined,
       tekening: tekenModus() ? tekening() : undefined,
       wegen: staat.wegen,
+      zonderDoodlopend: staat.dood !== false,
       punten: rondje ? staat.punten.slice(0, 2) : staat.punten,
       rondjeKm: rondje || staat.modus === 'gebied' ? staat.km : null,
       law: staat.law,
@@ -928,7 +952,10 @@ function tekenTabel() {
   if (plan.law > 0.005) delen.push(`${pct(plan.law)} LAW`)
   const ronden = uitslag.opties[gekozen] && uitslag.opties[gekozen].ronden
   if (ronden > 1) delen.push(`${ronden} rondjes`)
-  else if (a.dubbel > 0.02) delen.push(`${pct(a.dubbel)} dubbel`)
+  else {
+    const dub = keuze().dubbel ?? a.dubbel
+    if (dub > 0.02) delen.push(`${pct(dub)} dubbel`)
+  }
   const noot = delen.join(' · ')
   el('noot').textContent = noot
 }
@@ -1426,6 +1453,7 @@ el('luchtfoto').checked = !!staat.luchtfoto
 vatSamen()
 el('vorm').value = staat.vorm === 'kronkel' ? 'kronkel' : 'lus'
 el('wegen').value = staat.wegen
+el('dood').checked = staat.dood !== false
 for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
 puntenGewijzigd()
 tekenTekening()

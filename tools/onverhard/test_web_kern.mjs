@@ -593,3 +593,24 @@ test('AHN-GeoTIFF lezen (float32, zlib, floating point predictor) en hoogtemeter
   assert.deepEqual(H.blokkenVoor([[82005, 451800], [82600, 451800]]), [[82000, 451500], [82500, 451500]])
   assert.ok(H.ahnUrl(82000, 451500).includes('SUBSET=x(82000,82500)') && H.ahnUrl(82000, 451500).includes('SCALESIZE=x(50),y(50)'))
 })
+
+test('doodlopende takken: een doodlopende straat (ook met een zijtak) valt af, de rest niet', () => {
+  const p = (dx, dy) => ({ lat: 52 + dy / 111320, lon: 5 + dx / 68600 })
+  const w = (id, a, b) => ({ type: 'way', id, tags: { highway: 'residential' }, geometry: [p(...a), p(...b)] })
+  // een vierkant blok (rondweg) met een doodlopende straat naar binnen, en daaraan nog een zijtakje
+  const el = [
+    w(1, [0, 0], [200, 0]), w(2, [200, 0], [200, 200]), w(3, [200, 200], [0, 200]), w(4, [0, 200], [0, 0]),
+    w(5, [0, 100], [80, 100]), w(6, [80, 100], [80, 140]),
+  ]
+  const g = G.bouwGraaf(el)
+  const dood = G.doodlopendeTakken(g)
+  let doodM = 0
+  for (let s = 0; s < dood.length; s++) if (dood[s]) doodM += g.lengte[s]
+  assert.ok(Math.abs(doodM - 120) < 2, `${doodM} m doodlopend`)
+  const met = G.vereisteSegmenten(g, 'straten')
+  const zonder = G.vereisteSegmenten(g, 'straten', { zonderDoodlopend: true })
+  const som = (v) => [...v].reduce((m, x, s) => m + (x ? g.lengte[s] : 0), 0)
+  assert.ok(Math.abs(som(met) - som(zonder) - 120) < 2)
+  const r = G.doorElkeStraat(g, G.dichtsteKnoop(g, ...K.naarRd(5, 52)).knoop, zonder)
+  assert.ok(Math.abs(r.meter - 800) < 5, `rondje om het blok: ${r.meter} m`)
+})

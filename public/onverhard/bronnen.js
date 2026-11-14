@@ -1038,9 +1038,15 @@ async function padenVoorTekening(punten, marge, instel, signal, meld) {
   return { o, elementen }
 }
 
-/** Startknoop: het getikte startpunt, anders de plek binnen het gebied het dichtst bij het midden. */
+/**
+ * Startknoop: het getikte startpunt als dat in (of vlak bij) het gebied ligt,
+ * anders de plek binnen het gebied het dichtst bij het midden.
+ */
 function startVoor(g, startpunt, o, binnen) {
-  if (startpunt) return G.dichtsteKnoop(g, ...K.naarRd(startpunt[1], startpunt[0])).knoop
+  if (startpunt) {
+    const k = G.dichtsteKnoop(g, ...K.naarRd(startpunt[1], startpunt[0])).knoop
+    if (!binnen || binnen[k] || o.rd.some(([x, y]) => Math.hypot(g.x[k] - x, g.y[k] - y) < 300)) return k
+  }
   let beste = -1
   let besteD = Infinity
   for (let i = 0; i < g.n; i++) {
@@ -1089,7 +1095,7 @@ export async function planStraten(instel, bgt, meld, signal) {
   const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5, gebied: ring, buitenFactor: 1 })
   const binnen = G.knopenBinnen(g, ring)
   const start = startVoor(g, instel.start, o, binnen)
-  const vereist = G.vereisteSegmenten(g, instel.wegen || 'straten')
+  const vereist = G.vereisteSegmenten(g, instel.wegen || 'straten', { zonderDoodlopend: instel.zonderDoodlopend !== false })
   const r = G.doorElkeStraat(g, start, vereist)
   if (!r || r.segs.length < 2) throw new BronFout('Tekening', `geen ${instel.wegen === 'paden' ? 'paden' : 'straten'} gevonden in dit gebied`)
   let gemist = 0
@@ -1101,7 +1107,7 @@ export async function planStraten(instel, bgt, meld, signal) {
   const km1 = (m) => (m / 1000).toFixed(1).replace('.', ',')
   const waarschuwingen = []
   if (gemist > 50) waarschuwingen.push(`${km1(gemist)} km onbereikbaar, zit er niet in`)
-  return { opties: [{ traject, an }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+  return { opties: [{ traject, an, dubbel: r.extraMeter / r.meter }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
 }
 
 /** Een route over echte paden langs een getekende lijn. */
@@ -1313,7 +1319,7 @@ export async function maakPlan(opties) {
   // beter dan via BRouter. Niet bij een voorkeur voor LAW-routes (die kent alleen BRouter).
   const tekenInstel = {
     trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, tekening: opties.tekening, start: opties.punten && opties.punten[0],
-    km: opties.rondjeKm || 10, wegen: opties.wegen, paden: opties.paden, voortgang: opties.voortgang,
+    km: opties.rondjeKm || 10, wegen: opties.wegen, zonderDoodlopend: opties.zonderDoodlopend, paden: opties.paden, voortgang: opties.voortgang,
   }
   if (opties.modus === 'gebied') plan = await planGebied(tekenInstel, bgt, alternatieven, meld, opties.signal)
   else if (opties.modus === 'straten') plan = await planStraten(tekenInstel, bgt, meld, opties.signal)
@@ -1349,7 +1355,7 @@ export async function maakPlan(opties) {
       km: o.an.lengte / 1000,
       zacht: K.zachtAandeel(o.an, 'eind'),
       law: K.lawAandeel(o.an),
-      dubbel: o.an.dubbel,
+      dubbel: o.dubbel ?? o.an.dubbel, // bij elke straat: wat je echt dubbel loopt (niet: straten aan twee kanten van een gracht)
       paadjes: K.paadjesAandeel(o.an),
       strand: K.strandMeter(o.an),
       kaartje: K.kaartjeMeter(o.an),

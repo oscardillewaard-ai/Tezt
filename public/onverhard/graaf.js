@@ -721,15 +721,47 @@ const STRATEN = new Set(['residential', 'living_street', 'unclassified', 'tertia
 const PADEN = new Set(['path', 'footway', 'track', 'bridleway', 'cycleway', 'steps'])
 
 /**
- * Welke segmenten moeten erin: binnen het gebied, en van de gekozen soort
- * ('straten', 'paden' of 'alles' wat begaanbaar is).
+ * Doodlopende takken: pel het hele netwerk af vanaf de losse eindjes (knopen
+ * met één lijn), zodat ook een doodlopend stuk aan een doodlopend stuk
+ * meegaat. Een straat die alleen aan de rand van het gebied ophoudt maar
+ * daarbuiten doorloopt, is niet doodlopend (het netwerk is ruimer geladen).
+ * Geeft per segment 1 als het in een doodlopende tak ligt.
  */
-export function vereisteSegmenten(g, soort = 'straten') {
+export function doodlopendeTakken(g) {
+  const graad = new Int32Array(g.n)
+  for (let i = 0; i < g.n; i++) graad[i] = g.begin[i + 1] - g.begin[i]
+  const weg = new Uint8Array(g.lengte.length)
+  const rij = []
+  for (let i = 0; i < g.n; i++) if (graad[i] === 1) rij.push(i)
+  while (rij.length) {
+    const u = rij.pop()
+    if (graad[u] !== 1) continue
+    for (let j = g.begin[u]; j < g.begin[u + 1]; j++) {
+      const s = g.buurSeg[j]
+      if (weg[s]) continue
+      weg[s] = 1
+      graad[u] = 0
+      const v = g.buur[j]
+      graad[v] -= 1
+      if (graad[v] === 1) rij.push(v)
+      break
+    }
+  }
+  return weg
+}
+
+/**
+ * Welke segmenten moeten erin: binnen het gebied, en van de gekozen soort
+ * ('straten', 'paden' of 'alles' wat begaanbaar is). Met zonderDoodlopend
+ * vallen doodlopende takken af.
+ */
+export function vereisteSegmenten(g, soort = 'straten', { zonderDoodlopend = false } = {}) {
+  const dood = zonderDoodlopend ? doodlopendeTakken(g) : null
   const highwayVan = g.tagLijst.map((t) => (/(?:^| )highway=(\S+)/.exec(t) || [])[1] || '')
   const dienstVan = g.tagLijst.map((t) => (/(?:^| )service=(\S+)/.exec(t) || [])[1] || '')
   const uit = new Uint8Array(g.lengte.length)
   for (let s = 0; s < uit.length; s++) {
-    if (!g.binnenSeg[s] || g.factor[s] >= STRAND_FACTOR) continue
+    if (!g.binnenSeg[s] || g.factor[s] >= STRAND_FACTOR || (dood && dood[s])) continue
     const h = highwayVan[g.segTags[s]]
     const straat = STRATEN.has(h) || (h === 'service' && !dienstVan[g.segTags[s]])
     const pad = PADEN.has(h)
@@ -814,29 +846,72 @@ export function doorElkeStraat(g, start, vereist) {
   }
   const oneven = [...graad.keys()].filter((k) => graad.get(k) % 2 === 1)
   const onevenSet = new Set(oneven)
+  // afstanden tussen oneven knopen (tot de 10 dichtstbijzijnde per knoop); alleen de getallen bewaren
+  const afst = new Map()
+  const zetAfst = (u, v, d) => {
+    if (!afst.has(u)) afst.set(u, new Map())
+    if (!afst.has(v)) afst.set(v, new Map())
+    afst.get(u).set(v, d)
+    afst.get(v).set(u, d)
+  }
   const paren = []
   for (const u of oneven) {
     let gevonden = 0
-    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => v !== u && onevenSet.has(v) && ++gevonden >= 6 })
-    for (const v of oneven) if (v !== u && Number.isFinite(boom.kosten[v])) paren.push([boom.kosten[v], u, v, boom])
+    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => v !== u && onevenSet.has(v) && ++gevonden >= 10 })
+    for (const v of oneven) {
+      if (v !== u && Number.isFinite(boom.kosten[v])) {
+        zetAfst(u, v, boom.kosten[v])
+        paren.push([boom.kosten[v], u, v])
+      }
+    }
   }
+  const d = (u, v) => (afst.get(u) && afst.get(u).has(v) ? afst.get(u).get(v) : Infinity)
+  // eerst gretig: dichtstbijzijnde paren eerst
   paren.sort((p, q) => p[0] - q[0])
-  const gekoppeld = new Set()
-  for (const [, u, v, boom] of paren) {
-    if (gekoppeld.has(u) || gekoppeld.has(v)) continue
-    gekoppeld.add(u)
-    gekoppeld.add(v)
-    const p = pad(boom, v)
-    for (let i = 0; i < p.segs.length; i++) randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
+  const partner = new Map()
+  for (const [, u, v] of paren) {
+    if (partner.has(u) || partner.has(v)) continue
+    partner.set(u, v)
+    partner.set(v, u)
   }
   // nog ongekoppelde (zelden): met de dichtstbijzijnde andere ongekoppelde
-  const over = oneven.filter((u) => !gekoppeld.has(u))
+  const over = oneven.filter((u) => !partner.has(u))
   while (over.length >= 2) {
     const u = over.shift()
     const rest = new Set(over)
     const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => rest.has(v) })
     const v = over.reduce((b, k) => (boom.kosten[k] < boom.kosten[b] ? k : b), over[0])
     over.splice(over.indexOf(v), 1)
+    zetAfst(u, v, boom.kosten[v])
+    partner.set(u, v)
+    partner.set(v, u)
+  }
+  // dan verbeteren: twee paren (a,b) en (c,e) ruilen als (a,c)+(b,e) of (a,e)+(b,c) korter is
+  for (let ronde = 0; ronde < 20; ronde++) {
+    let beter = false
+    const lijst = [...partner.entries()].filter(([u, v]) => u < v)
+    for (let i = 0; i < lijst.length; i++) {
+      const [a1, b1] = lijst[i]
+      if (partner.get(a1) !== b1) continue
+      for (const c1 of afst.get(a1) ? afst.get(a1).keys() : []) {
+        const e1 = partner.get(c1)
+        if (e1 === undefined || c1 === b1 || e1 === a1) continue
+        const nu = d(a1, b1) + d(c1, e1)
+        const r1 = d(a1, c1) + d(b1, e1)
+        if (r1 < nu - 1) {
+          partner.set(a1, c1); partner.set(c1, a1); partner.set(b1, e1); partner.set(e1, b1)
+          beter = true
+          break
+        }
+      }
+    }
+    if (!beter) break
+  }
+  // de gekozen verbindingen dubbel lopen
+  for (const [u, v] of partner) {
+    if (u > v) continue
+    const boom = dijkstra(g, u, { alleenLengte: true, doel: v })
+    if (!Number.isFinite(boom.kosten[v])) continue
     const p = pad(boom, v)
     for (let i = 0; i < p.segs.length; i++) randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
   }

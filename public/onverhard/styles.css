@@ -355,7 +355,7 @@ details.blok.stap[open] { padding-bottom: 12px; }
 .seg { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken .7s ease-out forwards; }
 .s1 { stroke: #2fae3a; animation-delay: .3s; } .s2 { stroke: #eda100; animation-delay: 1s; }
 .s3 { stroke: #2fae3a; animation-delay: 1.7s; } .s4 { stroke: #9085e9; animation-delay: 2.4s; }
-.profiel { fill: none; stroke: #e0a35a; stroke-width: 2.5; stroke-linejoin: round; }
+.intro-profiel { fill: none; stroke: #e0a35a; stroke-width: 2.5; stroke-linejoin: round; }
 .hm { text-anchor: end; font-size: 18px; opacity: 0; animation: verschijn .4s 2.6s forwards; }
 .intro-voet { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px 18px; }
 .intro-voet .klein { background: transparent; border-color: rgb(255 255 255 / .3); color: #dfe3cf; font-size: 14px; }

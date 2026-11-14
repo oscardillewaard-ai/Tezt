@@ -307,7 +307,11 @@ draait in je browser; er is geen eigen server.
   knopen met een oneven aantal wegen twee aan twee koppelen (dichtstbijzijnde
   eerst) en die verbinding dubbel lopen, en dan een Euler-rondje (Hierholzer).
   Stukken achter een hek of afgesloten pad die vanaf de start niet te bereiken
-  zijn, noemt de app apart. Elsenburgerbos, alle paden: 9,2 km paden, route
+  zijn, noemt de app apart. "Doodlopende straten overslaan" (standaard aan)
+  pelt het netwerk af vanaf de losse eindjes; een straat die als voetpad
+  doorloopt is voor een hardloper niet doodlopend. Na het gretig koppelen
+  ruilt de app paren als dat korter is. Een startpunt buiten het gebied telt
+  niet mee. Delft binnenstad, straten: 48 km straat, route 64,5 km. Elsenburgerbos, alle paden: 9,2 km paden, route
   12,1 km (24% dubbel of verbinding).
 - **Tekenen**: trek met je vinger de route die je wilt lopen. De app zoekt de
   paden die de lijn volgen: een pad binnen 20 m van de lijn is bijna gratis,
