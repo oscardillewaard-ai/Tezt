@@ -280,18 +280,11 @@ function tekenPuntenlijst() {
   const rondje = staat.modus === 'rondje'
   const n = staat.punten.length
   const tm = tekenModus()
-  // stappen: kop van stap 2, welke stap klaar is, en nummers (stap 3 alleen als er een lengte te kiezen is)
-  el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken het gebied', tekenen: 'Teken je route' }[staat.modus]
-  const plaatsKlaar = tm ? !!tekening() : rondje ? n >= 1 : n >= 2
-  el('stap2').classList.toggle('klaar', plaatsKlaar)
-  el('stap2').classList.toggle('actief', !plaatsKlaar)
-  const metLengte = staat.modus === 'gebied' || (rondje && n <= 1)
-  el('stap3').hidden = !metLengte
-  let nr = 1
-  for (const id of ['stap1', 'stap2', 'stap3', 'instellingen']) {
-    if (el(id).hidden) continue
-    el(id).querySelector('.stapnr').dataset.nr = String(nr++)
-  }
+  // stap 2: kop per soort, en pas verder als de plek bekend is
+  el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken de wijk', tekenen: 'Teken je route' }[staat.modus]
+  plaatsKlaar = tm ? !!tekening() : rondje ? n >= 1 : n >= 2
+  el('naar3').disabled = !plaatsKlaar
+  werkStapperBij()
   el('tekenpaneel').hidden = !tm
   el('wegenveld').hidden = staat.modus !== 'straten'
   el('doodveld').hidden = staat.modus !== 'straten'
@@ -373,7 +366,8 @@ function toonFout(tekst) {
 
 function voegPuntToe(p) {
   if (stopper || tekenen || Date.now() - netGetekend < 400) return // tijdens het plannen of tekenen geen punten zetten
-  if (staat.modus === 'tekenen') return
+  if (staat.modus === 'tekenen' || stap === 4) return
+  if (stap === 1) toonStap(2)
   if (!inNederland(p)) {
     toonFout('Dat punt ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
@@ -608,7 +602,61 @@ function zetModus(modus) {
   puntenGewijzigd()
 }
 el('modus').addEventListener('click', (e) => {
-  if (e.target.dataset.modus && !stopper) zetModus(e.target.dataset.modus)
+  const knop = e.target.closest('[data-modus]')
+  if (!knop || stopper) return
+  zetModus(knop.dataset.modus)
+  toonStap(2)
+})
+
+// ---------- Stappen ----------
+let stap = 1
+let plaatsKlaar = false
+let tab = 'hoogte'
+
+function werkStapperBij() {
+  const stapper = el('stapper')
+  if (!stapper) return
+  for (const b of stapper.children) {
+    const n = Number(b.dataset.stap)
+    b.classList.toggle('nu', n === stap)
+    b.classList.toggle('klaar', n !== stap && (n === 1 || (n === 2 && plaatsKlaar) || (n === 3 && !!uitslag) || (n === 4 && !!uitslag && stap < 4)))
+    b.disabled = (n === 3 && !plaatsKlaar) || (n === 4 && !uitslag)
+  }
+}
+
+/** Toon één stap: 1 soort, 2 waar, 3 opties, 4 route. */
+function toonStap(n, scroll = true) {
+  if (n === 4 && !uitslag) n = 3
+  if (n === 3 && !plaatsKlaar) n = 2
+  stap = n
+  for (const k of [1, 2, 3]) el(`stap${k}`).hidden = k !== n
+  el('resultaat').hidden = n !== 4
+  if (n !== 2) stopTekenen()
+  if (n === 4) toonTab(tab)
+  werkStapperBij()
+  // het paneel bovenaan in beeld (op de telefoon: net onder de kaart)
+  if (!scroll) return
+  if (window.innerWidth <= 860) el('stapper').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  else document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function toonTab(t) {
+  tab = t
+  for (const b of el('tabs').children) b.setAttribute('aria-pressed', String(b.dataset.tab === t))
+  for (const k of ['hoogte', 'water', 'ondergrond']) el(`tab-${k}`).hidden = k !== t
+  if (t === 'hoogte' && plan) tekenProfiel() // de breedte is pas bekend als het tabblad zichtbaar is
+  if (t === 'water') el('geenWater').hidden = !!(keuze().water && keuze().water.punten.length)
+}
+
+el('stapper').addEventListener('click', (e) => {
+  const knop = e.target.closest('[data-stap]')
+  if (knop && !knop.disabled && !stopper) toonStap(Number(knop.dataset.stap))
+})
+for (const knop of document.querySelectorAll('.terugknop')) knop.addEventListener('click', () => !stopper && toonStap(Number(knop.dataset.naar)))
+el('naar3').addEventListener('click', () => toonStap(3))
+el('tabs').addEventListener('click', (e) => {
+  const knop = e.target.closest('[data-tab]')
+  if (knop) toonTab(knop.dataset.tab)
 })
 el('km').addEventListener('change', () => {
   onthoud()
@@ -684,10 +732,12 @@ el('opnieuw').addEventListener('click', () => {
   toonFout('')
   bewaar()
   puntenGewijzigd()
+  toonStap(1)
   main.scrollTo?.({ top: 0 })
   window.scrollTo({ top: 0 })
 })
 const main = document.querySelector('main')
+el('nieuw').addEventListener('click', () => el('opnieuw').click())
 el('keerom').addEventListener('click', () => {
   onthoud()
   staat.punten.reverse()
@@ -736,6 +786,7 @@ async function planNu() {
     toonFout('Een van de punten ligt buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
     return
   }
+  toonStap(3)
   stopper = new AbortController()
   el('plan').hidden = true
   el('bezig').hidden = false
@@ -1439,7 +1490,7 @@ function tekenTwijfels() {
   const lijst = el('twijfels')
   lijst.innerHTML = ''
   el('twijfelkop').textContent = `Twijfelstukken (${plan.twijfels.length})`
-  el('twijfelblok').hidden = !plan.twijfels.length && !plan.twijfelKort.aantal
+  el('twijfelblok').hidden = true // op verzoek niet meer getoond
   const metFoto = new Set(staat.luchtfoto ? plan.twijfels.slice().sort((a, b) => b.tot - b.van - (a.tot - a.van)).slice(0, MAX_FOTOS) : [])
   for (const s of plan.twijfels) {
     const li = document.createElement('li')
@@ -1617,12 +1668,15 @@ function herteken() {
 
 function toonResultaat(nieuw) {
   stopAfspelen()
+  stap = 4
+  for (const k of [1, 2, 3]) el(`stap${k}`).hidden = true
   el('resultaat').hidden = false
+  werkStapperBij()
   tekenKern()
   el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
   tekenOpties()
-  tekenProfiel()
   tekenWater()
+  toonTab(tab)
   haalTijdenErbij()
   tekenAlternatieven()
   tekenRoute(nieuw)
@@ -1631,7 +1685,7 @@ function toonResultaat(nieuw) {
   tekenZachteStukken()
   tekenTwijfels()
   kleurRoute()
-  if (nieuw) el('resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (nieuw) el(window.innerWidth <= 860 ? 'stapper' : 'resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 el('gpx').addEventListener('click', () => {
@@ -1677,6 +1731,7 @@ function herstel(opname) {
     plan = null
     for (const laag of [routeLaag, altLaag, profielLaag, waterLaag]) laag.clearLayers()
     el('resultaat').hidden = true
+    if (stap === 4) toonStap(2)
   }
   el('km').value = staat.km
   el('vorm').value = staat.vorm
@@ -1726,11 +1781,19 @@ document.addEventListener('keydown', (e) => {
     return
   }
   if (typen || cmd || e.altKey) return
-  if (/^[1-5]$/.test(e.key) && !stopper) zetModus(MODI[Number(e.key) - 1])
+  if (/^[1-5]$/.test(e.key) && !stopper) {
+    zetModus(MODI[Number(e.key) - 1])
+    toonStap(2)
+  }
   else if (k === 'p' || e.key === 'Enter') {
     if (!el('plan').disabled && !stopper) planNu()
-  } else if (k === 't' && tekenModus()) startTekenen('vrij')
-  else if (k === 'r' && tekenModus() && staat.modus !== 'tekenen') startTekenen('rechthoek')
+  } else if (k === 't' && tekenModus()) {
+    if (stap !== 2) toonStap(2)
+    startTekenen('vrij')
+  } else if (k === 'r' && tekenModus() && staat.modus !== 'tekenen') {
+    if (stap !== 2) toonStap(2)
+    startTekenen('rechthoek')
+  }
   else if (k === 'g' && plan) el('gpx').click()
   else if (e.key === ' ' && plan && !el('resultaat').hidden) wisselAfspelen()
   else if (k === 'l') el('locatie').click()
@@ -1916,6 +1979,7 @@ puntenGewijzigd()
 tekenTekening()
 zetTerugKnop()
 if (tekenModus() && tekening()) kaart.fitBounds(L.latLngBounds(tekening()).pad(0.2))
+toonStap(staat.punten.length || tekening() ? (plaatsKlaar ? 3 : 2) : 1, false)
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))
 else if (staat.punten.length === 1) kaart.setView(staat.punten[0], 13)
 // een gedeelde link opent terwijl de app al open staat: opnieuw beginnen met die punten

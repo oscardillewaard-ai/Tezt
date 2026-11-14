@@ -279,6 +279,12 @@ In `public/onverhard/` van deze repo staat de planner als webapp, gemaakt voor
 **trailrunnen**: `https://oscardillewaard-ai.github.io/Tezt/onverhard/`. Alles
 draait in je browser; er is geen eigen server.
 
+**Opbouw**: vier stappen met een stappenbalk bovenaan: 1 soort route (vijf
+kaarten, of een GPX openen), 2 waar (zoeken, tikken of tekenen), 3 opties
+(lengte, vorm, instellingen, plannen), 4 route (resultaat met tabbladen
+Hoogte, Water en Ondergrond; Aanpassen en Nieuwe route). De kaart blijft
+steeds in beeld.
+
 **Wat je ermee doet**
 
 - **Van A naar B**: zoek een plek (adres, straat, postcode, plaats; via de

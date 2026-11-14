@@ -43,32 +43,68 @@
           </div>
         </header>
 
+        <nav class="stapper" id="stapper" aria-label="Stappen">
+          <button type="button" data-stap="1"><span class="stapnr" data-nr="1"></span><span>Soort</span></button>
+          <button type="button" data-stap="2"><span class="stapnr" data-nr="2"></span><span>Waar</span></button>
+          <button type="button" data-stap="3"><span class="stapnr" data-nr="3"></span><span>Opties</span></button>
+          <button type="button" data-stap="4"><span class="stapnr" data-nr="4"></span><span>Route</span></button>
+        </nav>
+        <p class="fout" id="fout" role="alert" hidden></p>
+
         <section id="invoer">
-          <div class="stap klaar" id="stap1">
-          <h3 class="stapkop"><span class="stapnr"></span>Soort route</h3>
-          <div class="keuze modi" id="modus" role="group" aria-label="Soort route">
-            <button type="button" data-modus="route" aria-pressed="true">A naar B</button>
-            <button type="button" data-modus="rondje" aria-pressed="false">Rondje</button>
-            <button type="button" data-modus="gebied" aria-pressed="false">In gebied</button>
-            <button type="button" data-modus="straten" aria-pressed="false">Elke straat</button>
-            <button type="button" data-modus="tekenen" aria-pressed="false">Tekenen</button>
-          </div>
+          <div class="stapvlak" id="stap1">
+            <h2 class="stapkop">Wat voor route?</h2>
+            <div class="modi" id="modus" role="group" aria-label="Soort route">
+              <button type="button" data-modus="route" aria-pressed="true"><span class="mico">↗</span><span><b>A naar B</b><small>Van punt naar punt, zo onverhard mogelijk</small></span></button>
+              <button type="button" data-modus="rondje" aria-pressed="false"><span class="mico">⟳</span><span><b>Rondje</b><small>Start, lengte, klaar</small></span></button>
+              <button type="button" data-modus="gebied" aria-pressed="false"><span class="mico">▢</span><span><b>In gebied</b><small>Rondjes binnen een bos of park</small></span></button>
+              <button type="button" data-modus="straten" aria-pressed="false"><span class="mico">▦</span><span><b>Elke straat</b><small>Elke straat of elk pad in een wijk</small></span></button>
+              <button type="button" data-modus="tekenen" aria-pressed="false"><span class="mico">✎</span><span><b>Tekenen</b><small>Trek een lijn, de app volgt hem</small></span></button>
+            </div>
+            <button type="button" id="gpxOpen" class="tekstknop" title="Of sleep een GPX-bestand op de kaart">📂 Of open een GPX-bestand</button>
+            <input type="file" id="gpxBestand" accept=".gpx,application/gpx+xml" hidden />
           </div>
 
-          <div class="stap" id="stap2">
-          <h3 class="stapkop"><span class="stapnr"></span><span id="stap2kop">Waar</span></h3>
-          <div class="zoek">
-            <input type="search" id="zoek" placeholder="Zoek een plek, adres of postcode" autocomplete="off" enterkeyhint="search" aria-label="Zoek een plek" aria-controls="zoekresultaten" />
-            <ul id="zoekresultaten" role="listbox" hidden></ul>
-          </div>
-          <p class="hint" id="hint"></p>
-          <div id="tekenpaneel" hidden>
-            <p class="tekenstatus" id="tekenstatus" hidden></p>
-            <div class="knoppen">
-              <button type="button" id="tekenVrij" aria-pressed="false">✎ Teken</button>
-              <button type="button" id="tekenVierkant" aria-pressed="false">▭ Rechthoek</button>
-              <button type="button" id="tekenWis">Wis tekening</button>
+          <div class="stapvlak" id="stap2" hidden>
+            <h2 class="stapkop" id="stap2kop">Waar</h2>
+            <div class="zoek">
+              <input type="search" id="zoek" placeholder="Zoek een plek, adres of postcode" autocomplete="off" enterkeyhint="search" aria-label="Zoek een plek" aria-controls="zoekresultaten" />
+              <ul id="zoekresultaten" role="listbox" hidden></ul>
             </div>
+            <p class="hint" id="hint"></p>
+            <div id="tekenpaneel" hidden>
+              <p class="tekenstatus" id="tekenstatus" hidden></p>
+              <div class="knoppen">
+                <button type="button" id="tekenVrij" aria-pressed="false">✎ Teken</button>
+                <button type="button" id="tekenVierkant" aria-pressed="false">▭ Rechthoek</button>
+                <button type="button" id="tekenWis">Wis tekening</button>
+              </div>
+            </div>
+            <ol class="punten" id="punten"></ol>
+            <div class="knoppen">
+              <button type="button" id="locatie">◎ Mijn locatie</button>
+              <button type="button" id="keerom">Keer om</button>
+              <button type="button" id="wis">Wis punten</button>
+            </div>
+            <div class="stapvoet">
+              <button type="button" class="klein terugknop" data-naar="1">← Terug</button>
+              <button type="button" class="hoofd" id="naar3">Verder →</button>
+            </div>
+          </div>
+
+          <div class="stapvlak" id="stap3" hidden>
+            <h2 class="stapkop">Opties</h2>
+            <label class="veld" id="kmveld" hidden>
+              <span>Lengte</span>
+              <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
+            </label>
+            <label class="veld" id="vormveld" hidden>
+              <span>Vorm</span>
+              <select id="vorm">
+                <option value="lus">Grote lus</option>
+                <option value="kronkel">Kronkelen in de buurt</option>
+              </select>
+            </label>
             <label class="veld" id="wegenveld" hidden>
               <span>Welke wegen</span>
               <select id="wegen">
@@ -78,72 +114,51 @@
               </select>
             </label>
             <label class="vinkje" id="doodveld" hidden><input type="checkbox" id="dood" checked /> Doodlopende straten overslaan</label>
+            <div id="instellingen">
+              <h3 class="subkop">Instellingen <small id="instSamenvatting"></small></h3>
+              <label class="veld">
+                <span>Soort paden</span>
+                <select id="trail">
+                  <option value="1">Smalle paadjes eerst (trail)</option>
+                  <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
+                  <option value="a">Maakt niet uit (ook verhard)</option>
+                </select>
+              </label>
+              <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
+              <label class="vinkje"><input type="checkbox" id="kaartje" /> Toegangskaart waterleidingduinen</label>
+              <label class="vinkje"><input type="checkbox" id="heuvels" /> Meer hoogtemeters</label>
+              <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
+              <details class="meer">
+                <summary>Meer</summary>
+                <label class="veld">
+                  <span>Landelijke wandelroutes (LAW)</span>
+                  <select id="law">
+                    <option value="1">Geen voorkeur</option>
+                    <option value="0.6">Lichte voorkeur</option>
+                    <option value="0.3">Sterke voorkeur</option>
+                  </select>
+                </label>
+                <label class="veld">
+                  <span>Hoeveel routes vergelijken</span>
+                  <select id="grondig">
+                    <option value="2">2 routes</option>
+                    <option value="4">4 routes (duurt langer)</option>
+                    <option value="1">1 route (snelst)</option>
+                    <option value="0">1 route, zonder officiële kaart</option>
+                  </select>
+                </label>
+              </details>
+            </div>
+            <div class="stapvoet">
+              <button type="button" class="klein terugknop" data-naar="2">← Terug</button>
+              <button type="button" class="hoofd" id="plan">Plan route</button>
+            </div>
+            <div id="bezig" hidden>
+              <div class="balkje"><i id="voortgang"></i></div>
+              <p id="status" role="status"></p>
+              <button type="button" id="stop">Stop</button>
+            </div>
           </div>
-          <ol class="punten" id="punten"></ol>
-          <div class="knoppen">
-            <button type="button" id="locatie">Mijn locatie</button>
-            <button type="button" id="gpxOpen" title="Of sleep een GPX-bestand op de kaart">📂 GPX openen</button>
-            <input type="file" id="gpxBestand" accept=".gpx,application/gpx+xml" hidden />
-            <button type="button" id="keerom">Keer om</button>
-            <button type="button" id="wis">Wis punten</button>
-          </div>
-          </div>
-
-          <div class="stap klaar" id="stap3">
-          <h3 class="stapkop"><span class="stapnr"></span>Lengte</h3>
-          <label class="veld" id="kmveld" hidden>
-            <span>Lengte van het rondje</span>
-            <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
-          </label>
-          <label class="veld" id="vormveld" hidden>
-            <span>Vorm van het rondje</span>
-            <select id="vorm">
-              <option value="lus">Grote lus</option>
-              <option value="kronkel">Kronkelen in de buurt</option>
-            </select>
-          </label>
-          </div>
-          <details class="blok stap klaar" id="instellingen">
-            <summary><span class="stapnr"></span>Instellingen <small id="instSamenvatting"></small></summary>
-          <label class="veld">
-            <span>Soort paden</span>
-            <select id="trail">
-              <option value="1">Smalle paadjes eerst (trail)</option>
-              <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
-              <option value="a">Maakt niet uit (ook verhard)</option>
-            </select>
-          </label>
-          <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
-          <label class="vinkje"><input type="checkbox" id="kaartje" /> Toegangskaart waterleidingduinen</label>
-          <label class="vinkje"><input type="checkbox" id="heuvels" /> Meer hoogtemeters</label>
-          <label class="veld">
-            <span>Landelijke wandelroutes (LAW)</span>
-            <select id="law">
-              <option value="1">Geen voorkeur</option>
-              <option value="0.6">Lichte voorkeur</option>
-              <option value="0.3">Sterke voorkeur</option>
-            </select>
-          </label>
-          <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
-          <label class="veld">
-            <span>Hoeveel routes vergelijken</span>
-            <select id="grondig">
-              <option value="2">2 routes</option>
-              <option value="4">4 routes (duurt langer)</option>
-              <option value="1">1 route (snelst)</option>
-              <option value="0">1 route, zonder officiële kaart</option>
-            </select>
-          </label>
-
-          </details>
-
-          <button type="button" class="hoofd" id="plan">Plan route</button>
-          <div id="bezig" hidden>
-            <div class="balkje"><i id="voortgang"></i></div>
-            <p id="status" role="status"></p>
-            <button type="button" id="stop">Stop</button>
-          </div>
-          <p class="fout" id="fout" role="alert" hidden></p>
         </section>
 
         <section id="resultaat" hidden>
@@ -161,23 +176,29 @@
             </div>
             <span class="afspeelstand" id="afspeelstand"></span>
           </div>
+          <div class="keuze tabs" id="tabs" role="tablist" aria-label="Details">
+            <button type="button" data-tab="hoogte" aria-pressed="true">Hoogte</button>
+            <button type="button" data-tab="water" aria-pressed="false">Water</button>
+            <button type="button" data-tab="ondergrond" aria-pressed="false">Ondergrond</button>
+          </div>
+          <div class="tabvlak" id="tab-hoogte">
           <div class="profiel" id="profiel" hidden>
             <h2 id="profielkop">Hoogteprofiel</h2>
             <div class="profielvlak" id="profielvlak"></div>
             <p class="noot" id="profielnoot"></p>
           </div>
+          </div>
+          <div class="tabvlak" id="tab-water" hidden>
           <div class="water" id="water" hidden>
             <h2 id="waterkop">Water onderweg</h2>
             <div class="waterfilter" id="waterfilter" role="group" aria-label="Soorten tonen"></div>
             <ul class="waterlijst" id="waterlijst"></ul>
             <button type="button" id="waterMeer" class="klein" hidden>Meer</button>
           </div>
-
-          <div class="knoppen">
-            <button type="button" class="hoofd" id="gpx">Download GPX</button>
-            <button type="button" id="deel">Kopieer link</button>
+          <p class="noot" id="geenWater" hidden>Geen water gevonden langs deze route.</p>
           </div>
 
+          <div class="tabvlak" id="tab-ondergrond" hidden>
           <div class="keuze klein" id="bron" role="group" aria-label="Kleur de route naar">
             <button type="button" data-bron="eind" aria-pressed="true">Eindoordeel</button>
             <button type="button" data-bron="bgt" aria-pressed="false">Officiële kaart</button>
@@ -188,10 +209,11 @@
           <ul class="legenda" id="legenda"></ul>
           <p class="noot" id="noot"></p>
 
-          <details class="blok">
+          <details class="blok" open>
             <summary>Kilometers per ondergrond</summary>
             <table id="tabel"></table>
           </details>
+          </div>
           <details class="blok" hidden>
             <summary>Langste onverharde stukken</summary>
             <table id="zacht"></table>
@@ -201,15 +223,17 @@
             <ul class="twijfels" id="twijfels"></ul>
             <p class="noot" id="twijfelnoot"></p>
           </details>
+
+          <div class="knoppen eindknoppen">
+            <button type="button" class="hoofd" id="gpx">Download GPX</button>
+            <button type="button" id="deel">Kopieer link</button>
+          </div>
+          <div class="stapvoet">
+            <button type="button" class="klein terugknop" data-naar="2">✎ Aanpassen</button>
+            <button type="button" class="klein" id="nieuw">＋ Nieuwe route</button>
+          </div>
         </section>
 
-        <details class="blok">
-          <summary>Goed om te weten</summary>
-          <p class="noot">Officiële kaart = BGT. Eindoordeel = BGT, anders OpenStreetMap.</p>
-          <p class="noot">Toegangskaart: afgesloten duinpaden doen mee; let ter plekke op de borden.</p>
-          <p class="noot toetsen"><kbd>1</kbd>–<kbd>5</kbd> soort route · <kbd>P</kbd> plan · <kbd>T</kbd> teken · <kbd>R</kbd> rechthoek · <kbd>Esc</kbd> stop · <kbd>⌫</kbd> laatste punt weg · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan · <kbd>Ctrl</kbd>+<kbd>Y</kbd> opnieuw · <kbd>G</kbd> GPX · <kbd>L</kbd> locatie · <kbd>N</kbd> opnieuw beginnen · <kbd>?</kbd> uitleg</p>
-          <p class="noot">Bronnen: © OpenStreetMap-bijdragers (OpenFreeMap, Overpass, BRouter) · BGT, AHN, luchtfoto en zoeken: PDOK.</p>
-        </details>
       </main>
     </div>
     <dialog id="intro" aria-label="Kennismaking">
@@ -291,6 +315,8 @@
       <h3>Handig</h3>
       <p class="noot">📂 GPX openen om een bestaande route te bekijken · ↶ ongedaan maken · ↺ opnieuw beginnen · ▶ route afspelen · instellingen voor strand, toegangskaart en meer hoogtemeters.</p>
       <p class="noot toetsen"><kbd>1</kbd>–<kbd>5</kbd> soort · <kbd>P</kbd> plan · <kbd>T</kbd> teken · <kbd>Esc</kbd> stop · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan · <kbd>Spatie</kbd> afspelen · <kbd>G</kbd> GPX</p>
+      <p class="noot">Officiële kaart = BGT; eindoordeel = BGT, anders OpenStreetMap. Toegangskaart: afgesloten duinpaden doen mee; let ter plekke op de borden.</p>
+      <p class="noot">Bronnen: © OpenStreetMap-bijdragers (OpenFreeMap, Overpass, BRouter) · BGT, AHN, luchtfoto en zoeken: PDOK.</p>
       <button type="button" id="hulpIntro" class="klein">Intro opnieuw bekijken</button>
     </dialog>
     <div class="tip" id="tip"></div>
