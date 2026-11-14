@@ -223,22 +223,37 @@
       </div>
       <div class="intro-dia" data-dia="1" hidden>
         <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
-          <defs><mask id="m1"><path class="teken laat" pathLength="1" d="M160,150 C100,150 70,110 90,75 C110,40 175,30 215,55 C255,80 250,130 215,145 C195,153 180,150 160,150" stroke="#fff" stroke-width="12" fill="none"/></mask></defs>
-          <path class="route" mask="url(#m1)" d="M160,150 C100,150 70,110 90,75 C110,40 175,30 215,55 C255,80 250,130 215,145 C195,153 180,150 160,150"/>
-          <g class="pin"><circle cx="160" cy="150" r="13"/><text x="160" y="155">S</text></g>
-          <text class="teller" x="160" y="102">0 km</text>
+          <g class="chips">
+            <g class="chip c1"><rect x="20" y="40" width="88" height="34" rx="17"/><text x="64" y="62">A → B</text></g>
+            <g class="chip c2"><rect x="116" y="40" width="88" height="34" rx="17"/><text x="160" y="62">Rondje</text></g>
+            <g class="chip c3"><rect x="212" y="40" width="88" height="34" rx="17"/><text x="256" y="62">In gebied</text></g>
+            <g class="chip c4"><rect x="62" y="90" width="96" height="34" rx="17"/><text x="110" y="112">Elke straat</text></g>
+            <g class="chip c5"><rect x="166" y="90" width="92" height="34" rx="17"/><text x="212" y="112">Tekenen</text></g>
+          </g>
+          <circle class="tik" cx="160" cy="57" r="16"/>
         </svg>
-        <h2>Rondje</h2><p>Kies een start en een lengte. Klaar in seconden.</p>
+        <h2>1 · Kies een soort</h2><p>Van A naar B, een rondje, binnen een gebied, door elke straat of langs je eigen lijn.</p>
       </div>
       <div class="intro-dia" data-dia="2" hidden>
         <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
-          <path class="gebied teken" pathLength="1" d="M70,60 C120,25 230,30 260,70 C290,110 250,170 180,165 C110,162 50,140 52,100 C53,80 60,68 70,60"/>
-          <path class="binnen" d="M110,110 C100,85 140,62 175,70 C210,78 225,110 200,128 C175,145 120,135 110,110"/>
-          <g class="pen"><path d="M0,0 l6,-16 l6,4 z" /><animateMotion dur="2.2s" fill="freeze" path="M70,60 C120,25 230,30 260,70 C290,110 250,170 180,165 C110,162 50,140 52,100 C53,80 60,68 70,60"/></g>
+          <g class="pin"><circle cx="110" cy="120" r="13"/><text x="110" y="125">S</text></g>
+          <path class="gebied teken laat" pathLength="1" d="M190,60 C230,40 290,60 290,100 C292,140 250,165 215,160 C180,156 165,130 168,105 C170,85 175,70 190,60"/>
+          <g class="pen"><path d="M0,0 l6,-16 l6,4 z" /><animateMotion dur="2.2s" begin="1s" fill="freeze" path="M190,60 C230,40 290,60 290,100 C292,140 250,165 215,160 C180,156 165,130 168,105 C170,85 175,70 190,60"/></g>
         </svg>
-        <h2>Teken op de kaart</h2><p>Een gebied, elke straat, of je eigen lijn.</p>
+        <h2>2 · Tik of teken</h2><p>Tik je startpunt op de kaart, of teken een gebied of je route met je vinger.</p>
       </div>
       <div class="intro-dia" data-dia="3" hidden>
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
+          <defs><mask id="m3"><path class="teken" pathLength="1" d="M60,150 C60,90 120,60 170,70 C230,82 270,110 250,150 C235,178 120,180 60,150" stroke="#fff" stroke-width="12" fill="none"/></mask></defs>
+          <path class="route" mask="url(#m3)" d="M60,150 C60,90 120,60 170,70 C230,82 270,110 250,150 C235,178 120,180 60,150"/>
+          <path class="omweg" d="M170,70 C185,40 215,35 230,55 C238,66 236,80 232,90"/>
+          <circle class="handvat" cx="214" cy="42" r="8"/>
+          <g class="gpx"><rect x="248" y="18" width="52" height="26" rx="6"/><text x="274" y="36">GPX</text></g>
+          <g class="pin"><circle cx="60" cy="150" r="11"/><text x="60" y="155">S</text></g>
+        </svg>
+        <h2>3 · Plan en pas aan</h2><p>Sleep de route waar je langs wilt, kies water onderweg en download de GPX.</p>
+      </div>
+      <div class="intro-dia" data-dia="4" hidden>
         <svg viewBox="0 0 320 200" aria-hidden="true"><g class="hoogtelijnen"><path d="M-10,40 C60,20 120,60 190,35 S300,10 340,30"/><path d="M-10,75 C50,55 130,95 200,70 S290,45 340,62"/><path d="M-10,115 C70,95 120,140 210,110 S300,90 340,104"/><path d="M-10,160 C60,140 140,180 220,150 S300,135 340,148"/><path d="M-10,195 C80,178 150,210 230,188 S310,175 340,185"/></g>
           <path class="seg s1" pathLength="1" d="M30,90 C60,70 90,70 120,80"/>
           <path class="seg s2" pathLength="1" d="M120,80 C150,90 165,60 195,55"/>
@@ -251,9 +266,32 @@
       </div>
       <div class="intro-voet">
         <button type="button" id="introSla" class="klein">Overslaan</button>
-        <div class="intro-stippen" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="intro-stippen" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
         <button type="button" id="introVerder" class="hoofd">Verder</button>
       </div>
+    </dialog>
+    <dialog id="hulp" aria-label="Uitleg">
+      <div class="hulp-kop">
+        <h2>Zo werkt het</h2>
+        <button type="button" id="hulpDicht" class="klein" aria-label="Sluiten">✕</button>
+      </div>
+      <ol class="hulp-stappen">
+        <li><b>Kies een soort route</b> bovenaan.</li>
+        <li><b>Tik je start</b> op de kaart of zoek een plek. Bij In gebied, Elke straat en Tekenen: <b>teken</b> met je vinger.</li>
+        <li><b>Plan</b>. Sleep daarna de route, kies water onderweg, speel hem af of download de GPX.</li>
+      </ol>
+      <h3>Soorten routes</h3>
+      <ul class="hulp-soorten">
+        <li><span class="hulp-ico">↗</span><div><b>A naar B</b><small>Van punt naar punt, zo onverhard mogelijk. Tik meer punten voor tussenpunten.</small></div><button type="button" class="klein" data-voorbeeld="route">Voorbeeld</button></li>
+        <li><span class="hulp-ico">⟳</span><div><b>Rondje</b><small>Kies start en lengte; je krijgt een paar echte lussen.</small></div><button type="button" class="klein" data-voorbeeld="rondje">Voorbeeld</button></li>
+        <li><span class="hulp-ico">▢</span><div><b>In gebied</b><small>Teken een bos of park; rondjes blijven erbinnen.</small></div><button type="button" class="klein" data-voorbeeld="gebied">Voorbeeld</button></li>
+        <li><span class="hulp-ico">▦</span><div><b>Elke straat</b><small>Teken een wijk; één route door elke straat of elk pad.</small></div><button type="button" class="klein" data-voorbeeld="straten">Voorbeeld</button></li>
+        <li><span class="hulp-ico">✎</span><div><b>Tekenen</b><small>Trek een lijn; de app volgt hem over echte paden.</small></div><button type="button" class="klein" data-voorbeeld="tekenen">Voorbeeld</button></li>
+      </ul>
+      <h3>Handig</h3>
+      <p class="noot">📂 GPX openen om een bestaande route te bekijken · ↶ ongedaan maken · ↺ opnieuw beginnen · ▶ route afspelen · instellingen voor strand, toegangskaart en meer hoogtemeters.</p>
+      <p class="noot toetsen"><kbd>1</kbd>–<kbd>5</kbd> soort · <kbd>P</kbd> plan · <kbd>T</kbd> teken · <kbd>Esc</kbd> stop · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan · <kbd>Spatie</kbd> afspelen · <kbd>G</kbd> GPX</p>
+      <button type="button" id="hulpIntro" class="klein">Intro opnieuw bekijken</button>
     </dialog>
     <div class="tip" id="tip"></div>
     <dialog id="foto"><form method="dialog"><button aria-label="Sluiten">Sluiten</button></form><img alt="" /><p></p></dialog>

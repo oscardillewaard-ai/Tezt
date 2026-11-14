@@ -1686,7 +1686,7 @@ el('terug').addEventListener('click', ongedaanMaken)
 // ---------- Sneltoetsen ----------
 const MODI = ['route', 'rondje', 'gebied', 'straten', 'tekenen']
 document.addEventListener('keydown', (e) => {
-  if (el('intro').open || el('foto').open) return
+  if (el('intro').open || el('foto').open || el('hulp').open) return
   const doel = e.target
   const typen = doel && (doel.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(doel.tagName))
   const cmd = e.ctrlKey || e.metaKey
@@ -1801,7 +1801,8 @@ function toonDia(i) {
   })
   document.querySelectorAll('.intro-stippen i').forEach((s, k) => s.classList.toggle('aan', k === i))
   el('introVerder').textContent = i === dias.length - 1 ? 'Aan de slag' : 'Verder'
-  if (i === 1) telOp(document.querySelector('.intro-dia[data-dia="1"] .teller'))
+  const teller = document.querySelector(`.intro-dia[data-dia="${i}"] .teller`)
+  if (teller) telOp(teller)
 }
 function telOp(tekst) {
   if (!tekst) return
@@ -1835,7 +1836,7 @@ el('intro').addEventListener('cancel', (e) => {
   sluitIntro()
 })
 el('intro').addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight' && introDia < 3) toonDia(introDia + 1)
+  if (e.key === 'ArrowRight' && introDia < 4) toonDia(introDia + 1)
   if (e.key === 'ArrowLeft' && introDia > 0) toonDia(introDia - 1)
 })
 // vegen op de telefoon
@@ -1847,10 +1848,31 @@ el('intro').addEventListener('pointerup', (e) => {
   if (veegX === null) return
   const dx = e.clientX - veegX
   veegX = null
-  if (dx < -40 && introDia < 3) toonDia(introDia + 1)
+  if (dx < -40 && introDia < 4) toonDia(introDia + 1)
   else if (dx > 40 && introDia > 0) toonDia(introDia - 1)
 })
-el('uitleg').addEventListener('click', openIntro)
+// uitleg met voorbeelden
+const VOORBEELDEN = {
+  route: 'p=52.13081,4.35323;52.10350,4.30180',
+  rondje: 'p=52.13081,4.35323&rondje=12',
+  gebied: 'modus=gebied&t=52.03342,4.33407;52.03751,4.34372;52.03553,4.34544;52.03183,4.34393;52.03104,4.33986;52.02946,4.33814;52.03183,4.33385&p=52.03262,4.33428&rondje=8',
+  straten: 'modus=straten&t=52.0168,4.3527;52.0150,4.3640;52.0060,4.3678;52.0010,4.3600;52.0030,4.3500;52.0110,4.3470&wegen=straten',
+  tekenen: 'modus=tekenen&t=52.03289,4.33514;52.03421,4.33814;52.03553,4.34115;52.03632,4.34286;52.03421,4.34372;52.03236,4.34115',
+}
+el('uitleg').addEventListener('click', () => el('hulp').showModal())
+el('hulpDicht').addEventListener('click', () => el('hulp').close())
+el('hulp').addEventListener('click', (e) => {
+  if (e.target === el('hulp')) el('hulp').close() // tik naast het venster
+  const v = e.target.dataset && e.target.dataset.voorbeeld
+  if (!v) return
+  el('hulp').close()
+  onthoud()
+  location.hash = `${VOORBEELDEN[v]}&plan=1` // de app laadt de link opnieuw en plant meteen
+})
+el('hulpIntro').addEventListener('click', () => {
+  el('hulp').close()
+  openIntro()
+})
 
 // ---------- Start ----------
 const hash = laad()

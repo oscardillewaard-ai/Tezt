@@ -426,3 +426,42 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 .waterlijst .open { color: #2f7a35; font-weight: 600; }
 .waterlijst .dicht { color: var(--fout-inkt); font-weight: 600; }
 :root[data-theme="dark"] .waterlijst .open { color: #7fd38a; }
+
+/* intro: soorten, tikken, aanpassen */
+.chip rect { fill: rgb(255 255 255 / .08); stroke: rgb(255 255 255 / .35); stroke-width: 1.5; }
+.chip text { fill: #f3f1e4; font: 700 15px var(--kop); text-anchor: middle; letter-spacing: .04em; }
+.chip { opacity: 0; animation: verschijn .35s forwards; }
+.c1 { animation-delay: .2s; } .c2 { animation-delay: .4s; } .c3 { animation-delay: .6s; } .c4 { animation-delay: .8s; } .c5 { animation-delay: 1s; }
+.c2 rect { animation: kies .4s 1.8s forwards; }
+.c2 text { animation: kiesTekst .4s 1.8s forwards; }
+.tik { fill: rgb(255 255 255 / .5); opacity: 0; transform-origin: 160px 57px; animation: tik .7s 1.5s ease-out forwards; }
+.omweg { fill: none; stroke: #ffcb05; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; opacity: 0; animation: verschijn .5s 2.8s forwards; }
+.handvat { fill: #ffcb05; stroke: #1f3328; stroke-width: 3; opacity: 0; animation: sleep 1.2s 2.2s ease-in-out forwards; }
+.gpx rect { fill: #ffcb05; } .gpx text { fill: #141a12; font: 700 13px var(--kop); text-anchor: middle; }
+.gpx { opacity: 0; animation: verschijn .4s 3.4s forwards; }
+@keyframes kies { to { fill: #ffcb05; stroke: #ffcb05; } }
+@keyframes kiesTekst { to { fill: #141a12; } }
+@keyframes tik { 0% { opacity: .8; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.6); } }
+@keyframes sleep { 0% { opacity: 1; transform: translate(-44px, 28px); } 100% { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .chip, .omweg, .gpx, .handvat { animation: none; opacity: 1; }
+  .tik { display: none; }
+}
+
+/* uitlegvenster */
+#hulp { width: min(94vw, 520px); max-height: 88vh; padding: 0 0 16px; border-radius: 18px; background: var(--vlak); color: var(--inkt); overflow: auto; }
+#hulp::backdrop { background: rgb(10 18 12 / .6); }
+.hulp-kop { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; color: var(--balk-tekst); border-bottom: 3px solid var(--route);
+            background: linear-gradient(rgb(20 34 26 / .62), rgb(20 34 26 / .62)), url('thema/trail.svg') center / cover no-repeat, var(--balk); }
+.hulp-kop h2 { margin: 0; color: var(--route); font: 700 24px/1 var(--kop); text-transform: uppercase; letter-spacing: .08em; }
+.hulp-kop button { background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .35); color: var(--balk-tekst); }
+#hulp h3 { font: 700 16px var(--kop); text-transform: uppercase; letter-spacing: .07em; margin: 16px 18px 8px; }
+.hulp-stappen { margin: 14px 18px 0; padding-left: 22px; }
+.hulp-stappen li { margin: 6px 0; }
+.hulp-soorten { list-style: none; margin: 0 18px; padding: 0; }
+.hulp-soorten li { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rand); }
+.hulp-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--balk); color: var(--route); font-weight: 700; }
+.hulp-soorten small { display: block; color: var(--inkt-2); font-size: 13px; }
+.hulp-soorten button { min-height: 36px; font-size: 13px; }
+#hulp .noot { margin: 6px 18px; }
+#hulpIntro { margin: 10px 18px 0; font-size: 14px; }
