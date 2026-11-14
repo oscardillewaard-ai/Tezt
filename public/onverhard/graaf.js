@@ -1297,3 +1297,62 @@ export function tagsLangs(g, xy, max = 15) {
   if (!segs.length) segs.push([0, xy.length - 1, ''])
   return segs
 }
+
+/**
+ * Haal een stukje route weg rond positie i0: het kleinste uitstapje dat bij
+ * dezelfde knoop vertrekt en terugkomt (een lusje of heen-en-terug naar een
+ * doodlopend eind) en i0 bevat, mits korter dan 'maxLus' meter en niet de
+ * hele route. Is er zo'n uitstapje niet, dan loopt een venster rond i0 een
+ * andere weg (de segmenten in het venster worden duur). Geeft {knopen, segs,
+ * vast, weg: meter weggehaald} of null.
+ */
+export function haalStukWeg(g, knopen, segs, vast, i0, { maxLus = null, venster = 250 } = {}) {
+  const opgeteld = [0]
+  for (let i = 0; i < segs.length; i++) opgeteld.push(opgeteld[i] + g.lengte[segs[i]])
+  const totaal = opgeteld[opgeteld.length - 1]
+  const grens = maxLus ?? Math.max(800, Math.min(5000, 0.5 * totaal))
+  const plekken = new Map()
+  knopen.forEach((k, i) => {
+    if (!plekken.has(k)) plekken.set(k, [])
+    plekken.get(k).push(i)
+  })
+  let beste = null
+  for (let a = i0; a >= 0 && opgeteld[i0] - opgeteld[a] <= grens; a--) {
+    for (const b of plekken.get(knopen[a])) {
+      if (b <= i0 || b === a) continue
+      const m = opgeteld[b] - opgeteld[a]
+      if (m > grens || (a === 0 && b === knopen.length - 1)) continue
+      if (vast.some((k) => k > a && k < b)) continue // een versleept punt blijft
+      if (!beste || m < beste.m) beste = { a, b, m }
+    }
+  }
+  if (beste) {
+    const { a, b, m } = beste
+    return {
+      knopen: [...knopen.slice(0, a + 1), ...knopen.slice(b + 1)],
+      segs: [...segs.slice(0, a), ...segs.slice(b)],
+      vast: vast.filter((k) => k <= a || k > b).map((k) => (k > b ? k - (b - a) : k)),
+      weg: m,
+    }
+  }
+  // geen uitstapje: het stuk rond i0 een andere weg laten lopen
+  let ia = i0
+  let ib = i0
+  while (ia > 0 && opgeteld[i0] - opgeteld[ia] < venster && !vast.includes(ia)) ia--
+  while (ib < knopen.length - 1 && opgeteld[ib] - opgeteld[i0] < venster && !vast.includes(ib)) ib++
+  if (ia >= ib || knopen[ia] === knopen[ib]) return null
+  const straf = new Float32Array(g.lengte.length).fill(1)
+  for (let i = ia; i < ib; i++) straf[segs[i]] = 25
+  for (let i = 0; i < ia; i++) straf[segs[i]] = Math.max(straf[segs[i]], 4)
+  for (let i = ib; i < segs.length; i++) straf[segs[i]] = Math.max(straf[segs[i]], 4)
+  const boom = dijkstra(g, knopen[ia], { straf, doel: knopen[ib] })
+  if (!Number.isFinite(boom.kosten[knopen[ib]])) return null
+  const p = pad(boom, knopen[ib])
+  const verschuiving = p.segs.length - (ib - ia)
+  return {
+    knopen: [...knopen.slice(0, ia), ...p.knopen, ...knopen.slice(ib + 1)],
+    segs: [...segs.slice(0, ia), ...p.segs, ...segs.slice(ib)],
+    vast: vast.map((k) => (k >= ib ? k + verschuiving : k)),
+    weg: 0,
+  }
+}

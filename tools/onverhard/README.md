@@ -350,6 +350,13 @@ draait in je browser; er is geen eigen server.
 - In gebied met onverhard als voorkeur maakt de app ook een route over élk
   onverhard pad in het gebied (zo nodig een paar keer rond); in een stadspark
   wint die vaak (Wilhelminapark Rijswijk: 25% in plaats van 11% onverhard).
+- **Stukje weghalen**: tik op de route, dan "✂ Haal dit stukje weg". Het
+  kleinste uitstapje rond die plek dat bij dezelfde knoop terugkomt (een
+  lusje, heen en terug naar een doodlopend eind) verdwijnt; is er geen, dan
+  loopt dat stuk een andere weg. Ook bij Elke straat.
+- **GPX openen**: een bestaande route (knop of slepen op de pagina) bekijken
+  met de paden eronder (dichtstbijzijnde pad binnen 15 m), de officiële kaart,
+  hoogte en water.
 - **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
   tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
   "Opnieuw" of na een nieuwe planning).

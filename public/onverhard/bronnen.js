@@ -1179,7 +1179,7 @@ export async function planStraten(instel, bgt, meld, signal) {
   const km1 = (m) => (m / 1000).toFixed(1).replace('.', ',')
   const waarschuwingen = []
   if (gemist > 50) waarschuwingen.push(`${km1(gemist)} km onbereikbaar, zit er niet in`)
-  return { opties: [{ traject, an, dubbel: r.extraMeter / r.meter }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [] }
+  return { opties: [{ traject, an, dubbel: r.extraMeter / r.meter, knopen: r.knopen, segs: r.segs }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [], graaf: g }
 }
 
 /** Een route over echte paden langs een getekende lijn. */
@@ -1447,11 +1447,12 @@ function optieVan(o, naam) {
  * legt de nieuwe route opnieuw langs de officiële kaart en het AHN.
  * Geeft een nieuwe optie, of null als het niet lukte.
  */
-export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null }, signal) {
+export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null, weghalen = false }, signal) {
   const g = uitslag.graaf
   if (!g || !optie.knopen) return null
   let r
   if (loslaten !== null) r = G.laatLos(g, optie.knopen, optie.segs, optie.vast, loslaten)
+  else if (weghalen) r = G.haalStukWeg(g, optie.knopen, optie.segs, optie.vast, i0)
   else {
     const doel = G.dichtsteKnoop(g, ...K.naarRd(punt[1], punt[0])).knoop
     r = G.versleep(g, optie.knopen, optie.segs, optie.vast.filter((k) => k !== i0 || k === 0 || k === optie.knopen.length - 1), i0, doel)

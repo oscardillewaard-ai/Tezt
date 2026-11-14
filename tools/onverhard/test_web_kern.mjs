@@ -692,3 +692,23 @@ test('openingstijden: gangbare OSM-notaties, open en dicht, en te ingewikkeld', 
   assert.equal(K.isOpen('Fr-Sa 18:00-02:00', op(5, 23)).open, true) // over middernacht
   assert.equal(K.isOpen('Apr-Sep: Mo-Su 10:00-18:00'), null)
 })
+
+test('stukje route weghalen: een lusje verdwijnt, de rest blijft aaneengesloten', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  const k = (i, j) => G.dichtsteKnoop(g, ...K.naarRd(p(i, j).lon, p(i, j).lat)).knoop
+  // een route van (0,0) naar (6,0) met onderweg een lusje bij (3,0): omhoog naar (3,2), rechts, terug
+  const langs = [k(0, 0), k(3, 0), k(3, 2), k(4, 2), k(4, 1), k(3, 1), k(3, 0), k(6, 0)]
+  const r = G.routeLangs(g, langs)
+  const opLus = r.knopen.indexOf(k(4, 2))
+  const w = G.haalStukWeg(g, r.knopen, r.segs, [0, r.knopen.length - 1], opLus)
+  assert.ok(w && w.weg > 300, `${w && w.weg} m weg`)
+  assert.ok(!w.knopen.includes(k(4, 2)), 'het lusje is weg')
+  assert.equal(w.knopen[0], k(0, 0))
+  assert.equal(w.knopen[w.knopen.length - 1], k(6, 0))
+  for (let i = 0; i < w.segs.length; i++) {
+    const s = w.segs[i]
+    const [a, b] = [w.knopen[i], w.knopen[i + 1]]
+    assert.ok((g.van[s] === a && g.naar[s] === b) || (g.van[s] === b && g.naar[s] === a), 'aaneengesloten')
+  }
+})

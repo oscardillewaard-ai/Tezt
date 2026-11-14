@@ -465,3 +465,5 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 .hulp-soorten button { min-height: 36px; font-size: 13px; }
 #hulp .noot { margin: 6px 18px; }
 #hulpIntro { margin: 10px 18px 0; font-size: 14px; }
+
+.leaflet-popup-content .weghalen { display: block; width: 100%; margin-top: 8px; min-height: 36px; font-weight: 600; }

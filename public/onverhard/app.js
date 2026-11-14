@@ -857,7 +857,23 @@ function tekenRoute(passend) {
   for (const s of plan.analyse.samengevoegd) {
     const pad = naarLatLon(s.xy)
     const lijn = L.polyline(pad, { color: KLEUR[s[bron]], weight: 5, opacity: 1, lineCap: 'butt', bubblingMouseEvents: false }).addTo(routeLaag)
-    lijn.bindPopup(() => popup(s), { maxWidth: 300 })
+    lijn.bindPopup(() => {
+      const inhoud = document.createElement('div')
+      inhoud.innerHTML = popup(s)
+      if (uitslag.graaf && keuze().knopen) {
+        const knop = document.createElement('button')
+        knop.type = 'button'
+        knop.className = 'weghalen'
+        knop.textContent = '✂ Haal dit stukje weg'
+        knop.addEventListener('click', () => {
+          const plek = lijn.getPopup().getLatLng()
+          kaart.closePopup()
+          versleepNaar(dichtsteIndex(plek), null, null, true)
+        })
+        inhoud.appendChild(knop)
+      }
+      return inhoud
+    }, { maxWidth: 300 })
     lijn.bindTooltip(() => `km ${nl(s.van / 1000)}–${nl(s.tot / 1000)} · ${s[bron]}${s.twijfel ? ' · twijfel' : ''}`, { sticky: true })
     maakVersleepbaar(lijn)
     lijnen.push([lijn, s])
@@ -951,14 +967,14 @@ document.addEventListener('pointerup', (e) => {
 })
 
 /** Laat de route via een nieuw punt lopen (of, met loslaten, een versleept punt weer vrij). */
-async function versleepNaar(i0, punt, loslaten = null) {
+async function versleepNaar(i0, punt, loslaten = null, weghalen = false) {
   if (uitslag.graaf && keuze().knopen) {
     aanpassen = true
     kaart.getContainer().classList.add('rekent')
     try {
-      const nieuw = await pasRouteAan(uitslag, keuze(), { i0, punt, loslaten })
+      const nieuw = await pasRouteAan(uitslag, keuze(), { i0, punt, loslaten, weghalen })
       if (!nieuw) {
-        toonFout('Daar kan de route niet langs.')
+        toonFout(weghalen ? 'Dit stukje kan niet weg zonder grote omweg.' : 'Daar kan de route niet langs.')
         tekenRoute(false)
         return
       }
