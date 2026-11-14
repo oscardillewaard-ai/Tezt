@@ -124,7 +124,7 @@
               <option value="0.3">Sterke voorkeur</option>
             </select>
           </label>
-          <label class="vinkje"><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
+          <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
           <label class="veld">
             <span>Hoeveel routes vergelijken</span>
             <select id="grondig">
@@ -192,11 +192,11 @@
             <summary>Kilometers per ondergrond</summary>
             <table id="tabel"></table>
           </details>
-          <details class="blok">
+          <details class="blok" hidden>
             <summary>Langste onverharde stukken</summary>
             <table id="zacht"></table>
           </details>
-          <details class="blok" id="twijfelblok">
+          <details class="blok" id="twijfelblok" hidden>
             <summary id="twijfelkop">Twijfelstukken</summary>
             <ul class="twijfels" id="twijfels"></ul>
             <p class="noot" id="twijfelnoot"></p>

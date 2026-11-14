@@ -654,7 +654,7 @@ function vatSamen() {
   if (staat.heuvels) delen.push('meer hoogtemeters')
   if (staat.law !== 1) delen.push(staat.law <= 0.3 ? 'sterke LAW-voorkeur' : 'lichte LAW-voorkeur')
   delen.push(staat.grondig === 0 ? '1 route, zonder officiële kaart' : `${Math.max(1, staat.grondig)} ${staat.grondig === 1 ? 'route' : 'routes'}`)
-  if (staat.luchtfoto) delen.push("luchtfoto's")
+
   el('instSamenvatting').textContent = '· ' + delen.join(' · ')
 }
 el('instellingen').addEventListener('change', vatSamen)
