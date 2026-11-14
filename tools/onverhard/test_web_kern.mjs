@@ -3,6 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as K from '../../public/onverhard/kern.js'
+import * as G from '../../public/onverhard/graaf.js'
 
 const vierkant = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] })
 const feature = (id, fysiek, geometry, niveau = 0) => ({
@@ -312,4 +313,68 @@ test('toegangskaart: afgesloten paden herkennen en het profiel', () => {
   assert.ok(p.includes('assign afgesloten') && p.includes('multiply ( if afgesloten then 1.3 else 1 )'))
   assert.ok(!/assign forbidden = [^\n]*access=private/.test(p))
   assert.ok(K.maakProfiel(1, { trail: true }).includes('access=private|no not footok'))
+})
+
+// ---------- eigen routeplanner ----------
+// een rooster van paden (onverhard) met één asfaltweg erdoor, 100 m tussen kruisingen
+function roosterElementen() {
+  const el = []
+  const p = (i, j) => ({ lat: 52 + j * 0.0009, lon: 5 + i * 0.00146 })
+  let id = 1
+  for (let j = 0; j <= 10; j++) {
+    for (let i = 0; i < 10; i++) {
+      const tags = j === 5 ? { highway: 'tertiary', surface: 'asphalt' } : { highway: 'path', surface: 'sand' }
+      el.push({ type: 'way', id: id++, tags, geometry: [p(i, j), p(i + 1, j)] })
+    }
+  }
+  for (let i = 0; i <= 10; i++) {
+    for (let j = 0; j < 10; j++) el.push({ type: 'way', id: id++, tags: { highway: 'path', surface: 'ground' }, geometry: [p(i, j), p(i, j + 1)] })
+  }
+  return { el, p }
+}
+
+test('eigen planner: graaf, kortste mooiste pad, strand verboden, afgesloten alleen met kaartje', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  assert.equal(g.n, 121)
+  assert.equal(G.netwerken(g).grootte.length, 1)
+  // van links naar rechts over rij 5: de asfaltweg is korter dan om, maar het pad ernaast wint
+  const naarRd = (q) => K.naarRd(q.lon, q.lat)
+  const a = G.dichtsteKnoop(g, ...naarRd(p(0, 5))).knoop
+  const b = G.dichtsteKnoop(g, ...naarRd(p(10, 5))).knoop
+  const r = G.routeLangs(g, [a, b])
+  const tr = G.maakTraject(g, r.knopen, r.segs)
+  assert.ok(tr.segs.some(([, , t]) => t.includes('highway=path')))
+  assert.ok(!tr.segs.slice(1, -1).some(([, , t]) => t.includes('tertiary')), 'midden over het pad, niet over de weg')
+  // strand: een vlak over het hele rooster maakt elk segment heel duur
+  const strand = { type: 'way', id: 9999, tags: { natural: 'beach' }, geometry: [p(-1, -1), p(11, -1), p(11, 11), p(-1, 11), p(-1, -1)] }
+  const gs = G.bouwGraaf([...el, strand], { trail: true })
+  assert.equal(gs.aantalStrand, gs.lengte.length)
+  assert.equal(G.bouwGraaf([...el, strand], { trail: true, strandMijden: false }).aantalStrand, 0)
+  // afgesloten pad: zonder kaartje niet in de graaf, met kaartje wel
+  const dicht = [{ type: 'way', id: 1, tags: { highway: 'path', access: 'no' }, geometry: [p(0, 0), p(1, 0)] }]
+  assert.equal(G.bouwGraaf(dicht).lengte.length, 0)
+  assert.equal(G.bouwGraaf(dicht, { kaartje: true }).lengte.length, 1)
+  // de Overpass-vraag: cirkel om de start, zonder opritten en stoepen
+  const v = G.overpassVraag(52.1, 4.3, 5000)
+  assert.ok(v.includes('around:5000,52.10000,4.30000') && v.includes('sidewalk') && v.includes('natural"="beach'))
+})
+
+test('eigen planner: rondjes zijn echte lussen van ongeveer de gevraagde lengte, zonder uitstapjes', () => {
+  const { el, p } = roosterElementen()
+  const g = G.bouwGraaf(el, { trail: true })
+  const start = G.dichtsteKnoop(g, ...K.naarRd(p(5, 2).lon, p(5, 2).lat)).knoop
+  for (const kronkel of [false, true]) {
+    const z = G.zoekRondjes(g, start, 2400, { kronkel })
+    assert.ok(z.rondjes.length >= 2, `rondjes gevonden (kronkel ${kronkel})`)
+    const r = z.rondjes[0]
+    assert.equal(r.knopen[0], start)
+    assert.equal(r.knopen[r.knopen.length - 1], start)
+    assert.ok(Math.abs(r.meter - 2400) / 2400 < 0.25, `lengte ${r.meter}`)
+    assert.ok(r.dubbel < 0.2, `dubbel ${r.dubbel}`)
+    assert.equal(r.strand, 0)
+    for (let i = 1; i < r.segs.length; i++) assert.notEqual(r.segs[i], r.segs[i - 1], 'geen heen-en-terug over één segment')
+  }
+  // uitstapje: 0-1-2-1-3 wordt 0-1-3
+  assert.deepEqual(G.zonderUitstapjes([0, 1, 2, 1, 3], [10, 11, 11, 12]), { knopen: [0, 1, 3], segs: [10, 12] })
 })

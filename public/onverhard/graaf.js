@@ -381,12 +381,12 @@ export function zonderUitstapjes(knopen, segs) {
  * Zoek rondjes van ongeveer 'doel' meter vanaf knoop 'start'. Een rondje gaat
  * start → A → B (→ C) → start; de hoekpunten komen uit een ring van
  * kandidaten rond de start (per windrichting en afstand de plek met de
- * mooiste route ernaartoe). Wat al gelopen is krijgt straf, zodat het een
+ * mooiste route ernaartoe). Wat al gelopen is kost acht keer zo veel, zodat het een
  * echte lus wordt. 'kronkel': vier hoeken dicht bij de start in plaats van
  * een grote driehoek, voor kronkelen in een klein gebied.
  * Geeft {rondjes: [{knopen, segs, meter, kosten, dubbel, strand, via}], ...}.
  */
-export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false } = {}) {
+export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false, strafFactor = 8 } = {}) {
   const boom = dijkstra(g, start, { maxKosten: doel * 6 })
   const sx = g.x[start]
   const sy = g.y[start]
@@ -434,7 +434,7 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
   for (const { hoeken } of combis.slice(0, maxProbeer)) {
     straf.fill(1)
     const p1 = pad(boom, hoeken[0].knoop)
-    for (const s of p1.segs) straf[s] = 4
+    for (const s of p1.segs) straf[s] = strafFactor
     let knopen = p1.knopen.slice()
     let segs = p1.segs.slice()
     let vorige = hoeken[0].knoop
@@ -446,7 +446,7 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
         break
       }
       const p = pad(b, doelKnoop)
-      for (const s of p.segs) straf[s] = 4
+      for (const s of p.segs) straf[s] = strafFactor
       knopen = knopen.concat(p.knopen.slice(1))
       segs = segs.concat(p.segs)
       vorige = doelKnoop

@@ -316,10 +316,11 @@ draait in je browser; er is geen eigen server.
   als hij niet veel langer wordt en niet meer heen en terug gaat; anders
   meldt de app hoeveel strand er nog in zit.
 - *Hoeveel routes vergelijken*: 2 (standaard), 4, 1, of 1 zonder officiële
-  kaart. Bij een rondje is "1 route" ook een snelle zoektocht (6 richtingen en
-  5 in plaats van 7 routes per lus): ongeveer half zo lang wachten, maar in de
-  vergelijking met Komoot duidelijk minder mooie rondjes (bijvoorbeeld
-  Meijendel 56% in plaats van 75% onverhard, N70 55% in plaats van 86%).
+  kaart. Gaat een rondje via BRouter, dan is "1 route" ook een snelle
+  zoektocht (6 richtingen en 5 in plaats van 7 routes per lus): ongeveer half
+  zo lang wachten, maar duidelijk minder mooie rondjes (in de vergelijking met
+  Komoot bijvoorbeeld Meijendel 56% in plaats van 75% onverhard). Voor de
+  eigen planner maakt het voor de kwaliteit niet uit.
 - *Luchtfoto's bij twijfelstukken* (standaard uit): een uitsnede van de
   luchtfoto bij elk twijfelstuk, met een kleurindicatie. In de praktijk voegde
   het weinig toe, daarom staat het uit.
@@ -340,7 +341,34 @@ draait in je browser; er is geen eigen server.
   meer dan 25% heen en terug gaat, biedt de app alleen aan als er niets anders
   is.
 
-**Hoe een rondje gezocht wordt** ("Grote lus"): per windrichting (8) legt de
+**Rondjes rekent de app zelf uit** (sinds november 2026). Een rondje vanaf
+één punt gaat niet meer via de BRouter-server, maar zo:
+
+1. De app haalt alle wegen en paden binnen een cirkel rond de start op uit
+   OpenStreetMap via de [Overpass API](https://overpass-api.de) (straal
+   ongeveer 0,38 × de lengte; opritten, parkeerplaatsen en stoepen niet). In
+   de duinen is dat een paar honderd kB, naast een stad een paar MB
+   (gecomprimeerd over de lijn).
+2. Van die paden maakt hij een netwerk (`graaf.js`) met dezelfde kosten als
+   het BRouter-profiel: smalle onverharde paadjes het goedkoopst, asfalt het
+   duurst. Strand (in OpenStreetMap `natural=beach`) is bijna verboden; een
+   afgesloten pad doet alleen mee met het vinkje voor de toegangskaart.
+3. Per windrichting (24) en afstand (4 ringen) zoekt hij de plek met de
+   mooiste weg ernaartoe. Uit die plekken probeert hij een paar honderd
+   driehoeken start → A → B → start ("Kronkelen": vier hoeken dicht bij de
+   start); wat al gelopen is krijgt straf, zodat het een echte lus wordt, en
+   doodlopende uitstapjes vallen weg. Dat kost minder dan een seconde.
+4. De beste vijf legt hij langs de officiële kaart. Vindt die strand of
+   afgesloten stukken buiten de natuur die OpenStreetMap niet zo kent, dan
+   zoekt hij nog één keer met die plekken verboden.
+
+Een rondje duurt zo een paar seconden in plaats van een paar minuten. Geeft
+Overpass geen antwoord (na 45 seconden per server, twee servers), dan rekent
+de app het rondje via BRouter zoals hieronder en zegt dat erbij. Een voorkeur
+voor LAW-routes gaat ook via BRouter: alleen BRouter kent de wandelroutes.
+
+**Via BRouter** (rondje via een keerpunt, van A naar B, of als Overpass niet
+antwoordt). Per windrichting (8) legt de
 app een keerpunt op ongeveer een kwart van de lengte; Komoot-rondjes zijn
 3,4 tot 5,3 keer zo lang als hun verste punt. Het keerpunt wordt naar de
 natuur getrokken (de officiële kaart, 100 m rondom: duin, bos, heide tellen,
@@ -367,7 +395,13 @@ De publieke BRouter-server antwoordt bij te veel verzoeken tegelijk met
 "probeer later". Daarom stuurt de app één verzoek tegelijk (minstens een
 seconde ertussen). Een rondje kost daardoor al gauw een paar minuten.
 
-**Vergelijking met Komoot** (`benchmark_rondjes.mjs`): zes trailgebieden, elk
+**Vergelijking met Komoot, eigen planner** (`benchmark_eigen.mjs`): zes
+trailgebieden, elk met een Komoot-hardlooproute als referentie, zelfde start
+en lengte, onverhard gemeten langs de officiële kaart:
+
+TABEL_EIGEN
+
+**Eerdere vergelijking, via BRouter** (`benchmark_rondjes.mjs`): zes trailgebieden, elk
 met een Komoot-hardlooproute als referentie, zelfde start en lengte. Onverhard
 gemeten langs de officiële kaart (voor Komoot hebben we geen OpenStreetMap-tags):
 
@@ -380,10 +414,11 @@ gemeten langs de officiële kaart (voor Komoot hebben we geen OpenStreetMap-tags
 | Loonse en Drunense Duinen (11 km) | 97% | 94% | 2% |
 | Veluwezoom (15 km) | 89% | 96% | 9% |
 
-Na deze meting is de grens voor heen en terug van 25% naar 15% gegaan. Bij
-Rockanje is "onverhard" volgens de officiële kaart lager dan volgens
-OpenStreetMap, omdat smalle duinpaden daar niet als pad op de officiële kaart
-staan.
+Na deze meting is de grens voor heen en terug van 25% naar 15% gegaan. De 67%
+bij Rockanje bleek een fout in het lezen van de officiële kaart: een object
+dat uit losse delen bestaat (het strand van Voornes Duin) kwam alleen met de
+delen uit de eerste tegel binnen. Na de reparatie is die route 97% onverhard,
+maar met 1,9 km strand; zonder strand haalde BRouter daar maar 54%.
 
 **Verschillen met de Python-tool**
 
@@ -413,16 +448,19 @@ node --test tools/onverhard/test_web_kern.mjs          # offline: rekenkern, teg
 NODE_USE_ENV_PROXY=1 node tools/onverhard/vergelijk_web.mjs uit/test.json "51.9921,4.3481" ...   # naast Python leggen
 (cd public && python3 -m http.server 8765) &
 node tools/onverhard/test_web_e2e.mjs <map> uit/test.json 'p=51.9921,4.3481;51.9255,4.4679&trail=0&strand=0'
-NODE_USE_ENV_PROXY=1 node tools/onverhard/benchmark_rondjes.mjs <map met komoot-gpx> [uit.json] [gebied ...]   # rondjes naast Komoot
+NODE_USE_ENV_PROXY=1 node tools/onverhard/benchmark_rondjes.mjs <map met komoot-gpx> [uit.json] [gebied ...]   # BRouter-rondjes naast Komoot
+NODE_USE_ENV_PROXY=1 node tools/onverhard/benchmark_eigen.mjs <map met komoot-gpx> [uit.json] [gebied ...]     # eigen rondjes naast Komoot
 ```
 
 `NODE_USE_ENV_PROXY=1` is alleen nodig achter een proxy. De end-to-end-test
 gebruikt Playwright uit de `node_modules` van de repo; zet `CHROMIUM_PAD` als
 die geen eigen browser heeft, en `ONVERHARD_URL` om de live site te testen.
+Met `ONVERHARD_OVERPASS=<bestand>` beantwoordt de test de Overpass-vraag met
+een eerder opgehaald antwoord (handig als Overpass druk is).
 
 ## Bronnen
 
-- Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL).
+- Routering: [BRouter](https://brouter.de) op data van © OpenStreetMap-bijdragers (ODbL); in de webversie rondjes zelf berekend op OpenStreetMap-data via de [Overpass API](https://overpass-api.de).
 - Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0): OGC API Features in de Python-tool, vectortegels in de webversie.
 - Luchtfoto: PDOK luchtfoto RGB, Het Waterschapshuis / Beeldmateriaal Nederland (CC BY 4.0).
 
