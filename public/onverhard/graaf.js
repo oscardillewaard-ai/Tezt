@@ -857,7 +857,9 @@ export function doorElkeStraat(g, start, vereist) {
   }
   for (const [a, b] of randen) voeg(a, b)
   zetIn(start)
+  let verbindMeter = 0
   const padToevoegen = (p) => {
+    for (const s of p.segs) verbindMeter += g.lengte[s]
     for (let i = 0; i < p.segs.length; i++) {
       randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
       voeg(p.knopen[i], p.knopen[i + 1])
@@ -902,7 +904,7 @@ export function doorElkeStraat(g, start, vereist) {
   const paren = []
   for (const u of oneven) {
     let gevonden = 0
-    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => v !== u && onevenSet.has(v) && ++gevonden >= 10 })
+    const boom = dijkstra(g, u, { alleenLengte: true, stop: (v) => v !== u && onevenSet.has(v) && ++gevonden >= 20 })
     for (const v of oneven) {
       if (v !== u && Number.isFinite(boom.kosten[v])) {
         zetAfst(u, v, boom.kosten[v])
@@ -931,32 +933,62 @@ export function doorElkeStraat(g, start, vereist) {
     partner.set(u, v)
     partner.set(v, u)
   }
-  // dan verbeteren: twee paren (a,b) en (c,e) ruilen als (a,c)+(b,e) of (a,e)+(b,c) korter is
-  for (let ronde = 0; ronde < 20; ronde++) {
+  // dan verbeteren: twee paren (a,b) en (c,e) ruilen als (a,c)+(b,e) of (a,e)+(b,c) korter is;
+  // vanuit a én vanuit b zoeken, en doorgaan tot het niet meer korter wordt
+  const koppel = (x, y) => {
+    partner.set(x, y)
+    partner.set(y, x)
+  }
+  const verbeter = () => {
+  for (let ronde = 0; ronde < 60; ronde++) {
     let beter = false
-    const lijst = [...partner.entries()].filter(([u, v]) => u < v)
-    for (let i = 0; i < lijst.length; i++) {
-      const [a1, b1] = lijst[i]
-      if (partner.get(a1) !== b1) continue
-      for (const c1 of afst.get(a1) ? afst.get(a1).keys() : []) {
-        const e1 = partner.get(c1)
-        if (e1 === undefined || c1 === b1 || e1 === a1) continue
-        const nu = d(a1, b1) + d(c1, e1)
-        const r1 = d(a1, c1) + d(b1, e1)
-        if (r1 < nu - 1) {
-          partner.set(a1, c1); partner.set(c1, a1); partner.set(b1, e1); partner.set(e1, b1)
-          beter = true
-          break
+    for (const a1 of oneven) {
+      const b1 = partner.get(a1)
+      if (b1 === undefined) continue
+      for (const [x, y] of [[a1, b1], [b1, a1]]) {
+        for (const c1 of afst.get(x) ? afst.get(x).keys() : []) {
+          const e1 = partner.get(c1)
+          if (e1 === undefined || c1 === y || c1 === x || e1 === x) continue
+          const nu = d(x, y) + d(c1, e1)
+          if (d(x, c1) + d(y, e1) < nu - 1) {
+            koppel(x, c1)
+            koppel(y, e1)
+            beter = true
+            break
+          }
+          if (d(x, e1) + d(y, c1) < nu - 1) {
+            koppel(x, e1)
+            koppel(y, c1)
+            beter = true
+            break
+          }
         }
+        if (partner.get(a1) !== b1) break
       }
     }
     if (!beter) break
   }
+  }
+  verbeter()
+  // Lange paren (restjes van de gretige stap): voor die knopen ook de afstanden verder weg
+  // uitrekenen, zodat ruilen met paren die verder weg liggen ook kan. Daarna nog eens verbeteren.
+  for (let keer = 0; keer < 2; keer++) {
+    const lang = oneven.filter((x) => partner.has(x) && d(x, partner.get(x)) > 60)
+    if (!lang.length) break
+    for (const x of lang) {
+      const grens = Math.min(3000, 2 * d(x, partner.get(x)) + 200)
+      const boom = dijkstra(g, x, { alleenLengte: true, maxKosten: grens })
+      for (const y of oneven) if (y !== x && boom.kosten[y] <= grens) zetAfst(x, y, boom.kosten[y])
+    }
+    verbeter()
+  }
   // de gekozen verbindingen dubbel lopen
+  let koppelMeter = 0
   for (const [u, v] of partner) {
     if (u > v) continue
     const boom = dijkstra(g, u, { alleenLengte: true, doel: v })
     if (!Number.isFinite(boom.kosten[v])) continue
+    koppelMeter += boom.kosten[v]
     const p = pad(boom, v)
     for (let i = 0; i < p.segs.length; i++) randen.push([p.knopen[i], p.knopen[i + 1], p.segs[i]])
   }
@@ -993,7 +1025,7 @@ export function doorElkeStraat(g, start, vereist) {
   const segs = kring.slice(1).map(([, s]) => s)
   let meter = 0
   for (const s of segs) meter += g.lengte[s]
-  return { knopen, segs, meter, vereistMeter, extraMeter: Math.max(0, meter - vereistMeter), nietGelopen: randen.length - segs.length }
+  return { knopen, segs, meter, vereistMeter, extraMeter: Math.max(0, meter - vereistMeter), nietGelopen: randen.length - segs.length, verbindMeter, koppelMeter, oneven: oneven.length }
 }
 
 // ---------- Route langs een tekening ----------

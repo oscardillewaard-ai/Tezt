@@ -311,7 +311,8 @@ draait in je browser; er is geen eigen server.
   pelt het netwerk af vanaf de losse eindjes; een straat die als voetpad
   doorloopt is voor een hardloper niet doodlopend. Na het gretig koppelen
   ruilt de app paren als dat korter is. Een startpunt buiten het gebied telt
-  niet mee. Delft binnenstad, straten: 48 km straat, route 64,5 km. Elsenburgerbos, alle paden: 9,2 km paden, route
+  niet mee. Delft binnenstad, straten: 48 km straat, route 62,4 km (23% extra;
+  lange paren krijgen een tweede ronde ruilen met verder weg gelegen knopen). Elsenburgerbos, alle paden: 9,2 km paden, route
   12,1 km (24% dubbel of verbinding).
 - **Tekenen**: trek met je vinger de route die je wilt lopen. De app zoekt de
   paden die de lijn volgen: een pad binnen 20 m van de lijn is bijna gratis,
