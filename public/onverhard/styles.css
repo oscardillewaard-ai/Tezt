@@ -539,3 +539,11 @@ details.meer > summary { cursor: pointer; margin-top: 12px; color: var(--inkt-2)
 .bewaardlijst b { display: block; font-weight: 600; }
 .bewaardlijst small { display: block; color: var(--inkt-3); font: 500 11px var(--mono); }
 .bewaardlijst button { min-height: 36px; padding: 4px 10px; font-size: 14px; }
+
+/* rechtermuisknop / lang drukken op de kaart */
+.kaartmenu { position: fixed; z-index: 3000; min-width: 210px; padding: 6px; border-radius: 12px; background: var(--vlak); color: var(--inkt);
+             border: 1.5px solid var(--rand); box-shadow: 0 10px 30px rgb(0 0 0 / .3); animation: menu-in .12s ease-out; }
+.kaartmenu button { display: block; width: 100%; text-align: left; border: 0; background: none; min-height: 38px; padding: 6px 10px; border-radius: 8px; font-size: 15px; }
+.kaartmenu button:hover, .kaartmenu button:focus-visible { background: var(--vlak-2); }
+.kaartmenu hr { border: 0; border-top: 1px solid var(--rand); margin: 4px 2px; }
+@keyframes menu-in { from { opacity: 0; transform: scale(.96); } }

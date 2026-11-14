@@ -1944,6 +1944,103 @@ for (const plek of [document.body]) {
   })
 }
 
+// ---------- Rechtermuisknop / lang drukken op de kaart ----------
+function sluitMenu() {
+  el('kaartmenu').hidden = true
+}
+kaart.on('contextmenu', (e) => {
+  if (tekenen || stopper) return
+  L.DomEvent.preventDefault(e.originalEvent)
+  const p = [e.latlng.lat, e.latlng.lng]
+  const opties = []
+  const zet = (fn) => () => {
+    sluitMenu()
+    if (!inNederland(p)) return toonFout('Dat punt ligt buiten Nederland.')
+    fn()
+  }
+  if (uitslag && uitslag.graaf && keuze().knopen && stap === 4) {
+    opties.push(['↪ Route via hier', zet(() => versleepNaar(dichtsteIndex(e.latlng), p))])
+    opties.push(null)
+  }
+  if (staat.modus === 'route') {
+    opties.push(['📍 Start hier', zet(() => {
+      onthoud()
+      staat.punten = staat.punten.length ? [p, ...staat.punten.slice(1)] : [p]
+      puntenGewijzigd()
+      if (stap < 2 || stap === 4) toonStap(2)
+    })])
+    opties.push(['🏁 Eindpunt hier', zet(() => {
+      onthoud()
+      staat.punten = staat.punten.length > 1 ? [...staat.punten.slice(0, -1), p] : [...staat.punten, p]
+      puntenGewijzigd()
+      if (stap < 2 || stap === 4) toonStap(2)
+    })])
+    if (staat.punten.length >= 2) {
+      opties.push(['➕ Tussenpunt hier', zet(() => {
+        onthoud()
+        staat.punten.splice(staat.punten.length - 1, 0, p)
+        puntenGewijzigd()
+      })])
+    }
+  }
+  opties.push(['⟳ Rondje vanaf hier', zet(() => {
+    onthoud()
+    zetModus('rondje')
+    staat.punten = [p]
+    puntenGewijzigd()
+    toonStap(3)
+  })])
+  if (TEKENMODI.has(staat.modus) && staat.modus !== 'tekenen') {
+    opties.push(['📍 Start van het rondje hier', zet(() => {
+      onthoud()
+      staat.punten = [p]
+      puntenGewijzigd()
+    })])
+  }
+  opties.push(null)
+  opties.push(['🔍 Zoom in hier', () => {
+    sluitMenu()
+    kaart.setView(e.latlng, Math.min(18, kaart.getZoom() + 2))
+  }])
+  opties.push(['📋 Kopieer coördinaten', async () => {
+    sluitMenu()
+    const tekst = `${p[0].toFixed(5)}, ${p[1].toFixed(5)}`
+    try {
+      await navigator.clipboard.writeText(tekst)
+    } catch {
+      prompt('Coördinaten:', tekst)
+    }
+  }])
+  const menu = el('kaartmenu')
+  menu.innerHTML = ''
+  for (const o of opties) {
+    if (!o) {
+      if (menu.lastChild && menu.lastChild.tagName !== 'HR') menu.appendChild(document.createElement('hr'))
+      continue
+    }
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.setAttribute('role', 'menuitem')
+    knop.textContent = o[0]
+    knop.addEventListener('click', o[1])
+    menu.appendChild(knop)
+  }
+  menu.hidden = false
+  const x = e.originalEvent.clientX
+  const y = e.originalEvent.clientY
+  menu.style.left = `${Math.min(x, window.innerWidth - menu.offsetWidth - 8)}px`
+  menu.style.top = `${Math.min(y, window.innerHeight - menu.offsetHeight - 8)}px`
+  netGetekend = Date.now() // de tik die het menu sluit is geen nieuw punt
+  menu.querySelector('button')?.focus()
+})
+document.addEventListener('pointerdown', (e) => {
+  if (!el('kaartmenu').hidden && !el('kaartmenu').contains(e.target)) sluitMenu()
+})
+kaart.on('movestart zoomstart', sluitMenu)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') sluitMenu()
+})
+
 // ---------- Kennismaking ----------
 const INTRO = 'onverhard.intro'
 let introDia = 0

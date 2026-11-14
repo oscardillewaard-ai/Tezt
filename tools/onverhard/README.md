@@ -363,6 +363,12 @@ steeds in beeld.
 - **GPX openen**: een bestaande route (knop of slepen op de pagina) bekijken
   met de paden eronder (dichtstbijzijnde pad binnen 15 m), de officiële kaart,
   hoogte en water.
+- **Bewaren**: "★ Bewaar" zet de route (met de punten of tekening) in de
+  browser; "Mijn routes" in stap 1 opent of verwijdert ze.
+- **Rechtermuisknop of lang drukken op de kaart**: start, eindpunt of
+  tussenpunt hier, rondje vanaf hier, route via hier, inzoomen, coördinaten.
+- **Lusjes**: komt een rondje na een omweg van hooguit 800 m weer binnen 40 m
+  van een eerder punt, en is er een korte verbinding, dan valt de omweg weg.
 - **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
   tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
   "Opnieuw" of na een nieuwe planning).
