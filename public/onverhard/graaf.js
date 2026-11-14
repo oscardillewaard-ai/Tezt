@@ -1095,3 +1095,62 @@ export function laatLos(g, knopen, segs, vast, index, { venster = null } = {}) {
   const verschuiving = p.segs.length - (na - voor)
   return { knopen: nieuweKnopen, segs: nieuweSegs, vast: rest.map((k) => (k >= na ? k + verschuiving : k)) }
 }
+
+// ---------- Water onderweg ----------
+/**
+ * Punten (water, horeca, winkel, toilet, tankstation) binnen 'max' meter van
+ * de route, met hun plek langs de route. Geeft ze gesorteerd op afstand vanaf
+ * de start: [{soort, naam, lat, lon, km, afstand, index}], plus het langste
+ * stuk zonder waterpunt (in meter, start en finish tellen als waterpunt).
+ */
+export function waterLangs(xy, pois, max = 300) {
+  const opgeteld = [0]
+  for (let i = 1; i < xy.length; i++) opgeteld.push(opgeteld[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
+  // segmenten van de route in een rooster van 200 m (een lang recht stuk in alle cellen die het raakt)
+  const rooster = new Map()
+  for (let i = 1; i < xy.length; i++) {
+    const [ax, ay] = xy[i - 1]
+    const [bx, by] = xy[i]
+    const stappen = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 100))
+    const cellen = new Set()
+    for (let k = 0; k <= stappen; k++) cellen.add(Math.floor((ax + ((bx - ax) * k) / stappen) / 200) + ',' + Math.floor((ay + ((by - ay) * k) / stappen) / 200))
+    for (const c of cellen) {
+      if (!rooster.has(c)) rooster.set(c, [])
+      rooster.get(c).push(i)
+    }
+  }
+  const uit = []
+  const gezien = [] // [soort, x, y] van wat er al in zit
+  for (const p of pois) {
+    const [x, y] = K.naarRd(p.lon, p.lat)
+    if (gezien.some(([s, gx, gy]) => s === p.soort && Math.hypot(gx - x, gy - y) < 15)) continue // zelfde punt uit twee tegels
+    let beste = -1
+    let besteD = max
+    let besteKm = 0
+    const cx = Math.floor(x / 200)
+    const cy = Math.floor(y / 200)
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      for (const i of rooster.get(cx + dx + ',' + (cy + dy)) || []) {
+        const [ax, ay] = xy[i - 1]
+        const [bx, by] = xy[i]
+        const l2 = (bx - ax) ** 2 + (by - ay) ** 2
+        let t = l2 ? ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / l2 : 0
+        t = t < 0 ? 0 : t > 1 ? 1 : t
+        const d = Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay)))
+        if (d < besteD) {
+          besteD = d
+          beste = t < 0.5 ? i - 1 : i
+          besteKm = (opgeteld[i - 1] + t * (opgeteld[i] - opgeteld[i - 1])) / 1000
+        }
+      }
+    }
+    if (beste < 0) continue
+    gezien.push([p.soort, x, y])
+    uit.push({ ...p, afstand: besteD, index: beste, km: besteKm })
+  }
+  uit.sort((a, b) => a.km - b.km)
+  const plekken = [0, ...uit.map((p) => p.km * 1000), opgeteld[opgeteld.length - 1]]
+  let langst = 0
+  for (let i = 1; i < plekken.length; i++) langst = Math.max(langst, plekken[i] - plekken[i - 1])
+  return { punten: uit, langsteZonder: langst }
+}

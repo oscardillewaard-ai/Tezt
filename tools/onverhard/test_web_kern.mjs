@@ -646,3 +646,14 @@ test('route verslepen: het stuk rond de greep gaat via het nieuwe punt, loslaten
   assert.equal(l.knopen[0], start)
   assert.equal(l.knopen[l.knopen.length - 1], start)
 })
+
+test('water onderweg: punten bij de route met hun km, dubbele weg, langste stuk zonder', () => {
+  const p = (dx, dy) => ({ lat: 52 + dy / 111320, lon: 5 + dx / 68600 })
+  const xy = [[0, 0], [5000, 0]].map(([dx, dy]) => { const q = p(dx, dy); return K.naarRd(q.lon, q.lat) })
+  // lijn van 5 km; taps op 1 km (dubbel uit twee tegels) en 4 km, een café 1 km van de route af
+  const poi = (soort, dx, dy) => ({ type: 'poi', soort, naam: '', ...p(dx, dy) })
+  const w = G.waterLangs(xy, [poi('water', 1000, 20), poi('water', 1003, 21), poi('water', 4000, -50), poi('horeca', 2500, 1000)], 300)
+  assert.equal(w.punten.length, 2)
+  assert.ok(Math.abs(w.punten[0].km - 1) < 0.25 && Math.abs(w.punten[1].km - 4) < 0.25)
+  assert.ok(Math.abs(w.langsteZonder - 3000) < 300, `${w.langsteZonder}`)
+})

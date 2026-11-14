@@ -672,7 +672,7 @@ el('opnieuw').addEventListener('click', () => {
   plan = null
   gekozen = 0
   opKaart.clear()
-  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag]) laag.clearLayers()
+  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag]) laag.clearLayers()
   el('resultaat').hidden = true
   toonFout('')
   bewaar()
@@ -1001,6 +1001,69 @@ function tekenHandvatten() {
     m.bindPopup(knop)
   }
 }
+
+// ---------- Water onderweg ----------
+const waterLaag = L.layerGroup().addTo(kaart)
+const WATER = { water: ['💧', 'Drinkwater'], horeca: ['☕', 'Horeca'], winkel: ['🛒', 'Winkel'], toilet: ['🚻', 'Toilet'], tank: ['⛽', 'Tankstation'] }
+let waterAlles = false
+
+function tekenWater() {
+  waterLaag.clearLayers()
+  const w = keuze().water
+  const blok = el('water')
+  if (!w) {
+    blok.hidden = true
+    return
+  }
+  blok.hidden = false
+  const aantalWater = w.punten.filter((p) => p.soort === 'water').length
+  el('waterkop').textContent = `Water onderweg · ${aantalWater} tap${aantalWater === 1 ? '' : 'punten'} · langste stuk zonder ${nl(w.langsteZonder / 1000, 1)} km`
+  const kanVia = !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
+  const lijst = el('waterlijst')
+  lijst.innerHTML = ''
+  const tonen = waterAlles ? w.punten : w.punten.slice(0, 10)
+  for (const p of tonen) {
+    const [ico, soort] = WATER[p.soort]
+    const li = document.createElement('li')
+    li.innerHTML = `<span class="ico">${ico}</span><span class="km">km ${nl(p.km, 1)}</span><span>${veilig(p.naam || soort)}<small>${Math.round(p.afstand)} m van de route</small></span>`
+    if (kanVia) {
+      const knop = document.createElement('button')
+      knop.type = 'button'
+      knop.textContent = 'Via hier'
+      knop.addEventListener('click', () => versleepNaar(p.index, [p.lat, p.lon]))
+      li.appendChild(knop)
+    }
+    li.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') kaart.setView([p.lat, p.lon], Math.max(kaart.getZoom(), 16))
+    })
+    lijst.appendChild(li)
+  }
+  el('waterMeer').hidden = waterAlles || w.punten.length <= 10
+  for (const p of w.punten) {
+    const [ico, soort] = WATER[p.soort]
+    const m = L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: '', html: `<div class="waterico ${p.soort}">${ico}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+      keyboard: false, zIndexOffset: 500,
+    }).addTo(waterLaag)
+    const inhoud = document.createElement('div')
+    inhoud.innerHTML = `<b>${veilig(p.naam || soort)}</b><br>${soort} · km ${nl(p.km, 1)} · ${Math.round(p.afstand)} m van de route<br>`
+    if (kanVia) {
+      const knop = document.createElement('button')
+      knop.type = 'button'
+      knop.textContent = 'Route via hier'
+      knop.addEventListener('click', () => {
+        kaart.closePopup()
+        versleepNaar(p.index, [p.lat, p.lon])
+      })
+      inhoud.appendChild(knop)
+    }
+    m.bindPopup(inhoud)
+  }
+}
+el('waterMeer').addEventListener('click', () => {
+  waterAlles = true
+  tekenWater()
+})
 
 function kleurRoute() {
   for (const [lijn, s] of lijnen) lijn.setStyle({ color: KLEUR[s[bron]] })
@@ -1404,6 +1467,7 @@ function toonResultaat(nieuw) {
   el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
   tekenOpties()
   tekenProfiel()
+  tekenWater()
   tekenAlternatieven()
   tekenRoute(nieuw)
   tekenBalken()
@@ -1455,7 +1519,7 @@ function herstel(opname) {
     toonResultaat(false)
   } else {
     plan = null
-    for (const laag of [routeLaag, altLaag, profielLaag]) laag.clearLayers()
+    for (const laag of [routeLaag, altLaag, profielLaag, waterLaag]) laag.clearLayers()
     el('resultaat').hidden = true
   }
   el('km').value = staat.km

@@ -891,8 +891,12 @@ async function ofmAdres(signal) {
  * nieuwe kaartversie), dus een tweede rondje in dezelfde buurt kost niets.
  */
 export async function haalTegelPaden([lat, lon], straal, signal, voortgang = () => {}) {
+  return haalTegels(T.tegelsRond(lat, lon, straal), signal, voortgang)
+}
+
+/** Lees deze kaarttegels ([[x, y], ...] op zoom 14): wegen, paden, stranden en punten. */
+export async function haalTegels(tegels, signal, voortgang = () => {}) {
   const sjabloon = await ofmAdres(signal)
-  const tegels = T.tegelsRond(lat, lon, straal)
   const uit = []
   let volgende = 0
   let klaar = 0
@@ -1129,6 +1133,27 @@ export async function planTekening(instel, bgt, meld, signal) {
   return { opties: [{ traject, an, knopen: r.knopen, segs: r.segs }], waarschuwingen, doel: r.meter, eigen: true, uitleg: [], graaf: g }
 }
 
+// ---------- Water onderweg ----------
+/**
+ * Waterpunten langs elke route: de kaarttegels waar de routes doorheen gaan
+ * (en de buren), uit de browsercache als ze al gehaald zijn. Hooguit 250 tegels.
+ */
+async function voegWaterToe(lijst, signal, meld) {
+  const tegels = new Map()
+  for (const o of lijst) {
+    const xy = o.analyse.xy
+    for (let i = 0; i < xy.length; i += 8) {
+      const [lon, lat] = K.naarWgs(xy[i][0], xy[i][1])
+      const [x, y] = T.tegelXY(lat, lon)
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) tegels.set(`${x + dx}/${y + dy}`, [x + dx, y + dy])
+    }
+  }
+  if (tegels.size > 250) return
+  meld('Water onderweg zoeken')
+  const pois = (await haalTegels([...tegels.values()], signal)).filter((e) => e.type === 'poi')
+  for (const o of lijst) o.water = G.waterLangs(o.analyse.xy, pois, 300)
+}
+
 // ---------- Hoogtemeters (AHN via PDOK) ----------
 const ahnCache = new Map()
 
@@ -1251,6 +1276,11 @@ export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null },
   if (uitslag.bgt) await markeerOngewenst(an, uitslag.instel || {}, uitslag.bgt)
   const nieuw = optieVan({ traject, an, ronden: optie.ronden }, optie.naam)
   Object.assign(nieuw, { knopen: r.knopen, segs: r.segs, vast: r.vast })
+  try {
+    await voegWaterToe([nieuw], signal, () => {})
+  } catch (fout) {
+    if (afgebroken(fout)) throw fout
+  }
   try {
     await voegHoogtesToe([nieuw], signal, () => {})
     nieuw.stijgen = nieuw.hoogte ? nieuw.hoogte.stijgen : null
@@ -1431,6 +1461,11 @@ export async function maakPlan(opties) {
       o.dalen = o.hoogte ? o.hoogte.dalen : null
     }
     if (lijst.some((o) => !o.hoogte)) meldingen.push('Hoogtemeters onbekend')
+    try {
+      await voegWaterToe(lijst, opties.signal, meld)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+    }
   }
   if (br.strandMijden && lijst.some((o) => o.strand > 300)) {
     meldingen.push('Strand niet helemaal te vermijden')

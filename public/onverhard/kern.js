@@ -468,7 +468,11 @@ export class Lezer {
   sla(type) {
     if (type === 0) this.varint()
     else if (type === 1) this.pos += 8
-    else if (type === 2) this.pos += this.varint()
+    else if (type === 2) {
+      // eerst de lengte lezen, dan pas optellen (anders telt de oude positie mee)
+      const lengte = this.varint()
+      this.pos += lengte
+    }
     else if (type === 5) this.pos += 4
     else throw new Error(`onbekend protobuf-veldtype ${type}`)
   }

@@ -38,6 +38,15 @@ const KLASSE = {
   minor: 'unclassified', service: 'service', track: 'track', path: 'path', raceway: 'raceway', busway: 'bus_guideway',
 }
 
+// punten waar je water kunt krijgen (OpenMapTiles-laag 'poi': klasse/subklasse)
+export const POI_SOORT = {
+  'drinking_water/drinking_water': 'water',
+  'cafe/cafe': 'horeca', 'restaurant/restaurant': 'horeca', 'fast_food/fast_food': 'horeca', 'beer/pub': 'horeca', 'bar/bar': 'horeca', 'ice_cream/ice_cream': 'horeca',
+  'grocery/supermarket': 'winkel', 'shop/convenience': 'winkel', 'bakery/bakery': 'winkel',
+  'toilets/toilets': 'toilet',
+  'fuel/fuel': 'tank',
+}
+
 function highwayVan(p) {
   const k = p.class
   if (k === 'path') return ['footway', 'cycleway', 'bridleway', 'steps', 'pedestrian', 'path'].includes(p.subclass) ? p.subclass : 'path'
@@ -79,7 +88,7 @@ export function leesOsmTegel(bytes, x, y, idStart = 0) {
       else if (n === 5 && t === 0) extent = laag.varint()
       else laag.sla(t)
     }
-    if (naam !== 'transportation' && naam !== 'landcover') continue
+    if (naam !== 'transportation' && naam !== 'landcover' && naam !== 'poi') continue
     const waardeCache = new Map()
     const waarde = (i) => {
       if (!waardeCache.has(i)) waardeCache.set(i, leesWaarde(waarden[i]))
@@ -142,6 +151,12 @@ export function leesOsmTegel(bytes, x, y, idStart = 0) {
         if (p.brunnel === 'tunnel') t.tunnel = 'yes'
         if (p.layer) t.layer = String(p.layer)
         for (const st of stukken) if (st.length >= 2) uit.push({ type: 'way', id: ++id, tags: t, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel' })
+      } else if (naam === 'poi' && soort === 1 && stukken.length && stukken[0].length) {
+        const s2 = POI_SOORT[`${p.class}/${p.subclass}`]
+        if (s2) {
+          const { lat, lon } = naarLatLon(stukken[0][0][0], stukken[0][0][1])
+          uit.push({ type: 'poi', id: ++id, soort: s2, naam: p['name:nl'] || p.name || '', lat, lon })
+        }
       } else if (naam === 'landcover' && soort === 3 && p.subclass === 'beach') {
         for (const st of stukken) if (st.length >= 4) uit.push({ type: 'way', id: ++id, tags: { natural: 'beach' }, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel' })
       }

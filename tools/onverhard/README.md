@@ -334,6 +334,10 @@ draait in je browser; er is geen eigen server.
   kant) op het netwerk van de planning, dus meteen. Het punt wordt een
   handvat: nog eens slepen, of tikken om weg te halen. Bij A naar B komt er
   een tussenpunt bij en wordt de route opnieuw gepland.
+- **Water onderweg**: drinkwaterpunten, horeca, supermarkten, toiletten en
+  tankstations binnen 300 m van de route (uit de laag 'poi' van de
+  OpenFreeMap-tegels), met de km waar je ze tegenkomt en het langste stuk
+  zonder. "Via hier" laat de route erlangs lopen (zoals verslepen).
 - **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
   tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
   "Opnieuw" of na een nieuwe planning).

@@ -394,3 +394,16 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 /* versleepbare route: handvatten bij versleepte punten, en een wachtcursor tijdens het rekenen */
 .punt.via.sleep { width: 18px; height: 18px; border-radius: 50%; background: var(--route); border: 3px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
 .rekent, .rekent * { cursor: progress !important; }
+
+/* water onderweg */
+.waterlijst { list-style: none; margin: 0; padding: 0; }
+.waterlijst li { display: grid; grid-template-columns: 30px 54px 1fr auto; align-items: center; gap: 8px; padding: 6px 0;
+                 border-bottom: 1px solid var(--rand); font-size: 14px; }
+.waterlijst .ico { font-size: 18px; text-align: center; }
+.waterlijst .km { font: 700 15px var(--kop); }
+.waterlijst small { display: block; color: var(--inkt-3); font: 500 11px var(--mono); }
+.waterlijst button { min-height: 34px; padding: 4px 10px; font-size: 13px; }
+#waterMeer { margin-top: 8px; font-size: 14px; }
+.waterico { font-size: 15px; line-height: 24px; text-align: center; width: 26px; height: 26px; border-radius: 50%;
+            background: var(--vlak); border: 2px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+.waterico.water { background: #d9f0ff; border-color: #1565c0; }
