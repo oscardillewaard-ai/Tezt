@@ -108,10 +108,12 @@
             <select id="trail">
               <option value="1">Smalle paadjes eerst (trail)</option>
               <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
+              <option value="a">Maakt niet uit (ook verhard)</option>
             </select>
           </label>
           <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
           <label class="vinkje"><input type="checkbox" id="kaartje" /> Toegangskaart waterleidingduinen</label>
+          <label class="vinkje"><input type="checkbox" id="heuvels" /> Meer hoogtemeters</label>
           <label class="veld">
             <span>Landelijke wandelroutes (LAW)</span>
             <select id="law">
@@ -148,6 +150,15 @@
 
           <h2>Routes</h2>
           <ul class="opties" id="opties"></ul>
+          <div class="afspelen" id="afspeelbalk">
+            <button type="button" id="afspeel" class="hoofd">▶ Afspelen</button>
+            <div class="keuze klein" id="tempo" role="group" aria-label="Snelheid">
+              <button type="button" data-tempo="1" aria-pressed="true">1×</button>
+              <button type="button" data-tempo="2" aria-pressed="false">2×</button>
+              <button type="button" data-tempo="4" aria-pressed="false">4×</button>
+            </div>
+            <span class="afspeelstand" id="afspeelstand"></span>
+          </div>
           <div class="profiel" id="profiel" hidden>
             <h2 id="profielkop">Hoogteprofiel</h2>
             <div class="profielvlak" id="profielvlak"></div>

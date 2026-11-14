@@ -407,3 +407,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 .waterico { font-size: 15px; line-height: 24px; text-align: center; width: 26px; height: 26px; border-radius: 50%;
             background: var(--vlak); border: 2px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
 .waterico.water { background: #d9f0ff; border-color: #1565c0; }
+
+/* route afspelen */
+.afspelen { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+#afspeel { min-height: 42px; font-size: 17px; padding: 6px 16px; }
+#tempo { flex: none; }
+#tempo button { min-width: 44px; }
+.afspeelstand { font: 500 13px var(--mono); color: var(--inkt-2); margin-left: auto; }
+.loper { width: 30px; height: 30px; border-radius: 50%; background: var(--route); border: 3px solid var(--balk); display: grid; place-items: center;
+         font-size: 16px; box-shadow: 0 2px 8px rgb(0 0 0 / .45); }
+.loper::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; border: 3px solid var(--route); opacity: .6; animation: puls 1.2s ease-out infinite; }
+@keyframes puls { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.3); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .loper::after { animation: none; } }

@@ -338,6 +338,17 @@ draait in je browser; er is geen eigen server.
   tankstations binnen 300 m van de route (uit de laag 'poi' van de
   OpenFreeMap-tegels), met de km waar je ze tegenkomt en het langste stuk
   zonder. "Via hier" laat de route erlangs lopen (zoals verslepen).
+- **Route afspelen**: ▶ laat een loper over de route gaan (hele route in 40 s,
+  of 2× / 4× zo snel); de kaart volgt en het hoogteprofiel wijst mee.
+  Spatie = afspelen/pauze.
+- **Meer hoogtemeters** (instelling): meer kandidaat-rondjes, voor elk het AHN
+  gemeten, en een bonus voor meters stijgen per km (vol bij 15 m/km). N70,
+  15 km: route A van ↗ 159 naar ↗ 228 m (90 in plaats van 96% onverhard).
+- **Soort paden "Maakt niet uit (ook verhard)"**: geen voorkeur voor
+  onverhard, alleen drukke wegen zijn wat duurder.
+- In gebied met onverhard als voorkeur maakt de app ook een route over élk
+  onverhard pad in het gebied (zo nodig een paar keer rond); in een stadspark
+  wint die vaak (Wilhelminapark Rijswijk: 25% in plaats van 11% onverhard).
 - **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
   tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
   "Opnieuw" of na een nieuwe planning).

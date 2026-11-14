@@ -44,7 +44,7 @@ function leesKleuren() {
 leesKleuren()
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false }
 const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
 const tekenModus = () => TEKENMODI.has(staat.modus)
 /** de tekening die bij deze modus hoort: een gebied (vlak) of een lijn */
@@ -626,10 +626,15 @@ el('grondig').addEventListener('change', () => {
 })
 el('trail').addEventListener('change', () => {
   staat.trail = el('trail').value === '1'
+  staat.alles = el('trail').value === 'a'
   bewaar()
 })
 el('strand').addEventListener('change', () => {
   staat.strand = el('strand').checked
+  bewaar()
+})
+el('heuvels').addEventListener('change', () => {
+  staat.heuvels = el('heuvels').checked
   bewaar()
 })
 el('kaartje').addEventListener('change', () => {
@@ -643,9 +648,10 @@ el('luchtfoto').addEventListener('change', () => {
 })
 /** Eén regel onder 'Instellingen' met wat er aan staat. */
 function vatSamen() {
-  const delen = [staat.trail ? 'trail' : 'alles onverhard']
+  const delen = [staat.alles ? 'ook verhard' : staat.trail ? 'trail' : 'alles onverhard']
   if (staat.strand) delen.push('strand overslaan')
   if (staat.kaartje) delen.push('toegangskaart')
+  if (staat.heuvels) delen.push('meer hoogtemeters')
   if (staat.law !== 1) delen.push(staat.law <= 0.3 ? 'sterke LAW-voorkeur' : 'lichte LAW-voorkeur')
   delen.push(staat.grondig === 0 ? '1 route, zonder officiële kaart' : `${Math.max(1, staat.grondig)} ${staat.grondig === 1 ? 'route' : 'routes'}`)
   if (staat.luchtfoto) delen.push("luchtfoto's")
@@ -672,6 +678,7 @@ el('opnieuw').addEventListener('click', () => {
   plan = null
   gekozen = 0
   opKaart.clear()
+  stopAfspelen()
   for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag]) laag.clearLayers()
   el('resultaat').hidden = true
   toonFout('')
@@ -744,10 +751,12 @@ async function planNu() {
       tekening: tekenModus() ? tekening() : undefined,
       wegen: staat.wegen,
       zonderDoodlopend: staat.dood !== false,
+      heuvels: !!staat.heuvels,
       punten: rondje ? staat.punten.slice(0, 2) : staat.punten,
       rondjeKm: rondje || staat.modus === 'gebied' ? staat.km : null,
       law: staat.law,
       trail: staat.trail,
+      alles: !!staat.alles,
       strandMijden: staat.strand,
       kaartje: staat.kaartje,
       vorm: staat.vorm,
@@ -1001,6 +1010,76 @@ function tekenHandvatten() {
     m.bindPopup(knop)
   }
 }
+
+// ---------- Route afspelen ----------
+const afspeelLaag = L.layerGroup().addTo(kaart)
+let afspelen = null // { d, totaal, tempo, laatst, raf, xy, opgeteld, loper }
+let tempo = 1
+const AFSPEEL_MS = 40000 // hele route in 40 s bij 1×
+
+function stopAfspelen(wissen = true) {
+  if (afspelen && afspelen.raf) cancelAnimationFrame(afspelen.raf)
+  if (wissen) {
+    afspelen = null
+    afspeelLaag.clearLayers()
+    el('afspeelstand').textContent = ''
+  } else if (afspelen) afspelen.raf = null
+  el('afspeel').textContent = '▶ Afspelen'
+}
+
+function afspeelStap(nu) {
+  const a = afspelen
+  if (!a) return
+  const dt = a.laatst ? nu - a.laatst : 0
+  a.laatst = nu
+  a.d = Math.min(a.totaal, a.d + (a.totaal / AFSPEEL_MS) * dt * tempo)
+  const [x, y] = puntOpAfstand(a.xy, a.opgeteld, a.d)
+  const [lon, lat] = K.naarWgs(x, y)
+  a.loper.setLatLng([lat, lon])
+  // de kaart volgt de loper als die uit het midden van beeld loopt
+  const binnen = kaart.getBounds().pad(-0.25)
+  if (!binnen.contains([lat, lon])) kaart.panTo([lat, lon], { animate: true, duration: 0.6 })
+  const h = profielNaar ? profielNaar(a.d * a.schaal, false) : null
+  el('afspeelstand').textContent = `km ${nl(a.d / 1000, 1)}${typeof h === 'number' ? ` · ${Math.round(h)} m` : ''}`
+  if (a.d >= a.totaal) {
+    stopAfspelen(false)
+    el('afspeel').textContent = '↺ Nog eens'
+    a.d = 0
+    a.klaar = true
+    return
+  }
+  a.raf = requestAnimationFrame(afspeelStap)
+}
+
+function wisselAfspelen() {
+  if (!plan) return
+  if (afspelen && afspelen.raf) {
+    stopAfspelen(false)
+    el('afspeel').textContent = '▶ Verder'
+    return
+  }
+  if (!afspelen) {
+    const xy = plan.analyse.xy
+    const opgeteld = [0]
+    for (let i = 1; i < xy.length; i++) opgeteld.push(opgeteld[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
+    const h = keuze().hoogte
+    const totaal = opgeteld[opgeteld.length - 1]
+    const loper = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="loper">🏃</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false, zIndexOffset: 2000 })
+    afspelen = { d: 0, totaal, xy, opgeteld, loper, schaal: h ? h.afstand[h.afstand.length - 1] / totaal : 1 }
+    loper.addTo(afspeelLaag)
+  }
+  if (afspelen.klaar) afspelen.klaar = false
+  afspelen.laatst = 0
+  el('afspeel').textContent = '❚❚ Pauze'
+  afspelen.raf = requestAnimationFrame(afspeelStap)
+}
+el('afspeel').addEventListener('click', wisselAfspelen)
+el('tempo').addEventListener('click', (e) => {
+  const t = Number(e.target.dataset.tempo)
+  if (!t) return
+  tempo = t
+  for (const b of el('tempo').children) b.setAttribute('aria-pressed', String(Number(b.dataset.tempo) === t))
+})
 
 // ---------- Water onderweg ----------
 const waterLaag = L.layerGroup().addTo(kaart)
@@ -1346,6 +1425,7 @@ const keuze = () => uitslag.opties[gekozen] || {}
 // ---------- Hoogteprofiel ----------
 const profielLaag = L.layerGroup().addTo(kaart)
 let profielMeting = null
+let profielNaar = null // (meter langs de route, metStip) -> hoogte; het profiel wijst die plek aan
 
 /** RD-punt op 'd' meter langs de route (voor de stip op de kaart). */
 function puntOpAfstand(xy, opgeteld, d) {
@@ -1376,6 +1456,7 @@ function tekenProfiel() {
     return
   }
   blok.hidden = false
+  profielNaar = null
   el('profielkop').textContent = `Hoogteprofiel · ↗ ${Math.round(h.stijgen)} m · ↘ ${Math.round(h.dalen)} m`
   el('profielnoot').textContent = `${Math.round(h.min)}–${Math.round(h.max)} m · ${h.bron === 'AHN' ? 'AHN' : 'SRTM (grof)'}`
   const vlak = el('profielvlak')
@@ -1420,10 +1501,7 @@ function tekenProfiel() {
   const wijzer = svg.querySelector('.wijzer')
   const tip = vlak.querySelector('.profieltip')
   const stip = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 3, fillColor: getComputedStyle(document.documentElement).getPropertyValue('--hoogtelijn').trim() || '#a8661c', fillOpacity: 1, interactive: false })
-  profielMeting = (clientX) => {
-    const r = svg.getBoundingClientRect()
-    const x = ((clientX - r.left) / r.width) * W
-    const d = Math.max(0, Math.min(totaal, ((x - links) / (W - links - 4)) * totaal))
+  profielNaar = (d, metStip = true) => {
     let i = Math.round(d / (h.afstand[1] - h.afstand[0] || 10))
     i = Math.max(0, Math.min(h.afstand.length - 1, i))
     const px = sx(h.afstand[i])
@@ -1436,9 +1514,16 @@ function tekenProfiel() {
     tip.hidden = false
     tip.style.left = `${Math.max(14, Math.min(86, (px / W) * 100))}%`
     tip.textContent = `${nl(h.afstand[i] / 1000, 1)} km · ${Math.round(h.hoogte[i])} m`
+    if (!metStip) return h.hoogte[i]
     const [lon, lat] = K.naarWgs(...puntOpAfstand(xy, opgeteld, h.afstand[i] * schaalD))
     stip.setLatLng([lat, lon])
     if (!profielLaag.hasLayer(stip)) stip.addTo(profielLaag)
+    return h.hoogte[i]
+  }
+  profielMeting = (clientX) => {
+    const r = svg.getBoundingClientRect()
+    const x = ((clientX - r.left) / r.width) * W
+    profielNaar(Math.max(0, Math.min(totaal, ((x - links) / (W - links - 4)) * totaal)))
   }
   svg.addEventListener('pointermove', (e) => profielMeting(e.clientX))
   svg.addEventListener('pointerdown', (e) => profielMeting(e.clientX))
@@ -1462,6 +1547,7 @@ function herteken() {
 }
 
 function toonResultaat(nieuw) {
+  stopAfspelen()
   el('resultaat').hidden = false
   tekenKern()
   el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
@@ -1576,6 +1662,7 @@ document.addEventListener('keydown', (e) => {
   } else if (k === 't' && tekenModus()) startTekenen('vrij')
   else if (k === 'r' && tekenModus() && staat.modus !== 'tekenen') startTekenen('rechthoek')
   else if (k === 'g' && plan) el('gpx').click()
+  else if (e.key === ' ' && plan && !el('resultaat').hidden) wisselAfspelen()
   else if (k === 'l') el('locatie').click()
   else if (k === 'n') el('opnieuw').click()
   else if ((e.key === 'Backspace' || e.key === 'Delete') && staat.punten.length && !stopper) {
@@ -1667,9 +1754,10 @@ if (el('law').value !== String(staat.law)) {
 }
 el('grondig').value = String(staat.grondig)
 if (el('grondig').value !== String(staat.grondig)) el('grondig').value = '2'
-el('trail').value = staat.trail ? '1' : '0'
+el('trail').value = staat.alles ? 'a' : staat.trail ? '1' : '0'
 el('strand').checked = staat.strand
 el('kaartje').checked = !!staat.kaartje
+el('heuvels').checked = !!staat.heuvels
 el('luchtfoto').checked = !!staat.luchtfoto
 vatSamen()
 el('vorm').value = staat.vorm === 'kronkel' ? 'kronkel' : 'lus'

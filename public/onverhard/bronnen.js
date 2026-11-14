@@ -460,7 +460,9 @@ async function opLand(punten, bgt) {
  * over hetzelfde pad en (als je het strand overslaat) voor strand.
  */
 function waardering(an, br, bron) {
-  let w = K.zachtAandeel(an, bron) - 1.5 * an.dubbel
+  // 'maakt niet uit': ondergrond telt niet, alleen weinig heen en terug (en geen strand)
+  let w = (br.alles ? 1 : K.zachtAandeel(an, bron)) - 1.5 * an.dubbel
+  if (br.alles) return br.strandMijden && an.lengte ? w - 4 * (K.strandMeter(an) / an.lengte) : w
   if (br.trail) w += 0.5 * K.paadjesAandeel(an)
   if (br.strandMijden && an.lengte) w -= 4 * (K.strandMeter(an) / an.lengte)
   return w
@@ -933,6 +935,21 @@ export async function haalTegels(tegels, signal, voortgang = () => {}) {
 }
 
 /**
+ * Meer hoogtemeters: meet het AHN langs alle kandidaten (gedeelde blokken één
+ * keer) en geef een bonus voor meters stijgen per km (vol bij 15 m/km).
+ */
+async function hoogteBonus(kandidaten, signal, meld) {
+  const items = kandidaten.map((k) => ({ traject: k.traject, analyse: k.an }))
+  meld('Hoogtemeters van de rondjes meten')
+  await voegHoogtesToe(items, signal, () => {})
+  kandidaten.forEach((k, i) => {
+    const h = items[i].hoogte
+    if (!h) return
+    k.score += 0.5 * Math.min(1.5, h.stijgen / (k.an.lengte / 1000) / 15)
+  })
+}
+
+/**
  * Een rondje met de eigen routeplanner: haal de paden in de buurt op, zoek
  * honderden rondjes op de graaf (dat kost minder dan een seconde) en leg de
  * beste langs de officiële kaart. Vindt die strand of afgesloten stukken
@@ -961,7 +978,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
     }
   }
   const [sx, sy] = K.naarRd(start[1], start[0])
-  const opbouw = { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap }
+  const opbouw = { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap }
   let lijst = []
   let gezocht = 0
   let graaf = null
@@ -973,7 +990,7 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
     const s = G.dichtsteKnoop(g, sx, sy)
     if (s.knoop < 0) throw new BronFout(OSM_BRON, 'geen paden in de buurt van de start')
     if (s.afstand > 400) throw new BronFout(OSM_BRON, `het dichtstbijzijnde pad ligt ${Math.round(s.afstand)} m van de start`)
-    const z = G.zoekRondjes(g, s.knoop, doel, { kronkel, aantal: Math.max(5, aantalOpties + 3), maxProbeer: kronkel ? 220 : 160 })
+    const z = G.zoekRondjes(g, s.knoop, doel, { kronkel, aantal: instel.heuvels ? 10 : Math.max(5, aantalOpties + 3), maxProbeer: kronkel ? 220 : 160 })
     gezocht += z.geprobeerd
     if (!z.rondjes.length) throw new BronFout(OSM_BRON, 'geen rondje gevonden vanaf deze plek (te weinig paden in de buurt?)')
     lijst = []
@@ -998,6 +1015,13 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
       }
     }
     if (!opnieuw) break
+  }
+  if (instel.heuvels) {
+    try {
+      await hoogteBonus(lijst, signal, meld)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+    }
   }
   lijst.sort((a, b) => b.score - a.score)
   const opties = []
@@ -1073,21 +1097,63 @@ export async function planGebied(instel, bgt, aantalOpties, meld, signal) {
   meld('Rondjes in het gebied zoeken')
   await wacht(0, signal)
   const ring = ringVan(o.rd)
-  const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5, gebied: ring })
+  const g = G.bouwGraaf(elementen, { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5, gebied: ring })
   const binnen = G.knopenBinnen(g, ring)
   const start = startVoor(g, instel.start, o, binnen)
   const doel = instel.km * 1000
-  const z = G.zoekRondjesInGebied(g, start, doel, binnen, { aantal: Math.max(2, aantalOpties) })
+  // hoeveel onverhard pad ligt er in het gebied?
+  const onverhard = G.onverhardeSegmenten(g)
+  let onverhardM = 0
+  let totaalM = 0
+  for (let s = 0; s < onverhard.length; s++) {
+    if (g.binnenSeg[s]) totaalM += g.lengte[s]
+    if (onverhard[s]) onverhardM += g.lengte[s]
+  }
+  const z = G.zoekRondjesInGebied(g, start, doel, binnen, { aantal: instel.heuvels ? 6 : Math.max(2, aantalOpties) })
   if (!z.rondjes.length) throw new BronFout('Tekening', 'geen rondje gevonden binnen dit gebied (te weinig paden, of de start ligt er te ver vanaf)')
-  const opties = []
-  for (const [i, r] of z.rondjes.slice(0, Math.max(2, aantalOpties)).entries()) {
+  let opties = []
+  for (const [i, r] of z.rondjes.slice(0, instel.heuvels ? 6 : Math.max(2, aantalOpties)).entries()) {
     meld(`Ondergrond van rondje ${i + 1} controleren`)
     const traject = G.maakTraject(g, r.knopen, r.segs, [[g.lat[start], g.lon[start]]])
-    opties.push({ traject, an: await analyseerRoute(traject, bgt), ronden: r.ronden, knopen: r.knopen, segs: r.segs })
+    opties.push({ traject, an: await analyseerRoute(traject, bgt), ronden: r.ronden, knopen: r.knopen, segs: r.segs, score: -i * 0.01 })
   }
+  // Zelf kiezen voor onverhard (niet bij 'maakt niet uit'): ook een route over élk onverhard pad in
+  // het gebied, zo nodig een paar keer rond. In een gebied met weinig onverhard (een stadspark) is
+  // dat vaak onverharder dan een rondje; dan wint die.
+  if (!instel.alles && onverhardM > 300) {
+    const r = G.doorElkeStraat(g, start, onverhard)
+    if (r && r.segs.length > 2) {
+      let knopen = r.knopen
+      let segs = r.segs
+      let ronden = 1
+      while (ronden < 10 && (ronden + 0.5) * r.meter < doel) {
+        knopen = knopen.concat(r.knopen.slice(1))
+        segs = segs.concat(r.segs)
+        ronden++
+      }
+      const traject = G.maakTraject(g, knopen, segs, [[g.lat[start], g.lon[start]]])
+      const an = await analyseerRoute(traject, bgt)
+      const zacht = (x) => K.zachtAandeel(x.an, bgt ? 'eind' : 'osm')
+      const kandidaat = { traject, an, ronden, knopen, segs, score: 1 }
+      if (!opties.length || zacht(kandidaat) > zacht(opties[0]) + 0.05) opties.unshift(kandidaat)
+      else opties.push(kandidaat)
+    }
+  }
+  if (instel.heuvels) {
+    try {
+      await hoogteBonus(opties, signal, meld)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+    }
+    opties.sort((a, b) => b.score - a.score)
+  }
+  opties = opties.slice(0, Math.max(2, aantalOpties))
   const waarschuwingen = []
+  if (!instel.alles && totaalM > 0 && onverhardM < 0.3 * totaalM) {
+    waarschuwingen.push(`Weinig onverhard hier: ${(onverhardM / 1000).toFixed(1).replace('.', ',')} km van ${(totaalM / 1000).toFixed(0)} km pad`)
+  }
   if (opties[0].ronden > 1) {
-    waarschuwingen.push(`${opties[0].ronden} rondjes van ca. ${(z.lus / 1000).toFixed(1).replace('.', ',')} km`)
+    waarschuwingen.push(`${opties[0].ronden} rondjes van ca. ${(opties[0].an.lengte / opties[0].ronden / 1000).toFixed(1).replace('.', ',')} km`)
   }
   return { opties, waarschuwingen, doel, eigen: true, uitleg: [], graaf: g }
 }
@@ -1121,7 +1187,7 @@ export async function planTekening(instel, bgt, meld, signal) {
   const { elementen } = await padenVoorTekening(instel.tekening, 400, instel, signal, meld)
   meld('Route langs je tekening zoeken')
   await wacht(0, signal)
-  const g = G.bouwGraaf(elementen, { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5 })
+  const g = G.bouwGraaf(elementen, { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden, snap: 1.5 })
   const lijn = instel.tekening.map(([la, lo]) => K.naarRd(lo, la))
   const r = G.volgTekening(g, lijn)
   if (!r) throw new BronFout('Tekening', 'geen route langs deze lijn gevonden (liggen er paden in de buurt?)')
@@ -1391,6 +1457,7 @@ export async function maakPlan(opties) {
   const br = new BRouter(opties.law ?? 1, opties.signal, {
     trail: opties.trail ?? true, strandMijden: opties.strandMijden ?? true, kaartje: opties.kaartje ?? false,
   })
+  br.alles = !!opties.alles
   const bgt = opties.metBgt === false ? null : new Bgt({ signal: opties.signal, voortgang: opties.voortgang })
   br.bgt = bgt // zodat BRouter de stranden kan mijden die de officiële kaart aanwijst
   const alternatieven = Math.max(1, opties.alternatieven ?? 2)
@@ -1399,15 +1466,15 @@ export async function maakPlan(opties) {
   // Een rondje vanaf één punt rekenen we zelf uit op de paden van OpenStreetMap: sneller en
   // beter dan via BRouter. Niet bij een voorkeur voor LAW-routes (die kent alleen BRouter).
   const tekenInstel = {
-    trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, tekening: opties.tekening, start: opties.punten && opties.punten[0],
-    km: opties.rondjeKm || 10, wegen: opties.wegen, zonderDoodlopend: opties.zonderDoodlopend, paden: opties.paden, voortgang: opties.voortgang,
+    trail: br.trail, alles: br.alles, strandMijden: br.strandMijden, kaartje: br.kaartje, tekening: opties.tekening, start: opties.punten && opties.punten[0],
+    km: opties.rondjeKm || 10, wegen: opties.wegen, zonderDoodlopend: opties.zonderDoodlopend, paden: opties.paden, voortgang: opties.voortgang, heuvels: opties.heuvels,
   }
   if (opties.modus === 'gebied') plan = await planGebied(tekenInstel, bgt, alternatieven, meld, opties.signal)
   else if (opties.modus === 'straten') plan = await planStraten(tekenInstel, bgt, meld, opties.signal)
   else if (opties.modus === 'tekenen') plan = await planTekening(tekenInstel, bgt, meld, opties.signal)
   else if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
     try {
-      plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang }, bgt, alternatieven, meld, opties.signal)
+      plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, alles: br.alles, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang, heuvels: opties.heuvels }, bgt, alternatieven, meld, opties.signal)
     } catch (fout) {
       if (afgebroken(fout)) throw fout
       vooraf.push('Paden niet op te halen; via BRouter gerekend')

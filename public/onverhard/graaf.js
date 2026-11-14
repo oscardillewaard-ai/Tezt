@@ -9,6 +9,7 @@ import * as K from './kern.js'
 
 const NOOIT = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'construction', 'proposed', 'raceway', 'bus_guideway', 'platform', 'elevator', 'abandoned', 'razed'])
 export const STRAND_FACTOR = 40 // strand mag alleen als er echt niets anders is
+const ALLES_FACTOR = { primary: 2, primary_link: 2, secondary: 1.6, secondary_link: 1.6, tertiary: 1.25, tertiary_link: 1.25, steps: 1.3 }
 
 /**
  * De Overpass-vraag: alle wegen en paden plus de stranden binnen 'straal'
@@ -187,7 +188,7 @@ function verbindLosseEinden(d, snap) {
  * (extraStranden: vlakken {polygonen, bbox} uit de officiële kaart).
  * Knopen zijn de punten van de OSM-wegen (gedeelde punten = kruisingen).
  */
-export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0, gebied = null, buitenFactor = 30 } = {}) {
+export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0, gebied = null, buitenFactor = 30 } = {}) {
   const stranden = strandMijden ? strandRingen(elementen).concat(extraStranden) : []
   // te mijden plekken (RD-punten, 20 m eromheen), via een rooster van 50 m
   const mijd = new Set()
@@ -240,7 +241,8 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
       ti = tagLijst.push(tekst) - 1
       tagIndex.set(tekst, ti)
     }
-    const f0 = K.kostenfactor(K.osmKlasse(tekst).klasse, tekst, trail) * (afgesloten ? 1.3 : 1)
+    // 'alles': geen voorkeur voor onverhard; alleen drukke wegen zijn wat duurder
+    const f0 = (alles ? ALLES_FACTOR[t.highway] || 1 : K.kostenfactor(K.osmKlasse(tekst).klasse, tekst, trail)) * (afgesloten ? 1.3 : 1)
     const geom = e.geometry
     for (let i = 1; i < geom.length; i++) {
       if (!geom[i - 1] || !geom[i]) continue
@@ -1196,4 +1198,16 @@ export function waterLangs(xy, pois, max = 300) {
   let langst = 0
   for (let i = 1; i < plekken.length; i++) langst = Math.max(langst, plekken[i] - plekken[i - 1])
   return { punten: uit, langsteZonder: langst }
+}
+
+/** Segmenten binnen het gebied die onverhard of half verhard zijn (lage kosten in het trailprofiel). */
+export function onverhardeSegmenten(g) {
+  const uit = new Uint8Array(g.lengte.length)
+  const klasse = g.tagLijst.map((t) => K.osmKlasse(t).klasse)
+  for (let s = 0; s < uit.length; s++) {
+    if (!g.binnenSeg[s] || g.factor[s] >= STRAND_FACTOR) continue
+    const k = klasse[g.segTags[s]]
+    if (k === K.ONVERHARD || k === K.HALF) uit[s] = 1
+  }
+  return uit
 }
