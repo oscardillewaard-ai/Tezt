@@ -1404,7 +1404,7 @@ export async function importeerGpx(tekst, opties = {}) {
     }
   } else meldingen.push('Route te lang om de paden eronder te herkennen; alleen de officiële kaart')
   const traject = { coords: coords.map((c) => [c[0], c[1], c[2]]), segs, punten: [] }
-  const uit = await bekijkRoute(traject, naam || 'GPX', opties)
+  const uit = await bekijkRoute(traject, `GPX · ${naam || 'route'}`, opties)
   uit.meldingen.unshift(...meldingen)
   return uit
 }

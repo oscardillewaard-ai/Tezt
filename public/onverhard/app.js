@@ -1293,7 +1293,7 @@ function tekenOpties() {
     else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
-    const titel = o.ingelezen ? `GPX · ${veilig(o.ingelezen)}` : `Route ${o.naam}${i === 0 ? '</b> · aanbevolen<b>' : ''}`
+    const titel = o.ingelezen ? veilig(o.ingelezen) : `Route ${o.naam}${i === 0 ? '</b> · aanbevolen<b>' : ''}`
     kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
@@ -1834,7 +1834,7 @@ el('bewaar').addEventListener('click', () => {
   const o = keuze()
   const soort = { route: 'Route', rondje: 'Rondje', gebied: 'Rondjes in gebied', straten: 'Elke straat', tekenen: 'Getekende route' }[staat.modus] || 'Route'
   const datum = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  const naam = prompt('Naam van de route', o.ingelezen ? o.ingelezen : `${soort} ${nl(o.km, 0)} km · ${datum}`)
+  const naam = prompt('Naam van de route', o.ingelezen ? o.ingelezen.replace(/^(★|GPX ·) /, '') : `${soort} ${nl(o.km, 0)} km · ${datum}`)
   if (!naam) return
   const r = {
     id: Date.now().toString(36),
@@ -1867,7 +1867,7 @@ async function openBewaard(r) {
   el('plan').hidden = true
   el('bezig').hidden = false
   try {
-    const resultaat = await bekijkRoute({ coords: r.traject.coords.map((c) => [c[0], c[1], null]), segs: r.traject.segs, punten: r.traject.punten || [] }, r.naam, {
+    const resultaat = await bekijkRoute({ coords: r.traject.coords.map((c) => [c[0], c[1], null]), segs: r.traject.segs, punten: r.traject.punten || [] }, `★ ${r.naam}`, {
       signal: stopper.signal,
       metBgt: staat.grondig > 0,
       meld: (t) => {
