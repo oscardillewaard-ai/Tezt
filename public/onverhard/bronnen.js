@@ -3,12 +3,15 @@
 // server. De antwoorden blijven in het geheugen zolang de pagina open is.
 
 import * as K from './kern.js'
+import * as G from './graaf.js'
 
 const BROUTER_URL = 'https://brouter.de/brouter'
 const BGT_BRON = 'de officiële kaart (PDOK)'
 const LOCATIESERVER = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free'
 const TEGEL_URL = 'https://api.pdok.nl/kadaster/bgt/ogc/v1/tiles/NetherlandsRDNewQuad/12/'
 const LUCHTFOTO_WMS = 'https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0'
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
+const OSM_BRON = 'OpenStreetMap (Overpass)'
 
 /** Een externe bron (BRouter of PDOK) gaf een fout. */
 export class BronFout extends Error {
@@ -41,7 +44,7 @@ const TIJDSLIMIET_MS = 90000
  */
 async function haalBinnen(url, opties) {
   const c = new AbortController()
-  const klok = setTimeout(() => c.abort(new DOMException('Geen antwoord binnen de tijd', 'TimeoutError')), TIJDSLIMIET_MS)
+  const klok = setTimeout(() => c.abort(new DOMException('Geen antwoord binnen de tijd', 'TimeoutError')), opties.tijdslimiet || TIJDSLIMIET_MS)
   const gebruiker = opties.signal
   const stop = () => c.abort(gebruiker.reason)
   if (gebruiker) {
@@ -78,7 +81,7 @@ async function vraag(bron, url, opties = {}, pogingen = 4) {
       }
     } catch (fout) {
       if (opties.signal && opties.signal.aborted) throw fout // de gebruiker stopte
-      laatste = fout.name === 'TimeoutError' ? 'geen antwoord binnen 90 seconden' : `netwerkfout (${fout.message})`
+      laatste = fout.name === 'TimeoutError' ? `geen antwoord binnen ${Math.round((opties.tijdslimiet || TIJDSLIMIET_MS) / 1000)} seconden` : `netwerkfout (${fout.message})`
     }
     if (poging < pogingen - 1) await wacht(wachttijden[Math.min(poging, 2)], opties.signal)
   }
@@ -828,6 +831,111 @@ export async function planRondjeLussen(start, km, br, bgt, aantalOpties, meld = 
   return { opties, waarschuwingen, doel, uitleg }
 }
 
+// ---------- Eigen routeplanner (OpenStreetMap-paden, zelf rekenen) ----------
+const padenCache = new Map()
+
+/**
+ * Alle wegen, paden en stranden binnen 'straal' meter van een punt, uit
+ * OpenStreetMap via de Overpass API (twee servers; de tweede als de eerste
+ * het niet doet). Het antwoord blijft bewaard zolang de app open is.
+ */
+export async function haalPaden([lat, lon], straal, signal) {
+  const sleutel = `${lat.toFixed(4)},${lon.toFixed(4)},${Math.round(straal / 100)}`
+  if (padenCache.has(sleutel)) return padenCache.get(sleutel)
+  const body = new URLSearchParams({ data: G.overpassVraag(lat, lon, straal) })
+  let laatste = 'onbekende fout'
+  for (const url of OVERPASS) {
+    try {
+      const r = await vraag(OSM_BRON, url, { method: 'POST', body, signal, tijdslimiet: 45000 }, 1)
+      if (!r.ok) {
+        laatste = `HTTP ${r.status}`
+        continue
+      }
+      const d = await r.json()
+      if (d.remark && /error|timed out/i.test(d.remark)) {
+        laatste = d.remark.slice(0, 120)
+        continue
+      }
+      if (padenCache.size >= 2) padenCache.delete(padenCache.keys().next().value)
+      padenCache.set(sleutel, d.elements)
+      return d.elements
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      laatste = fout.melding || fout.message
+    }
+  }
+  throw new BronFout(OSM_BRON, laatste)
+}
+
+/**
+ * Een rondje met de eigen routeplanner: haal de paden in de buurt op, zoek
+ * honderden rondjes op de graaf (dat kost minder dan een seconde) en leg de
+ * beste langs de officiële kaart. Vindt die strand of afgesloten stukken
+ * buiten de natuur die OpenStreetMap niet als zodanig kent, dan zoeken we nog
+ * één keer met die plekken verboden.
+ */
+export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld = () => {}, signal) {
+  const doel = km * 1000
+  const kronkel = instel.vorm === 'kronkel'
+  const straal = Math.max(1500, (kronkel ? 0.32 : 0.38) * doel)
+  meld('Paden in de buurt ophalen (OpenStreetMap)')
+  const elementen = instel.paden || (await haalPaden(start, straal, signal)) // paden: alleen voor tests
+  const [sx, sy] = K.naarRd(start[1], start[0])
+  const opbouw = { trail: instel.trail, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [] }
+  let lijst = []
+  let gezocht = 0
+  for (let ronde = 0; ronde < 2; ronde++) {
+    meld(ronde ? 'Rondjes opnieuw zoeken, nu zonder strand en afgesloten stukken' : 'Rondjes zoeken')
+    await wacht(0, signal) // de pagina even laten bijwerken
+    const g = G.bouwGraaf(elementen, opbouw)
+    const s = G.dichtsteKnoop(g, sx, sy)
+    if (s.knoop < 0) throw new BronFout(OSM_BRON, 'geen paden in de buurt van de start')
+    if (s.afstand > 400) throw new BronFout(OSM_BRON, `het dichtstbijzijnde pad ligt ${Math.round(s.afstand)} m van de start`)
+    const z = G.zoekRondjes(g, s.knoop, doel, { kronkel, aantal: Math.max(5, aantalOpties + 3), maxProbeer: kronkel ? 220 : 160 })
+    gezocht += z.geprobeerd
+    if (!z.rondjes.length) throw new BronFout(OSM_BRON, 'geen rondje gevonden vanaf deze plek (te weinig paden in de buurt?)')
+    lijst = []
+    for (const [i, r] of z.rondjes.entries()) {
+      meld(`Ondergrond van rondje ${i + 1} van ${z.rondjes.length} controleren`)
+      const traject = G.maakTraject(g, r.knopen, r.segs, [start, ...r.via.map((v) => [g.lat[v], g.lon[v]]), start])
+      const an = await analyseerRoute(traject, bgt)
+      const af = Math.abs(an.lengte - doel) / doel
+      lijst.push({ traject, an, lengte: an.lengte, score: waardering(an, instel, bgt ? 'eind' : 'osm') - 3 * Math.max(0, af - 0.1) })
+    }
+    if (!bgt || ronde === 1) break
+    let opnieuw = false
+    if (instel.strandMijden && lijst.some((k) => K.strandMeter(k.an) > 0)) {
+      opbouw.extraStranden = [...bgt.vlakken.stranden]
+      opnieuw = true
+    }
+    if (instel.kaartje) {
+      for (const k of lijst) {
+        if (!(await markeerOngewenst(k.an, { strandMijden: false, kaartje: true }, bgt))) continue
+        for (const st of k.an.stukken) if (st.ongewenst) opbouw.mijdPunten.push(...K.bemonster(st.xy, 15))
+        opnieuw = true
+      }
+    }
+    if (!opnieuw) break
+  }
+  lijst.sort((a, b) => b.score - a.score)
+  const opties = []
+  for (const k of lijst) {
+    if (opties.length >= Math.max(2, aantalOpties)) break
+    if (opties.every((o) => K.overlap(o.an.xy, k.an.xy) < 0.7)) opties.push({ traject: k.traject, an: k.an })
+  }
+  const waarschuwingen = []
+  for (const o of opties) {
+    if (Math.abs(o.an.lengte - doel) / doel > 0.1) {
+      waarschuwingen.push(`een van de rondjes is ${(o.an.lengte / 1000).toFixed(1).replace('.', ',')} km: met de paden hier lukte ${km} km niet precies`)
+    }
+  }
+  const uitleg = lijst.map((k) => ({
+    richting: null, rek: kronkel ? 'kronkel' : 'lus', km: k.lengte / 1000, afwijking: 0, osm: 0, score: k.score,
+    zacht: K.zachtAandeel(k.an, 'eind'), paadjes: K.paadjesAandeel(k.an), strand: K.strandMeter(k.an), dubbel: k.an.dubbel, voldoet: true,
+  }))
+  return { opties, waarschuwingen, doel, uitleg, eigen: true, gezocht }
+}
+
 const LETTERS = 'ABCDEFGH'
 
 /**
@@ -934,18 +1042,32 @@ export async function maakPlan(opties) {
   br.bgt = bgt // zodat BRouter de stranden kan mijden die de officiële kaart aanwijst
   const alternatieven = Math.max(1, opties.alternatieven ?? 2)
   let plan
-  if (opties.rondjeKm && opties.punten.length > 1) plan = await planLus(opties.punten[0], opties.punten[1], br, bgt, alternatieven, meld)
+  const vooraf = []
+  // Een rondje vanaf één punt rekenen we zelf uit op de paden van OpenStreetMap: sneller en
+  // beter dan via BRouter. Niet bij een voorkeur voor LAW-routes (die kent alleen BRouter).
+  if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
+    try {
+      plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden }, bgt, alternatieven, meld, opties.signal)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      vooraf.push(`De paden konden niet zelf worden doorgerekend (${fout.melding || fout.message}); daarom via BRouter, dat duurt langer.`)
+    }
+  }
+  if (plan) {
+    // al gedaan
+  } else if (opties.rondjeKm && opties.punten.length > 1) plan = await planLus(opties.punten[0], opties.punten[1], br, bgt, alternatieven, meld)
   else if (opties.rondjeKm && opties.vorm !== 'kronkel') plan = await planRondjeLussen(opties.punten[0], opties.rondjeKm, br, bgt, alternatieven, meld, alternatieven === 1)
   else if (opties.rondjeKm) plan = await planRondje(opties.punten[0], opties.rondjeKm, br, bgt, opties.kandidaten ?? 12, alternatieven, meld, opties.vorm)
   else plan = await planRoute(opties.punten, br, bgt, alternatieven, meld)
   const lijst = []
-  const meldingen = plan.waarschuwingen.slice()
+  const meldingen = vooraf.concat(plan.waarschuwingen)
   for (const [i, o] of plan.opties.entries()) {
     if (!o.an || !K.zelfdeTraject(o.an.traject, o.traject)) {
       meld(`Route ${LETTERS[i]} samenstellen`)
       o.an = await analyseerRoute(o.traject, bgt)
     }
-    if ((br.strandMijden || br.kaartje) && bgt) await zonderOngewenst(o, br, bgt, meld, LETTERS[i], plan.doel)
+    if ((br.strandMijden || br.kaartje) && bgt && !plan.eigen) await zonderOngewenst(o, br, bgt, meld, LETTERS[i], plan.doel)
+    else if (plan.eigen && bgt) await markeerOngewenst(o.an, br, bgt)
     if (lijst.some((x) => K.zelfdeTraject(x.traject, o.traject))) continue
     lijst.push({
       naam: LETTERS[i],

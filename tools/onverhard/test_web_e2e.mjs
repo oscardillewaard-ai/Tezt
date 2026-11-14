@@ -36,8 +36,14 @@ let bytes = 0
 let verzoeken = 0
 page.on('console', (m) => m.type() === 'error' && fouten.push(m.text()))
 page.on('pageerror', (e) => fouten.push('PAGEERROR ' + e.message))
+// ONVERHARD_OVERPASS=<bestand>: beantwoord de Overpass-vraag met dit bestand (een eerder
+// opgehaald antwoord), zodat de test niet afhangt van een drukke Overpass-server
+if (process.env.ONVERHARD_OVERPASS) {
+  const inhoud = fs.readFileSync(process.env.ONVERHARD_OVERPASS)
+  await page.route('**/api/interpreter', (route) => route.fulfill({ status: 200, body: inhoud, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' } }))
+}
 page.on('requestfinished', async (r) => {
-  if (/brouter|api\.pdok/.test(r.url())) {
+  if (/brouter|api\.pdok|interpreter/.test(r.url())) {
     verzoeken += 1
     bytes += (await r.sizes()).responseBodySize // zoals over de lijn (gecomprimeerd)
   }

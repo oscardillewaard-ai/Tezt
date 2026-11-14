@@ -10,10 +10,18 @@ import * as K from './kern.js'
 const NOOIT = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'construction', 'proposed', 'raceway', 'bus_guideway', 'platform', 'elevator', 'abandoned', 'razed'])
 export const STRAND_FACTOR = 40 // strand mag alleen als er echt niets anders is
 
-/** De Overpass-vraag: alle wegen en paden plus de stranden in een bbox [zuid, west, noord, oost]. */
-export function overpassVraag([z, w, n, o]) {
-  const bb = `${z.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${o.toFixed(5)}`
-  return `[out:json][timeout:90];(way["highway"](${bb});way["natural"="beach"](${bb});relation["natural"="beach"](${bb}););out geom qt;`
+/**
+ * De Overpass-vraag: alle wegen en paden plus de stranden binnen 'straal'
+ * meter van een punt. Opritten, parkeerplaatsen en stoepen laten we weg: die
+ * maken de download in een stad twee keer zo groot en een rondje heeft ze
+ * niet nodig (de straat ernaast is er wel).
+ */
+export function overpassVraag(lat, lon, straal) {
+  const rond = `around:${Math.round(straal)},${lat.toFixed(5)},${lon.toFixed(5)}`
+  return `[out:json][timeout:90];(` +
+    `way["highway"]["service"!~"^(driveway|parking_aisle|drive-through)$"]["footway"!="sidewalk"]["area"!="yes"](${rond});` +
+    `way["natural"="beach"](${rond});relation["natural"="beach"](${rond});` +
+    `);out geom qt;`
 }
 
 function tagTekst(tags) {
@@ -69,8 +77,19 @@ function opStrand(x, y, stranden) {
  * (extraStranden: vlakken {polygonen, bbox} uit de officiële kaart).
  * Knopen zijn de punten van de OSM-wegen (gedeelde punten = kruisingen).
  */
-export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [] } = {}) {
+export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [] } = {}) {
   const stranden = strandMijden ? strandRingen(elementen).concat(extraStranden) : []
+  // te mijden plekken (RD-punten, 20 m eromheen), via een rooster van 50 m
+  const mijd = new Set()
+  for (const [x, y] of mijdPunten) mijd.add(Math.floor(x / 50) + ',' + Math.floor(y / 50))
+  const teMijden = (x, y) => {
+    if (!mijd.size) return false
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      if (!mijd.has(Math.floor((x + 20 * dx) / 50) + ',' + Math.floor((y + 20 * dy) / 50))) continue
+      if (mijdPunten.some(([px, py]) => Math.hypot(px - x, py - y) < 20)) return true
+    }
+    return false
+  }
   const knoop = new Map()
   const lat = []
   const lon = []
@@ -119,7 +138,9 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
       const b = knoopVan(geom[i])
       if (a === b) continue
       const l = Math.hypot(xs[a] - xs[b], ys[a] - ys[b])
-      const strand = stranden.length && opStrand((xs[a] + xs[b]) / 2, (ys[a] + ys[b]) / 2, stranden)
+      const mx = (xs[a] + xs[b]) / 2
+      const my = (ys[a] + ys[b]) / 2
+      const strand = (stranden.length && opStrand(mx, my, stranden)) || teMijden(mx, my)
       van.push(a)
       naar.push(b)
       lengte.push(l)
@@ -152,12 +173,46 @@ export function bouwGraaf(elementen, { trail = true, kaartje = false, strandMijd
   }
 }
 
-/** De knoop het dichtst bij een RD-punt (alleen knopen met buren). */
+/** Nummer van het samenhangende netwerk per knoop, en de grootte van elk netwerk. */
+export function netwerken(g) {
+  if (g.netwerk) return g.netwerk
+  const nr = new Int32Array(g.n).fill(-1)
+  const grootte = []
+  const stapel = []
+  for (let i = 0; i < g.n; i++) {
+    if (nr[i] >= 0) continue
+    const id = grootte.length
+    let n = 0
+    nr[i] = id
+    stapel.push(i)
+    while (stapel.length) {
+      const u = stapel.pop()
+      n++
+      for (let j = g.begin[u]; j < g.begin[u + 1]; j++) {
+        const v = g.buur[j]
+        if (nr[v] < 0) {
+          nr[v] = id
+          stapel.push(v)
+        }
+      }
+    }
+    grootte.push(n)
+  }
+  g.netwerk = { nr, grootte }
+  return g.netwerk
+}
+
+/**
+ * De knoop het dichtst bij een RD-punt, op een netwerk van flinke omvang
+ * (geen los stukje pad rond een gebouw of achter een hek).
+ */
 export function dichtsteKnoop(g, x, y) {
+  const { nr, grootte } = netwerken(g)
+  const groot = Math.max(...grootte)
   let beste = -1
   let besteD = Infinity
   for (let i = 0; i < g.n; i++) {
-    if (g.begin[i + 1] === g.begin[i]) continue
+    if (g.begin[i + 1] === g.begin[i] || grootte[nr[i]] < 0.05 * groot) continue
     const d = (g.x[i] - x) ** 2 + (g.y[i] - y) ** 2
     if (d < besteD) {
       besteD = d
@@ -304,63 +359,100 @@ export function routeLangs(g, knopen, strafFactor = 1) {
 }
 
 /**
- * Zoek rondjes van ongeveer 'doel' meter vanaf knoop 'start'. Probeert
- * driehoeken start → A → B → start met A en B uit een ring van kandidaten
- * rond de start (per windrichting de mooiste bereikbare plek), met straf
- * op wat al gelopen is zodat het een echte lus wordt.
- * Geeft de beste rondjes: [{knopen, segs, meter, kosten, dubbel, strand, via}].
+ * Haal uitstapjes weg: loopt een route een segment op en meteen weer terug
+ * (een doodlopend stukje naar een tussenpunt), dan vallen beide weg.
  */
-export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160 } = {}) {
+export function zonderUitstapjes(knopen, segs) {
+  const kn = [knopen[0]]
+  const sg = []
+  for (let i = 0; i < segs.length; i++) {
+    if (sg.length && sg[sg.length - 1] === segs[i]) {
+      sg.pop()
+      kn.pop()
+    } else {
+      sg.push(segs[i])
+      kn.push(knopen[i + 1])
+    }
+  }
+  return { knopen: kn, segs: sg }
+}
+
+/**
+ * Zoek rondjes van ongeveer 'doel' meter vanaf knoop 'start'. Een rondje gaat
+ * start → A → B (→ C) → start; de hoekpunten komen uit een ring van
+ * kandidaten rond de start (per windrichting en afstand de plek met de
+ * mooiste route ernaartoe). Wat al gelopen is krijgt straf, zodat het een
+ * echte lus wordt. 'kronkel': vier hoeken dicht bij de start in plaats van
+ * een grote driehoek, voor kronkelen in een klein gebied.
+ * Geeft {rondjes: [{knopen, segs, meter, kosten, dubbel, strand, via}], ...}.
+ */
+export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProbeer = 160, kronkel = false } = {}) {
   const boom = dijkstra(g, start, { maxKosten: doel * 6 })
   const sx = g.x[start]
   const sy = g.y[start]
-  // kandidaten: per sector en per ring de plek met de laagste kosten per meter
-  const ringen = [0.18, 0.26, 0.34, 0.42]
+  const ringen = kronkel ? [0.1, 0.15, 0.2, 0.26] : [0.18, 0.26, 0.34, 0.42]
   const beste = new Map()
   for (let i = 0; i < g.n; i++) {
     const m = boom.meter[i]
-    if (!Number.isFinite(boom.kosten[i]) || m < 0.12 * doel || m > 0.48 * doel) continue
+    if (!Number.isFinite(boom.kosten[i]) || m < (ringen[0] - 0.05) * doel || m > (ringen[3] + 0.05) * doel) continue
     const hoek = (Math.atan2(g.x[i] - sx, g.y[i] - sy) * 180) / Math.PI
     const sector = Math.floor((((hoek % 360) + 360) % 360) / (360 / sectoren))
     let ring = 0
     for (let r = 1; r < ringen.length; r++) if (Math.abs(m - ringen[r] * doel) < Math.abs(m - ringen[ring] * doel)) ring = r
-    if (Math.abs(m - ringen[ring] * doel) > 0.05 * doel) continue
+    if (Math.abs(m - ringen[ring] * doel) > 0.04 * doel) continue
     const waarde = boom.kosten[i] / m
     const sleutel = sector * 10 + ring
     const nu = beste.get(sleutel)
-    if (!nu || waarde < nu.waarde) beste.set(sleutel, { knoop: i, waarde, meter: m, hoek, sector, ring })
+    if (!nu || waarde < nu.waarde) beste.set(sleutel, { knoop: i, waarde, meter: m, hoek })
   }
   const kand = [...beste.values()]
-  // paren: niet te dicht bij elkaar in richting, geschatte lengte in de buurt van het doel
-  const paren = []
+  const afstand = (p, q) => Math.hypot(g.x[p.knoop] - g.x[q.knoop], g.y[p.knoop] - g.y[q.knoop])
+  const draai = (p, q) => ((q.hoek - p.hoek) % 360 + 360) % 360
+  // combinaties van hoekpunten, rechtsom (linksom komt als omgekeerde volgorde ook langs);
+  // een eerste schatting van de lengte en hoe mooi de wegen naar de hoeken zijn bepaalt de volgorde
+  const combis = []
   for (const a of kand) {
     for (const b of kand) {
-      if (a === b) continue
-      let dh = ((b.hoek - a.hoek) % 360 + 360) % 360
-      if (dh < 25 || dh > 160) continue // rechtsom van a naar b; linksom komt als (b, a) ook langs
-      const ab = Math.hypot(g.x[a.knoop] - g.x[b.knoop], g.y[a.knoop] - g.y[b.knoop])
-      const schatting = a.meter + 1.35 * ab + b.meter
-      const af = Math.abs(schatting - doel) / doel
-      if (af > 0.3) continue
-      paren.push({ a, b, prior: a.waarde + b.waarde + 2 * af })
+      const dab = draai(a, b)
+      if (a === b || dab < 25 || dab > (kronkel ? 120 : 160)) continue
+      if (!kronkel) {
+        const af = Math.abs(a.meter + 1.35 * afstand(a, b) + b.meter - doel) / doel
+        if (af <= 0.3) combis.push({ hoeken: [a, b], prior: a.waarde + b.waarde + 2 * af })
+        continue
+      }
+      for (const c of kand) {
+        const dbc = draai(b, c)
+        if (c === a || c === b || dbc < 25 || dbc > 120 || dab + dbc > 240) continue
+        const af = Math.abs(a.meter + 1.35 * (afstand(a, b) + afstand(b, c)) + c.meter - doel) / doel
+        if (af <= 0.3) combis.push({ hoeken: [a, b, c], prior: (a.waarde + b.waarde + c.waarde) * (2 / 3) + 2 * af })
+      }
     }
   }
-  paren.sort((p, q) => p.prior - q.prior)
+  combis.sort((p, q) => p.prior - q.prior)
   const uit = []
   const straf = new Float32Array(g.lengte.length)
-  for (const { a, b } of paren.slice(0, maxProbeer)) {
+  for (const { hoeken } of combis.slice(0, maxProbeer)) {
     straf.fill(1)
-    const p1 = pad(boom, a.knoop)
+    const p1 = pad(boom, hoeken[0].knoop)
     for (const s of p1.segs) straf[s] = 4
-    const b2 = dijkstra(g, a.knoop, { straf, doel: b.knoop })
-    if (!Number.isFinite(b2.kosten[b.knoop])) continue
-    const p2 = pad(b2, b.knoop)
-    for (const s of p2.segs) straf[s] = 4
-    const b3 = dijkstra(g, b.knoop, { straf, doel: start })
-    if (!Number.isFinite(b3.kosten[start])) continue
-    const p3 = pad(b3, start)
-    const segs = [...p1.segs, ...p2.segs, ...p3.segs]
-    const knopen = [...p1.knopen, ...p2.knopen.slice(1), ...p3.knopen.slice(1)]
+    let knopen = p1.knopen.slice()
+    let segs = p1.segs.slice()
+    let vorige = hoeken[0].knoop
+    let gelukt = true
+    for (const doelKnoop of [...hoeken.slice(1).map((h) => h.knoop), start]) {
+      const b = dijkstra(g, vorige, { straf, doel: doelKnoop })
+      if (!Number.isFinite(b.kosten[doelKnoop])) {
+        gelukt = false
+        break
+      }
+      const p = pad(b, doelKnoop)
+      for (const s of p.segs) straf[s] = 4
+      knopen = knopen.concat(p.knopen.slice(1))
+      segs = segs.concat(p.segs)
+      vorige = doelKnoop
+    }
+    if (!gelukt) continue
+    ;({ knopen, segs } = zonderUitstapjes(knopen, segs))
     const t = tel(g, segs)
     // dubbel: meters over een segment dat al eerder in dit rondje zat
     const gezien = new Set()
@@ -371,7 +463,7 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
     }
     const af = Math.abs(t.meter - doel) / doel
     const score = t.kosten / t.meter + 3 * (dubbelM / t.meter) + 4 * Math.max(0, af - 0.08)
-    uit.push({ knopen, segs, meter: t.meter, kosten: t.kosten, strand: t.strand, dubbel: dubbelM / t.meter, score, via: [a.knoop, b.knoop] })
+    uit.push({ knopen, segs, meter: t.meter, kosten: t.kosten, strand: t.strand, dubbel: dubbelM / t.meter, score, via: hoeken.map((h) => h.knoop) })
   }
   uit.sort((p, q) => p.score - q.score)
   // verschillende rondjes: minder dan 60% dezelfde segmenten als een beter rondje
@@ -386,5 +478,5 @@ export function zoekRondjes(g, start, doel, { aantal = 6, sectoren = 24, maxProb
     })
     if (!lijkt) gekozen.push(r)
   }
-  return { rondjes: gekozen, kandidaten: kand.length, geprobeerd: Math.min(paren.length, maxProbeer) }
+  return { rondjes: gekozen, kandidaten: kand.length, geprobeerd: Math.min(combis.length, maxProbeer) }
 }
