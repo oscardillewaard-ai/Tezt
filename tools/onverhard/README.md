@@ -324,6 +324,11 @@ draait in je browser; er is geen eigen server.
   254 en 45 m): Komoot gebruikt een grove hoogtekaart die duinen afvlakt. Bij
   heel lange routes (meer dan 160 blokken) gebruikt de app de hoogtes van
   BRouter (SRTM) en zegt dat erbij.
+- **Ongedaan maken**: ↶ (of Ctrl+Z, Ctrl+Y om opnieuw te doen) draait punten,
+  tekeningen, modus en lengte terug, en brengt ook de vorige route terug (na
+  "Opnieuw" of na een nieuwe planning).
+- **Sneltoetsen**: 1–5 soort route, P plan, T teken, R rechthoek, Esc stop,
+  Backspace laatste punt weg, G GPX, L locatie, N opnieuw beginnen, ? uitleg.
 - **Routes vergelijken**: je krijgt routes A, B, … (A is de aanbevolen). Tik
   een route om hem te kiezen. Met "op kaart" zet je routes gestippeld naast
   elkaar; tik op zo'n stippellijn om die route te kiezen.

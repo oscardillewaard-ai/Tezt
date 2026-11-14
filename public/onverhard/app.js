@@ -56,6 +56,28 @@ const opKaart = new Set() // routes die op de kaart staan
 let bron = 'eind' // waar de routekleur naar kijkt
 let stopper = null // AbortController van de lopende planning
 
+// ---------- Ongedaan maken ----------
+const terugStapel = []
+const vooruitStapel = []
+/** Hoe het nu is: punten, tekening, keuzes én de geplande routes (die laatste als verwijzing). */
+const momentopname = () => ({
+  json: JSON.stringify({ modus: staat.modus, punten: staat.punten, vlak: staat.vlak, lijn: staat.lijn, km: staat.km, vorm: staat.vorm, wegen: staat.wegen }),
+  uitslag, gekozen, opKaart: [...opKaart],
+})
+/** Onthoud hoe het nu is, vlak voor een wijziging. */
+function onthoud() {
+  const nu = momentopname()
+  const laatste = terugStapel[terugStapel.length - 1]
+  if (!laatste || laatste.json !== nu.json || laatste.uitslag !== nu.uitslag) terugStapel.push(nu)
+  if (terugStapel.length > 60) terugStapel.shift()
+  vooruitStapel.length = 0
+  zetTerugKnop()
+}
+function zetTerugKnop() {
+  const knop = document.getElementById('terug')
+  if (knop) knop.disabled = !terugStapel.length
+}
+
 function bewaar() {
   try {
     localStorage.setItem(SLEUTEL, JSON.stringify(staat))
@@ -214,6 +236,7 @@ function tekenPunten() {
   staat.punten.forEach((p, i) => {
     const [tekst, klasse] = puntLabel(i)
     const marker = L.marker(p, { icon: icoon(tekst, klasse), draggable: true, title: puntNaam(i), zIndexOffset: 1000 })
+    marker.on('dragstart', onthoud)
     marker.on('dragend', () => {
       const { lat, lng } = marker.getLatLng()
       staat.punten[i] = [lat, lng]
@@ -223,6 +246,7 @@ function tekenPunten() {
     knop.type = 'button'
     knop.textContent = 'Verwijder dit punt'
     knop.addEventListener('click', () => {
+      onthoud()
       staat.punten.splice(i, 1)
       puntenGewijzigd()
     })
@@ -246,6 +270,7 @@ function tekenPuntenlijst() {
     knop.textContent = '✕'
     knop.setAttribute('aria-label', `Verwijder ${puntNaam(i).toLowerCase()}`)
     knop.addEventListener('click', () => {
+      onthoud()
       staat.punten.splice(i, 1)
       puntenGewijzigd()
     })
@@ -331,6 +356,7 @@ function voegPuntToe(p) {
     return
   }
   toonFout('')
+  onthoud()
   if (staat.modus === 'rondje') staat.punten = staat.punten.length ? [staat.punten[0], p] : [p]
   else if (tekenModus()) staat.punten = [p]
   else staat.punten.push(p)
@@ -427,7 +453,10 @@ function eindeSchets(e) {
   else punten = dunUit(punten, 8)
   const nodig = staat.modus === 'tekenen' ? 2 : 3
   stopTekenen()
-  if (punten.length >= nodig && (staat.modus === 'tekenen' || kaart.distance(punten[0], punten[2] || punten[1]) > 30)) {
+  // groot genoeg: de hele tekening moet minstens 30 m beslaan (niet het begin ervan)
+  const omvang = punten.length >= 2 ? kaart.distance(L.latLngBounds(punten).getSouthWest(), L.latLngBounds(punten).getNorthEast()) : 0
+  if (punten.length >= nodig && omvang > 30) {
+    onthoud()
     if (staat.modus === 'tekenen') staat.lijn = punten
     else staat.vlak = punten
     toonFout('')
@@ -441,6 +470,7 @@ kaartVlak.addEventListener('pointercancel', eindeSchets, { capture: true })
 el('tekenVrij').addEventListener('click', () => startTekenen('vrij'))
 el('tekenVierkant').addEventListener('click', () => startTekenen('rechthoek'))
 el('tekenWis').addEventListener('click', () => {
+  onthoud()
   stopTekenen()
   if (staat.modus === 'tekenen') staat.lijn = null
   else staat.vlak = null
@@ -449,6 +479,7 @@ el('tekenWis').addEventListener('click', () => {
   tekenPuntenlijst()
 })
 el('wegen').addEventListener('change', () => {
+  onthoud()
   staat.wegen = el('wegen').value
   bewaar()
   tekenPuntenlijst()
@@ -515,6 +546,7 @@ document.addEventListener('click', (e) => {
 
 // ---------- Invoer ----------
 function zetModus(modus) {
+  if (modus !== staat.modus) onthoud()
   if (modus !== 'route' && staat.modus !== modus) staat.punten = staat.punten.slice(0, 1) // alleen de start blijft
   stopTekenen()
   staat.modus = modus
@@ -526,6 +558,7 @@ el('modus').addEventListener('click', (e) => {
   if (e.target.dataset.modus && !stopper) zetModus(e.target.dataset.modus)
 })
 el('km').addEventListener('change', () => {
+  onthoud()
   staat.km = Math.max(2, Math.min(60, Number(el('km').value) || 10))
   el('km').value = staat.km
   bewaar()
@@ -570,12 +603,14 @@ el('twijfelblok').addEventListener('toggle', () => {
   if (plan) tekenRoute(false)
 })
 el('vorm').addEventListener('change', () => {
+  onthoud()
   staat.vorm = el('vorm').value
   bewaar()
 })
 /** Alles leeg: punten, tekening en routes (instellingen blijven). */
 el('opnieuw').addEventListener('click', () => {
   if (stopper) stopper.abort()
+  onthoud()
   stopTekenen()
   staat.punten = []
   staat.vlak = null
@@ -594,10 +629,12 @@ el('opnieuw').addEventListener('click', () => {
 })
 const main = document.querySelector('main')
 el('keerom').addEventListener('click', () => {
+  onthoud()
   staat.punten.reverse()
   puntenGewijzigd()
 })
 el('wis').addEventListener('click', () => {
+  onthoud()
   staat.punten = []
   puntenGewijzigd()
 })
@@ -673,6 +710,7 @@ async function planNu() {
         el('voortgang').style.width = `${(100 * klaar) / totaal}%`
       },
     })
+    onthoud() // zo brengt 'ongedaan maken' de vorige route terug
     uitslag = resultaat
     gekozen = 0
     opKaart.clear()
@@ -1219,6 +1257,89 @@ el('deel').addEventListener('click', async () => {
   }, 2000)
 })
 
+// ---------- Ongedaan maken: herstellen ----------
+function herstel(opname) {
+  Object.assign(staat, JSON.parse(opname.json))
+  stopTekenen()
+  // de routes van toen weer tonen (of weghalen als er toen nog geen waren)
+  uitslag = opname.uitslag
+  gekozen = opname.gekozen
+  opKaart.clear()
+  for (const i of opname.opKaart) opKaart.add(i)
+  if (uitslag) {
+    plan = details(uitslag.opties[gekozen], MIN_TWIJFEL)
+    toonResultaat(false)
+  } else {
+    plan = null
+    for (const laag of [routeLaag, altLaag, profielLaag]) laag.clearLayers()
+    el('resultaat').hidden = true
+  }
+  el('km').value = staat.km
+  el('vorm').value = staat.vorm
+  el('wegen').value = staat.wegen
+  for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
+  toonFout('')
+  puntenGewijzigd()
+  tekenTekening()
+  zetTerugKnop()
+}
+function ongedaanMaken() {
+  if (stopper || !terugStapel.length) return
+  vooruitStapel.push(momentopname())
+  herstel(terugStapel.pop())
+}
+function opnieuwDoen() {
+  if (stopper || !vooruitStapel.length) return
+  terugStapel.push(momentopname())
+  herstel(vooruitStapel.pop())
+}
+el('terug').addEventListener('click', ongedaanMaken)
+
+// ---------- Sneltoetsen ----------
+const MODI = ['route', 'rondje', 'gebied', 'straten', 'tekenen']
+document.addEventListener('keydown', (e) => {
+  if (el('intro').open || el('foto').open) return
+  const doel = e.target
+  const typen = doel && (doel.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(doel.tagName))
+  const cmd = e.ctrlKey || e.metaKey
+  const k = e.key.toLowerCase()
+  if (cmd && k === 'z' && !typen) {
+    e.preventDefault()
+    if (e.shiftKey) opnieuwDoen()
+    else ongedaanMaken()
+    return
+  }
+  if (cmd && k === 'y' && !typen) {
+    e.preventDefault()
+    opnieuwDoen()
+    return
+  }
+  if (e.key === 'Escape') {
+    if (tekenen) {
+      stopTekenen()
+      tekenPuntenlijst()
+    } else if (stopper) stopper.abort()
+    return
+  }
+  if (typen || cmd || e.altKey) return
+  if (/^[1-5]$/.test(e.key) && !stopper) zetModus(MODI[Number(e.key) - 1])
+  else if (k === 'p' || e.key === 'Enter') {
+    if (!el('plan').disabled && !stopper) planNu()
+  } else if (k === 't' && tekenModus()) startTekenen('vrij')
+  else if (k === 'r' && tekenModus() && staat.modus !== 'tekenen') startTekenen('rechthoek')
+  else if (k === 'g' && plan) el('gpx').click()
+  else if (k === 'l') el('locatie').click()
+  else if (k === 'n') el('opnieuw').click()
+  else if ((e.key === 'Backspace' || e.key === 'Delete') && staat.punten.length && !stopper) {
+    e.preventDefault()
+    onthoud()
+    staat.punten.pop()
+    puntenGewijzigd()
+  } else if (e.key === '?') openIntro()
+  else return
+  e.preventDefault()
+})
+
 // ---------- Kennismaking ----------
 const INTRO = 'onverhard.intro'
 let introDia = 0
@@ -1308,6 +1429,7 @@ el('wegen').value = staat.wegen
 for (const b of el('modus').children) b.setAttribute('aria-pressed', String(b.dataset.modus === staat.modus))
 puntenGewijzigd()
 tekenTekening()
+zetTerugKnop()
 if (tekenModus() && tekening()) kaart.fitBounds(L.latLngBounds(tekening()).pad(0.2))
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))
 else if (staat.punten.length === 1) kaart.setView(staat.punten[0], 13)

@@ -373,3 +373,9 @@ details.blok.stap[open] { padding-bottom: 12px; }
   .teken, .seg { animation: none; stroke-dashoffset: 0; }
   .teller, .binnen, .hm { animation: none; opacity: 1; }
 }
+
+#terug { font-size: 19px; }
+#terug:disabled { opacity: .35; }
+.toetsen { line-height: 2; }
+kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px solid var(--rand); border-bottom-width: 3px; border-radius: 6px;
+      background: var(--vlak); color: var(--inkt); font: 500 12px/1.5 var(--mono); text-align: center; }
