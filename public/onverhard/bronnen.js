@@ -1301,6 +1301,74 @@ function profielUitCoords(xy, coords) {
   return { afstand, hoogte, stijgen, dalen, min: Math.min(...hoogte), max: Math.max(...hoogte) }
 }
 
+// ---------- GPX inlezen ----------
+/** Punten uit een GPX-bestand (track, anders route): [[lon, lat, hoogte|null], ...]. */
+export function leesGpx(tekst) {
+  const doc = new DOMParser().parseFromString(tekst, 'application/xml')
+  if (doc.querySelector('parsererror')) throw new BronFout('GPX', 'dit is geen geldig GPX-bestand')
+  let punten = [...doc.getElementsByTagName('trkpt')]
+  if (!punten.length) punten = [...doc.getElementsByTagName('rtept')]
+  const coords = []
+  for (const p of punten) {
+    const lat = Number(p.getAttribute('lat'))
+    const lon = Number(p.getAttribute('lon'))
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    const ele = p.getElementsByTagName('ele')[0]
+    const vorige = coords[coords.length - 1]
+    if (vorige && vorige[0] === lon && vorige[1] === lat) continue
+    coords.push([lon, lat, ele ? Number(ele.textContent) : null])
+  }
+  if (coords.length < 2) throw new BronFout('GPX', 'geen route gevonden in dit bestand')
+  const naam = (doc.getElementsByTagName('name')[0] || {}).textContent || ''
+  return { coords, naam: naam.trim() }
+}
+
+/**
+ * Een ingelezen GPX-route bekijken zoals een geplande route: de paden eronder
+ * herkennen (kaarttegels, voor de OSM-ondergrond), langs de officiële kaart
+ * leggen, en hoogte en water erbij. Geeft hetzelfde als maakPlan.
+ */
+export async function importeerGpx(tekst, opties = {}) {
+  const meld = opties.meld || (() => {})
+  const { coords, naam } = leesGpx(tekst)
+  const xy = coords.map(([lon, lat]) => K.naarRd(lon, lat))
+  const meldingen = []
+  let segs = [[0, coords.length - 1, '']]
+  // tegels langs de route (en de buren), voor de wegen eronder
+  const tegels = new Map()
+  for (let i = 0; i < coords.length; i += 5) {
+    const [x, y] = T.tegelXY(coords[i][1], coords[i][0])
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) tegels.set(`${x + dx}/${y + dy}`, [x + dx, y + dy])
+  }
+  if (tegels.size <= 400) {
+    try {
+      meld('Paden onder de route herkennen')
+      const elementen = await haalTegels([...tegels.values()], opties.signal, opties.voortgang)
+      const g = G.bouwGraaf(elementen, { snap: 1.5, strandMijden: false })
+      segs = G.tagsLangs(g, xy)
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      meldingen.push('Paden onder de route niet herkend; alleen de officiële kaart')
+    }
+  } else meldingen.push('Route te lang om de paden eronder te herkennen; alleen de officiële kaart')
+  const traject = { coords: coords.map((c) => [c[0], c[1], c[2]]), segs, punten: [] }
+  const bgt = opties.metBgt === false ? null : new Bgt({ signal: opties.signal, voortgang: opties.voortgang })
+  meld('Ondergrond controleren')
+  const an = await analyseerRoute(traject, bgt)
+  const optie = optieVan({ traject, an }, 'A')
+  optie.ingelezen = naam || 'GPX'
+  const lijst = [optie]
+  try {
+    await voegHoogtesToe(lijst, opties.signal, meld)
+    optie.stijgen = optie.hoogte ? optie.hoogte.stijgen : null
+    optie.dalen = optie.hoogte ? optie.hoogte.dalen : null
+    await voegWaterToe(lijst, opties.signal, meld)
+  } catch (fout) {
+    if (afgebroken(fout)) throw fout
+  }
+  return { opties: lijst, uitleg: [], meldingen, verzoeken: 0, vlakken: bgt ? bgt.vlakken.lijst.length : 0, graaf: null, bgt, instel: {} }
+}
+
 const LETTERS = 'ABCDEFGH'
 
 /** Eén route zoals de app hem toont. */

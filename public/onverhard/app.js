@@ -2,7 +2,7 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
-import { pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -1173,7 +1173,8 @@ function tekenOpties() {
     else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
-    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>Route ${o.naam}</b>${i === 0 ? ' · aanbevolen' : ''}<small>${regel}</small></span>`
+    const titel = o.ingelezen ? `GPX · ${veilig(o.ingelezen)}` : `Route ${o.naam}${i === 0 ? '</b> · aanbevolen<b>' : ''}`
+    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
     toon.className = 'toon'
@@ -1674,6 +1675,62 @@ document.addEventListener('keydown', (e) => {
   else return
   e.preventDefault()
 })
+
+// ---------- GPX inlezen ----------
+async function leesGpxBestand(bestand) {
+  if (!bestand || stopper) return
+  toonFout('')
+  stopper = new AbortController()
+  el('plan').hidden = true
+  el('bezig').hidden = false
+  let stap = ''
+  try {
+    const tekst = await bestand.text()
+    const resultaat = await importeerGpx(tekst, {
+      signal: stopper.signal,
+      metBgt: staat.grondig > 0,
+      meld: (t) => {
+        stap = t
+        el('status').textContent = t + '…'
+        el('voortgang').style.width = '0'
+      },
+      voortgang: (klaar, totaal) => {
+        el('status').textContent = `${stap}: ${klaar} van ${totaal}`
+        el('voortgang').style.width = `${(100 * klaar) / totaal}%`
+      },
+    })
+    onthoud()
+    uitslag = resultaat
+    gekozen = 0
+    opKaart.clear()
+    opKaart.add(0)
+    plan = details(uitslag.opties[0], MIN_TWIJFEL)
+    stopBezig()
+    toonResultaat(true)
+  } catch (fout) {
+    if (fout.name === 'AbortError') toonFout('Gestopt.')
+    else toonFout(`GPX: ${fout.melding || fout.message}`)
+  } finally {
+    stopBezig()
+  }
+}
+el('gpxOpen').addEventListener('click', () => el('gpxBestand').click())
+el('gpxBestand').addEventListener('change', () => {
+  leesGpxBestand(el('gpxBestand').files[0])
+  el('gpxBestand').value = ''
+})
+// een GPX-bestand op de kaart (of de pagina) slepen
+for (const plek of [document.body]) {
+  plek.addEventListener('dragover', (e) => {
+    if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) e.preventDefault()
+  })
+  plek.addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0]
+    if (!f) return
+    e.preventDefault()
+    leesGpxBestand(f)
+  })
+}
 
 // ---------- Kennismaking ----------
 const INTRO = 'onverhard.intro'

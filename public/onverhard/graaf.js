@@ -1211,3 +1211,56 @@ export function onverhardeSegmenten(g) {
   }
   return uit
 }
+
+// ---------- GPX inlezen: de wegen eronder herkennen ----------
+/**
+ * Bij een ingelezen route (RD-punten) de OSM-tags van het pad eronder: per
+ * punt het dichtstbijzijnde segment binnen 'max' meter. Geeft segs zoals
+ * BRouter ze geeft: [[i0, i1, tags], ...] (stukken zonder pad: '').
+ */
+export function tagsLangs(g, xy, max = 15) {
+  const rooster = new Map()
+  for (let s = 0; s < g.lengte.length; s++) {
+    const a = g.van[s]
+    const b = g.naar[s]
+    const x0 = Math.floor((Math.min(g.x[a], g.x[b]) - max) / 25)
+    const x1 = Math.floor((Math.max(g.x[a], g.x[b]) + max) / 25)
+    const y0 = Math.floor((Math.min(g.y[a], g.y[b]) - max) / 25)
+    const y1 = Math.floor((Math.max(g.y[a], g.y[b]) + max) / 25)
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) continue
+    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
+      const k = cx + ',' + cy
+      if (!rooster.has(k)) rooster.set(k, [])
+      rooster.get(k).push(s)
+    }
+  }
+  const tagVan = xy.map(([x, y]) => {
+    let beste = -1
+    let besteD = max
+    for (const s of rooster.get(Math.floor(x / 25) + ',' + Math.floor(y / 25)) || []) {
+      const ax = g.x[g.van[s]]
+      const ay = g.y[g.van[s]]
+      const dx = g.x[g.naar[s]] - ax
+      const dy = g.y[g.naar[s]] - ay
+      const l2 = dx * dx + dy * dy
+      let t = l2 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0
+      t = t < 0 ? 0 : t > 1 ? 1 : t
+      const d = Math.hypot(x - (ax + t * dx), y - (ay + t * dy))
+      if (d < besteD) {
+        besteD = d
+        beste = s
+      }
+    }
+    return beste >= 0 ? g.tagLijst[g.segTags[beste]] : ''
+  })
+  const segs = []
+  let begin = 0
+  for (let i = 1; i < xy.length; i++) {
+    if (i === xy.length - 1 || tagVan[i] !== tagVan[begin]) {
+      segs.push([begin, i, tagVan[begin]])
+      begin = i
+    }
+  }
+  if (!segs.length) segs.push([0, xy.length - 1, ''])
+  return segs
+}
