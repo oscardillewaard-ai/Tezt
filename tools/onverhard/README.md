@@ -406,9 +406,9 @@ en lengte, onverhard gemeten langs de officiële kaart:
 | N70, Berg en Dal (15 km) | 79% | 95% (14,9 km) | 1% | 86% |
 | Schoorlse Duinen (14 km) | 88% | 95% (14,4 km) | 1% | 94% |
 | Loonse en Drunense Duinen (11 km) | 97% | 99% (11,4 km) | 0% | 92% |
-| Veluwezoom (15 km) | 89% | VELUWEZOOM | | 96% |
+| Veluwezoom (15 km) | 89% | 99% (15,5 km) | 1% | 96% |
 
-Rekentijd 0,4 tot 1,8 seconde per gebied, plus 2 tot 4 seconden voor de
+Rekentijd 0,4 tot 1,8 seconde per gebied, plus 2 tot 5 seconden voor de
 officiële kaart. De paden voor deze meting zijn opgehaald met een vierkant in
 plaats van een cirkel en mét opritten en stoepen (een iets ruimere download
 dan de app nu doet). Komoot staat hier hoger dan in de eerdere tabel omdat de
