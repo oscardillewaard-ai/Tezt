@@ -1,4 +1,4 @@
-# Onverhard: hardlooproutes over zo veel mogelijk onverhard
+# Onverhard (webversie: Nopav.es): hardlooproutes over zo veel mogelijk onverhard
 
 `onverhard.py` plant een hardlooproute in Nederland die zo veel mogelijk over
 onverharde paden gaat, en controleert de ondergrond daarna tegen officiële
@@ -272,6 +272,87 @@ veranderen mee met OSM en de BGT):
 | Zelfde zonder tussenpunten | 18,21 km | 64,9% | 61,0% | 61,0% | 0% |
 | Zelfde met `--law 0.3` | 23,32 km | 40,6% | 35,2% | 35,4% | 77% |
 | `--rondje 12` vanaf de Pijperring | 11,64 km | 52,8% | 58,9% | 58,9% | 0% |
+
+## Nopav.es: score, stations, omwegen en de nieuwe interface
+
+De webversie heet **Nopav.es**. Het URL-pad (`/onverhard/`), de
+localStorage-sleutels (`onverhard.*`, anders zijn bewaarde routes weg) en de
+namen in de code blijven `onverhard`. Het domein nopav.es is nog niet
+geregistreerd; dat moet de eigenaar zelf doen. Het ontwerp staat in
+[PLAN-nopaves.md](PLAN-nopaves.md).
+
+**Nopav.es-score** (`nopavesScore` in `kern.js`, 0 tot 100): 
+
+```
+100 × (0,75·onverhard(eind) + 0,15·paadjes + 0,10·(1 − min(1, langsteVerhardeStuk/2 km)))
+    − 100 × (dubbel + 2·strandaandeel)
+```
+
+afgekapt op 0 tot 100. "Onverhard" is onverhard plus half verhard volgens het
+eindoordeel; "paadjes" is het aandeel path/footway dat onverhard is. Labels:
+90 en hoger "Puur onverhard", 75 tot 89 "Lekker ruig", 55 tot 74 "Gemengd",
+onder 55 "Veel asfalt". De gewichten zijn een keuze en niet geijkt op de zes
+benchmarkgebieden. Bij een rondje staat de optie met de hoogste score bovenaan,
+met een strafpunt voor een lengte die meer dan 10% afwijkt.
+
+**Naar station** (`planStations` in `bronnen.js`): kies een start en ongeveer
+X km; de app zoekt treinstations in verschillende richtingen.
+
+1. Stations uit de kaarttegels op zoom 12 (laag `poi`, `railway/station` en
+   `railway/halt`), ongeveer 25 tegels van 6 km voor een straal van 12 km.
+2. Kandidaten: hemelsbreed 0,5 tot 0,85 × X km; per kompassector (8) het station
+   het dichtst bij 0,7 × X km, hooguit 6. Een waarschijnlijk treinstation wint
+   van een halte, en een knooppunt (rank 2 of 3, zoals Rotterdam Centraal) van
+   een klein station.
+3. Paden: de z14-tegels in een ellips langs de weg naar elk kandidaat-station
+   (`tegelsLangs`), hooguit 220; zit je erboven, dan valt het verste station af.
+4. Eén kortste-pad-boom vanaf de start geeft de routes naar alle stations.
+   Dezelfde twee rondes (strand en toegangskaart) als bij een rondje, via de
+   gedeelde helper `rondesMetGraaf`.
+5. Routes langer dan 1,3 × X km vallen af; korter dan 0,8 × X km geeft een
+   melding. Tot 4 routes, beste score eerst.
+
+Alle kandidaat-stations staan als 🚉 op de kaart (aan of uit via de
+kaartlagen-knop); een tik geeft "Route hierheen" op het al geladen netwerk. De
+GPX heet "Nopav.es → <station>".
+
+*Gemeten (19 november 2026, uit tegeldata):* de z12-stationslijst is gelijk aan
+die van z14 binnen 12 km van Delft (41 stations, geen enkele gemist). De
+tegels geven **geen** onderscheid tussen trein, tram en metro: RandstadRail
+staat er ook als `railway/station` (Spui, Stadhuis, Grote Markt). Daarom is er
+een gok: de Engelse naam eindigt op "railway station" of de Nederlandse begint
+met "station" of "halte". Zo'n station wordt bij de keuze voorgetrokken. Een
+echt station zonder die namen kan hierdoor minder snel gekozen worden; dat is
+niet uitgebreid gecontroleerd. Vanuit Delft op 15 km kost de stationsmodus
+ongeveer 21 tot 26 s en 200 tot 350 tegels; zie de commit voor de meting.
+
+**Groene omwegen** (`groeneOmwegen` in `graaf.js`): voor elk verhard stuk van
+200 m of meer langs een route op het eigen netwerk (stukken met minder dan 50 m
+onverhard ertussen samengevoegd, 100 m speling) zoekt de app de beste weg
+tussen begin en eind, met verhard ×6 en al gelopen ×8. Een omweg telt als hij
+hooguit 3 km en 4 × het stuk langer is, minstens 150 m extra onverhard
+oplevert, minder verhard overlaat en niet meer dan 20% dubbel loopt. Punten die
+je zelf neerzette blijven staan. De chip ("+1,2 km · ≈ +4 punten") schat de
+score-winst uit het aandeel onverhard en het dubbel lopen; paadjes en het
+langste verharde stuk tellen niet mee. Een tik past hem toe (↶ maakt hem
+ongedaan); Esc of de knop zet de modus uit. Niet bij "elke straat" en niet bij
+BRouter-uitslagen. Een rondje bij Rijswijk Buiten ging van 34 naar 38 punten en
+van 42% naar 53% onverhard, met 5% dubbel lopen. Een rondje door Delft zelf had
+geen omweg: de grote verharde stukken hebben daar geen onverhard alternatief.
+
+**Interface**: tijdens het laden staat er geen tekst meer (alleen een poppetje
+op de voortgangsbalk, Stop, en een verborgen `aria-live`-regel voor
+schermlezers). Water, winkels, horeca, toilet en tankstation zet je aan en uit
+met de kaartlagen-knop rechtsboven op de kaart. Het paneel heeft nog twee
+tabbladen (Hoogte en Ondergrond) en op de telefoon (< 700 px) is het een
+bottom sheet met drie standen (piek, half, vol; slepen of tikken op het
+handvat) over een schermvullende kaart. Op piek staat één regel: de score met
+GPX, bewaren en link, of de hoofdknop van de stap.
+
+**Testen**: `node --test tools/onverhard/test_web_kern.mjs` (rekenkern),
+`npx oxlint public/onverhard`, en met de echte bronnen
+`CHROMIUM_PAD=/opt/pw-browsers/chromium node tools/onverhard/test_web_nopaves.mjs <map> [desktop|mobiel]`
+(met `cd public && python3 -m http.server 8765` ernaast).
 
 ## Webversie
 

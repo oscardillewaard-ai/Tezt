@@ -1363,7 +1363,7 @@ const xmlVeilig = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>'
 export function maakGpx(traject, naam, tijd = new Date(), beschrijving = '') {
   const regels = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<gpx version="1.1" creator="onverhard-planner" xmlns="http://www.topografix.com/GPX/1/1">',
+    '<gpx version="1.1" creator="nopaves-planner" xmlns="http://www.topografix.com/GPX/1/1">',
     `  <metadata><name>${xmlVeilig(naam)}</name>${beschrijving ? `<desc>${xmlVeilig(beschrijving)}</desc>` : ''}<time>${tijd.toISOString().slice(0, 19)}Z</time></metadata>`,
   ]
   traject.punten.forEach(([lat, lon], i) => {

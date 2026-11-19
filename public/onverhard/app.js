@@ -2200,6 +2200,13 @@ kaart.on('contextmenu', (e) => {
       })])
     }
   }
+  opties.push(['🚉 Naar station vanaf hier', zet(() => {
+    onthoud()
+    zetModus('station')
+    staat.punten = [p]
+    puntenGewijzigd()
+    toonStap(3)
+  })])
   opties.push(['⟳ Rondje vanaf hier', zet(() => {
     onthoud()
     zetModus('rondje')
@@ -2321,11 +2328,12 @@ el('intro').addEventListener('pointerup', (e) => {
   if (veegX === null) return
   const dx = e.clientX - veegX
   veegX = null
-  if (dx < -40 && introDia < 4) toonDia(introDia + 1)
+  if (dx < -40 && introDia < document.querySelectorAll('.intro-dia').length - 1) toonDia(introDia + 1)
   else if (dx > 40 && introDia > 0) toonDia(introDia - 1)
 })
 // uitleg met voorbeelden
 const VOORBEELDEN = {
+  station: 'p=52.0116,4.3571&station=15',
   route: 'p=52.13081,4.35323;52.10350,4.30180',
   rondje: 'p=52.13081,4.35323&rondje=12',
   gebied: 'modus=gebied&t=52.03342,4.33407;52.03751,4.34372;52.03553,4.34544;52.03183,4.34393;52.03104,4.33986;52.02946,4.33814;52.03183,4.33385&p=52.03262,4.33428&rondje=8',

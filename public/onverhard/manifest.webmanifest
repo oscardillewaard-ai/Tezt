@@ -1,7 +1,7 @@
 {
-  "name": "Onverhard",
-  "short_name": "Onverhard",
-  "description": "Plan een hardlooproute over zo veel mogelijk onverharde paden en controleer de ondergrond met de BGT en de luchtfoto.",
+  "name": "Nopav.es",
+  "short_name": "Nopav.es",
+  "description": "Plan een hardlooproute over zo veel mogelijk onverharde paden, met een score, routes naar stations en groene omwegen.",
   "lang": "nl",
   "start_url": "./",
   "scope": "./",
