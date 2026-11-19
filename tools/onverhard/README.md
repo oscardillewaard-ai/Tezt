@@ -340,6 +340,23 @@ BRouter-uitslagen. Een rondje bij Rijswijk Buiten ging van 34 naar 38 punten en
 van 42% naar 53% onverhard, met 5% dubbel lopen. Een rondje door Delft zelf had
 geen omweg: de grote verharde stukken hebben daar geen onverhard alternatief.
 
+**Huisstijl Korrel**: de ondergrond is het merk. Zand, gras, heide, klei en
+asfalt hebben elk een eigen korrel en kleur (zand `#E3C98C`, veen `#2B211B`,
+heide `#9B4A7A`, mos `#5F7A2F`, klei `#A8714A`, asfalt `#565B63`); 's nachts is
+het dezelfde grond in donker. Het woordteken is `no` + `pav` (doorgestreept,
+gevuld met asfalt) + `.es`. Letters: Darker Grotesque (titels), Karla (tekst) en
+Overpass Mono (cijfers), lokaal meegeleverd in `fonts/`. Alles is vierkant met
+een rand van 2 px in inkt, zonder schaduw; de pictogrammen zijn lijntekeningen
+uit één sprite in `index.html` (geen emoji). De korrel komt terug in de
+ondergrondstrook onder de score, de legenda en de tabel, en als dunne laag over
+de route zelf (stippen = onverhard, streepjes = half verhard, lange strepen =
+open verharding, asfalt blijft effen). De kleuren van de ondergrondklassen zijn
+dezelfde als voorheen (gevalideerd op kleurenblindheid); de korrel zit erbovenop.
+De ondergrondkaart zelf is nog de OpenStreetMap-rastertegel, met alleen een
+warme tint; die opnieuw tekenen in korrels vraagt vectortegels en is niet
+gedaan. De appiconen zijn gemaakt met dezelfde letter; het ontwerp en de
+twee andere richtingen (Streep en Riso) stonden op een voorstelpagina.
+
 **Interface**: tijdens het laden staat er geen tekst meer (alleen een poppetje
 op de voortgangsbalk, Stop, en een verborgen `aria-live`-regel voor
 schermlezers). Water, winkels, horeca, toilet en tankstation zet je aan en uit
@@ -654,7 +671,7 @@ een eerder opgehaald antwoord (handig als Overpass druk is).
 - Ondergrond: Basisregistratie Grootschalige Topografie (BGT), Kadaster, via [PDOK](https://www.pdok.nl) (CC0): OGC API Features in de Python-tool, vectortegels in de webversie.
 - Luchtfoto: PDOK luchtfoto RGB, Het Waterschapshuis / Beeldmateriaal Nederland (CC BY 4.0).
 - Hoogte: Actueel Hoogtebestand Nederland (AHN, maaiveld 0,5 m), Rijkswaterstaat / Het Waterschapshuis, via [PDOK](https://www.pdok.nl) (CC0).
-- Kaartstijl en lettertypes van de webversie: overgenomen van de Tarapp in deze repo (Barlow Condensed en IBM Plex Mono, SIL Open Font License).
+- Lettertypes van de webversie: Darker Grotesque, Karla en Overpass Mono (SIL Open Font License 1.1, via Google Fonts; zie `public/onverhard/fonts/OFL-korrel-lettertypen.txt`).
 
 De tool gebruikt de publieke servers van BRouter en PDOK. Wees er zuinig op:
 laat de cache aan en draai geen grote aantallen routes achter elkaar.

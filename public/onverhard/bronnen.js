@@ -1137,7 +1137,7 @@ export async function planStations(instel, bgt, aantal, meld = () => {}, signal)
   opties = opties.slice(0, Math.max(4, aantal))
   const kort = opties.filter((k) => k.lengte < 0.8 * doel)
   if (kort.length) {
-    waarschuwingen.push(`${kort.length === 1 ? 'Route naar ' + kort[0].station + ' is' : kort.length + ' routes zijn'} korter dan gevraagd: probeer 🌿 Groene omwegen`)
+    waarschuwingen.push(`${kort.length === 1 ? 'Route naar ' + kort[0].station + ' is' : kort.length + ' routes zijn'} korter dan gevraagd: probeer Groene omwegen`)
   }
   return {
     opties: opties.map((k) => ({ traject: k.traject, an: k.an, knopen: k.knopen, segs: k.segs, station: k.station })),

@@ -44,6 +44,24 @@ function leesKleuren() {
 }
 leesKleuren()
 
+/** Een pictogram uit de sprite in index.html (een lijntekening in de kleur van de tekst). */
+const ico = (naam) => `<svg class="ico" aria-hidden="true"><use href="#i-${naam}"/></svg>`
+/** 'onverhard' wordt 'kl-onverhard': de korrel bij een ondergrondklasse (zie styles.css). */
+const korrelKlasse = (klasse) => `kl kl-${String(klasse).split(' ')[0]}`
+/**
+ * De korrel op de route zelf: een dunne laag erover, zodat de klasse ook zonder kleur te zien is.
+ * Onverhard krijgt stippen, half verhard streepjes, open verharding lange strepen en onbekend losse
+ * puntjes; gesloten verharding (asfalt) blijft effen.
+ */
+function korrelStijl(klasse) {
+  const inkt = '#2B211B'
+  if (klasse === K.ONVERHARD) return { color: inkt, weight: 2.4, opacity: 0.7, dashArray: '0.1 6', lineCap: 'round' }
+  if (klasse === K.HALF) return { color: inkt, weight: 2.2, opacity: 0.65, dashArray: '5 5', lineCap: 'butt' }
+  if (klasse === K.OPEN) return { color: '#F2E4B8', weight: 1.8, opacity: 0.9, dashArray: '10 6', lineCap: 'butt' }
+  if (klasse === K.ONBEKEND) return { color: inkt, weight: 2, opacity: 0.5, dashArray: '0.1 10', lineCap: 'round' }
+  return null
+}
+
 // ---------- Toestand ----------
 const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false }
 const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
@@ -296,7 +314,7 @@ function tekenPuntenlijst() {
   el('tekenWis').hidden = !tekening()
   const getekend = tekening()
   el('tekenstatus').hidden = !getekend
-  el('tekenVrij').textContent = getekend ? '✎ Opnieuw tekenen' : '✎ Teken'
+  el('tekenVrij').innerHTML = ico('potlood') + (getekend ? 'Opnieuw tekenen' : 'Teken')
   if (getekend) {
     let maat
     if (staat.modus === 'tekenen') {
@@ -398,13 +416,13 @@ function tekenTekening(vers = false) {
   tekenLaag.clearLayers()
   const t = tekening()
   if (!t || !t.length) return
-  const stijl = { color: '#ffcb05', weight: 4, opacity: 1, dashArray: '8 6', interactive: false, className: vers ? 'tekening-vers' : '' }
+  const stijl = { color: '#9B4A7A', weight: 4, opacity: 1, dashArray: '8 6', interactive: false, className: vers ? 'tekening-vers' : '' }
   if (staat.modus === 'tekenen') {
-    L.polyline(t, { ...stijl, color: '#1f3328', weight: 7, dashArray: null, opacity: 0.35 }).addTo(tekenLaag)
+    L.polyline(t, { ...stijl, color: '#2B211B', weight: 7, dashArray: null, opacity: 0.35 }).addTo(tekenLaag)
     L.polyline(t, stijl).addTo(tekenLaag)
   } else {
-    L.polygon(t, { ...stijl, color: '#1f3328', weight: 7, dashArray: null, opacity: 0.35, fill: false }).addTo(tekenLaag)
-    L.polygon(t, { ...stijl, fillColor: '#ffcb05', fillOpacity: 0.08 }).addTo(tekenLaag)
+    L.polygon(t, { ...stijl, color: '#2B211B', weight: 7, dashArray: null, opacity: 0.35, fill: false }).addTo(tekenLaag)
+    L.polygon(t, { ...stijl, fillColor: '#9B4A7A', fillOpacity: 0.08 }).addTo(tekenLaag)
   }
 }
 
@@ -464,7 +482,7 @@ kaartVlak.addEventListener('pointerdown', (e) => {
   e.stopPropagation()
   kaartVlak.setPointerCapture(e.pointerId)
   const p = kaart.mouseEventToLatLng(e)
-  schets = { punten: [[p.lat, p.lng]], lijn: L.polyline([[p.lat, p.lng]], { color: '#ffcb05', weight: 4, dashArray: '8 6', interactive: false }).addTo(tekenLaag) }
+  schets = { punten: [[p.lat, p.lng]], lijn: L.polyline([[p.lat, p.lng]], { color: '#9B4A7A', weight: 4, dashArray: '8 6', interactive: false }).addTo(tekenLaag) }
 }, { capture: true })
 kaartVlak.addEventListener('pointermove', (e) => {
   if (!tekenen || !schets) return
@@ -640,12 +658,12 @@ function werkPiekbalk() {
     return
   }
   let h
-  if (stopper) h = '<span class="piekloop" aria-hidden="true">🏃</span><span class="psamen"></span><button type="button" data-proxy="stop">Stop</button>'
+  if (stopper) h = '<span class="piekloop" aria-hidden="true">' + ico('loper') + '</span><span class="psamen"></span><button type="button" data-proxy="stop">Stop</button>'
   else if (stap === 4 && plan) {
     h =
       `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
       `<span class="psamen"><b>${nl(plan.analyse.lengte / 1000)} km</b><small>${pct(plan.zacht.eind)} onverhard · ${veilig(plan.label)}</small></span>` +
-      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">⬇</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">★</button><button type="button" data-proxy="deel" aria-label="Kopieer link">🔗</button></span>'
+      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>'
   } else if (stap === 2) {
     h = `<span class="psamen"><b>${veilig(el('stap2kop').textContent)}</b></span><button type="button" class="hoofd" data-proxy="naar3" ${plaatsKlaar ? '' : 'disabled'}>Verder →</button>`
   } else if (stap === 3) h = '<span class="psamen"><b>Klaar om te plannen</b></span><button type="button" class="hoofd" data-proxy="plan">Plan route</button>'
@@ -921,6 +939,7 @@ const naarLatLon = (xy) => xy.map(([x, y]) => {
   return [lat, lon]
 })
 let lijnen = [] // [[polyline, stuk], ...]
+let korrels = [] // [[polyline, stuk], ...]: de korrel op de route
 let twijfelLijn = {}
 
 function popup(s) {
@@ -963,6 +982,7 @@ function tekenAlternatieven() {
 function tekenRoute(passend) {
   routeLaag.clearLayers()
   lijnen = []
+  korrels = []
   twijfelLijn = {}
   const alles = naarLatLon(plan.analyse.xy)
   L.polyline(alles, { color: KLEUR.rouw, weight: 9, opacity: 0.9, interactive: false }).addTo(routeLaag)
@@ -976,7 +996,7 @@ function tekenRoute(passend) {
         const knop = document.createElement('button')
         knop.type = 'button'
         knop.className = 'weghalen'
-        knop.textContent = '✂ Haal dit stukje weg'
+        knop.innerHTML = ico('schaar') + 'Haal dit stukje weg'
         knop.addEventListener('click', () => {
           const plek = lijn.getPopup().getLatLng()
           kaart.closePopup()
@@ -989,6 +1009,7 @@ function tekenRoute(passend) {
     lijn.bindTooltip(() => `km ${nl(s.van / 1000)}–${nl(s.tot / 1000)} · ${s[bron]}${s.twijfel ? ' · twijfel' : ''}`, { sticky: true })
     maakVersleepbaar(lijn)
     lijnen.push([lijn, s])
+    korrels.push([L.polyline(pad, { ...(korrelStijl(s[bron]) || { color: '#000', weight: 1, dashArray: '1 9' }), opacity: korrelStijl(s[bron]) ? korrelStijl(s[bron]).opacity : 0, interactive: false }).addTo(routeLaag), s])
     const twijfelsTonen = el('twijfelblok').open
     if (s.twijfel && twijfelsTonen) {
       // dunne stippellijn eroverheen, zodat twijfel niet alleen aan kleur hangt
@@ -1059,8 +1080,8 @@ document.addEventListener('pointermove', (e) => {
   if (!slepen.bewogen) {
     slepen.bewogen = true
     kaart.closePopup()
-    slepen.elastiek = L.polyline([slepen.van, ll], { color: '#1f3328', weight: 3, dashArray: '6 6', interactive: false }).addTo(routeLaag)
-    slepen.stip = L.circleMarker(ll, { radius: 9, color: '#1f3328', weight: 3, fillColor: '#ffcb05', fillOpacity: 1, interactive: false }).addTo(routeLaag)
+    slepen.elastiek = L.polyline([slepen.van, ll], { color: '#2B211B', weight: 3, dashArray: '6 6', interactive: false }).addTo(routeLaag)
+    slepen.stip = L.circleMarker(ll, { radius: 9, color: '#2B211B', weight: 3, fillColor: '#9B4A7A', fillOpacity: 1, interactive: false }).addTo(routeLaag)
   }
   slepen.elastiek.setLatLngs([slepen.van, ll])
   slepen.stip.setLatLng(ll)
@@ -1152,7 +1173,7 @@ function stopAfspelen(wissen = true) {
     afspeelLaag.clearLayers()
     el('afspeelstand').textContent = ''
   } else if (afspelen) afspelen.raf = null
-  el('afspeel').textContent = '▶'
+  el('afspeel').innerHTML = ico('play')
   el('tempo').hidden = true
 }
 
@@ -1172,7 +1193,7 @@ function afspeelStap(nu) {
   el('afspeelstand').textContent = `km ${nl(a.d / 1000, 1)}${typeof h === 'number' ? ` · ${Math.round(h)} m` : ''}`
   if (a.d >= a.totaal) {
     stopAfspelen(false)
-    el('afspeel').textContent = '↺'
+    el('afspeel').innerHTML = ico('nogeens')
     a.d = 0
     a.klaar = true
     return
@@ -1184,7 +1205,7 @@ function wisselAfspelen() {
   if (!plan) return
   if (afspelen && afspelen.raf) {
     stopAfspelen(false)
-    el('afspeel').textContent = '▶'
+    el('afspeel').innerHTML = ico('play')
     return
   }
   if (!afspelen) {
@@ -1193,13 +1214,13 @@ function wisselAfspelen() {
     for (let i = 1; i < xy.length; i++) opgeteld.push(opgeteld[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]))
     const h = keuze().hoogte
     const totaal = opgeteld[opgeteld.length - 1]
-    const loper = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="loper">🏃</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false, zIndexOffset: 2000 })
+    const loper = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="loper">' + ico('loper') + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false, zIndexOffset: 2000 })
     afspelen = { d: 0, totaal, xy, opgeteld, loper, schaal: h ? h.afstand[h.afstand.length - 1] / totaal : 1 }
     loper.addTo(afspeelLaag)
   }
   if (afspelen.klaar) afspelen.klaar = false
   afspelen.laatst = 0
-  el('afspeel').textContent = '❚❚'
+  el('afspeel').innerHTML = ico('pauze')
   el('tempo').hidden = false
   afspelen.raf = requestAnimationFrame(afspeelStap)
 }
@@ -1243,7 +1264,8 @@ function tekenOmwegen() {
   }
   for (const o of lijst) {
     const toepassen = () => omwegToepassen(o)
-    L.polyline(o.lijn, { color: '#0a8f2b', weight: 6, opacity: 0.95, dashArray: '2 9', lineCap: 'round', bubblingMouseEvents: false })
+    L.polyline(o.lijn, { color: '#F2E4B8', weight: 10, opacity: 0.9, lineCap: 'round', interactive: false }).addTo(omwegLaag)
+    L.polyline(o.lijn, { color: '#5F7A2F', weight: 6, opacity: 0.95, dashArray: '2 9', lineCap: 'round', bubblingMouseEvents: false })
       .on('click', toepassen)
       .addTo(omwegLaag)
     const mid = o.lijn[Math.floor(o.lijn.length / 2)]
@@ -1294,7 +1316,7 @@ function tekenStations() {
   if (!uitslag || !uitslag.stations || !stationsAan) return
   for (const s of uitslag.stations) {
     const m = L.marker([s.lat, s.lon], {
-      icon: L.divIcon({ className: '', html: `<div class="stationico${s.trein ? '' : ' halte'}">🚉</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
+      icon: L.divIcon({ className: '', html: `<div class="stationico${s.trein ? '' : ' halte'}">${ico('station')}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
       keyboard: false, zIndexOffset: 600,
     }).addTo(stationLaag)
     const inhoud = document.createElement('div')
@@ -1350,7 +1372,7 @@ async function naarStation(s) {
 
 // ---------- Water onderweg ----------
 const waterLaag = L.layerGroup().addTo(kaart)
-const WATER = { water: ['💧', 'Drinkwater'], horeca: ['☕', 'Horeca'], winkel: ['🛒', 'Winkel'], toilet: ['🚻', 'Toilet'], tank: ['⛽', 'Tankstation'] }
+const WATER = { water: ['water', 'Drinkwater'], horeca: ['horeca', 'Horeca'], winkel: ['winkel', 'Winkel'], toilet: ['toilet', 'Toilet'], tank: ['tank', 'Tankstation'] }
 const waterAan = new Set(['water', 'winkel']) // standaard alleen drinkwater en winkels; de rest met een tik erbij
 let tijdenGehaald = null // de water-uitslag waarvoor de openingstijden al gehaald zijn
 
@@ -1386,7 +1408,7 @@ function tekenKaartlagen(w) {
     knop.setAttribute('aria-pressed', String(stationsAan))
     knop.setAttribute('aria-label', `Stations: ${stations.length}`)
     knop.title = `Stations (${stations.length})`
-    knop.innerHTML = `<span>🚉</span><small>${stations.length}</small>`
+    knop.innerHTML = `<span>${ico('station')}</span><small>${stations.length}</small>`
     knop.addEventListener('click', () => {
       stationsAan = !stationsAan
       tekenStations()
@@ -1394,14 +1416,14 @@ function tekenKaartlagen(w) {
     })
     kaartlagenVak.appendChild(knop)
   }
-  for (const [soort, [ico, naam]] of soorten) {
+  for (const [soort, [pictogram, naam]] of soorten) {
     const n = w.punten.filter((p) => p.soort === soort).length
     const knop = document.createElement('button')
     knop.type = 'button'
     knop.setAttribute('aria-pressed', String(waterAan.has(soort)))
     knop.setAttribute('aria-label', `${naam}: ${n}`)
     knop.title = `${naam} (${n})`
-    knop.innerHTML = `<span>${ico}</span><small>${n}</small>`
+    knop.innerHTML = `<span>${ico(pictogram)}</span><small>${n}</small>`
     knop.addEventListener('click', () => {
       if (waterAan.has(soort)) waterAan.delete(soort)
       else waterAan.add(soort)
@@ -1425,9 +1447,9 @@ function tekenWater() {
   regel.textContent = `Langste stuk zonder water: ${nl(w.langsteZonder / 1000, 1)} km`
   const kanVia = !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
   for (const p of w.punten.filter((p) => waterAan.has(p.soort))) {
-    const [ico, soort] = WATER[p.soort]
+    const [pictogram, soort] = WATER[p.soort]
     const m = L.marker([p.lat, p.lon], {
-      icon: L.divIcon({ className: '', html: `<div class="waterico ${p.soort}">${ico}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+      icon: L.divIcon({ className: '', html: `<div class="waterico ${p.soort}">${ico(pictogram)}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       keyboard: false, zIndexOffset: 500,
     }).addTo(waterLaag)
     const inhoud = document.createElement('div')
@@ -1459,6 +1481,7 @@ async function haalTijdenErbij() {
 
 function kleurRoute() {
   for (const [lijn, s] of lijnen) lijn.setStyle({ color: KLEUR[s[bron]] })
+  for (const [k, s] of korrels) k.setStyle(korrelStijl(s[bron]) || { opacity: 0 })
   for (const b of el('bron').children) b.setAttribute('aria-pressed', String(b.dataset.bron === bron))
 }
 el('bron').addEventListener('click', (e) => {
@@ -1512,8 +1535,8 @@ function tekenBalken() {
   for (const r of plan.tabel) {
     const c = r[bron]
     if (c.km <= 0.005) continue
-    h += `<li><span class="ondergrondnaam"><i style="background:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></span>` +
-      `<span class="ondergrondbalk"><i style="width:${Math.max(2, c.pct)}%;background:${KLEUR[r.klasse]}"></i></span>` +
+    h += `<li><span class="ondergrondnaam"><i class="${korrelKlasse(r.klasse)}" style="background-color:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></span>` +
+      `<span class="ondergrondbalk"><i class="${korrelKlasse(r.klasse)}" style="width:${Math.max(2, c.pct)}%;background-color:${KLEUR[r.klasse]}"></i></span>` +
       `<span class="ondergrondgetal"><b>${nl(c.km, 1)} km</b><small>${nl(c.pct, 0)}%</small></span></li>`
   }
   doos.innerHTML = h + '</ul>'
@@ -1525,7 +1548,7 @@ function tekenTabel() {
   let h = '<tr><th>Ondergrond</th><th>OpenStreet&shy;Map</th><th>Officiële kaart</th><th>Eind&shy;oordeel</th></tr>'
   for (const r of plan.tabel) {
     h +=
-      `<tr><td><i style="background:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></td>` +
+      `<tr><td><i class="${korrelKlasse(r.klasse)}" style="background-color:${KLEUR[r.klasse]}"></i>${r.klasse}<small>${TOELICHTING[r.klasse]}</small></td>` +
       `<td>${cel(r.osm)}</td><td>${cel(r.bgt)}</td><td>${cel(r.eind)}</td></tr>`
   }
   h +=
@@ -1707,9 +1730,25 @@ function tekenTwijfels() {
 /** Kleurklasse bij een score, voor de tegel en de badge. */
 const scoreKlasse = (s) => (s >= 90 ? 's-top' : s >= 75 ? 's-goed' : s >= 55 ? 's-mid' : 's-laag')
 
+/** De ondergrond van de gekozen route als één strook korrels, met de grootste delen eronder. */
+function strookHtml() {
+  const rijen = plan.tabel.filter((r) => r.eind.pct >= 0.5)
+  if (!rijen.length) return ''
+  const delen = rijen.map((r) => `<i class="${korrelKlasse(r.klasse)}" style="width:${r.eind.pct}%;background-color:${KLEUR[r.klasse]}"></i>`).join('')
+  const beschrijving = rijen.map((r) => `${r.klasse} ${nl(r.eind.pct, 0)}%`).join(', ')
+  const leg = rijen
+    .slice()
+    .sort((x, y) => y.eind.pct - x.eind.pct)
+    .slice(0, 4)
+    .map((r) => `<span><i class="${korrelKlasse(r.klasse)}" style="background-color:${KLEUR[r.klasse]}"></i>${r.klasse} ${nl(r.eind.pct, 0)}%</span>`)
+    .join('')
+  return `<div class="strook" role="img" aria-label="Ondergrond: ${beschrijving}">${delen}</div><p class="strookleg">${leg}</p>`
+}
+
 function tekenKern() {
   el('kern').innerHTML =
     `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span></div>` +
+    strookHtml() +
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
     `<div><b>${pct(plan.zacht.eind)}</b><span>onverhard + half verhard</span></div>` +
     (keuze().hoogte
@@ -1892,12 +1931,12 @@ el('deel').addEventListener('click', async () => {
   const link = deelLink()
   try {
     await navigator.clipboard.writeText(link)
-    el('deel').textContent = '✓ Gekopieerd'
+    el('deel').innerHTML = ico('link') + 'Gekopieerd'
   } catch {
     prompt('Kopieer deze link:', link)
   }
   setTimeout(() => {
-    el('deel').textContent = '🔗 Link'
+    el('deel').innerHTML = ico('link') + 'Link'
   }, 2000)
 })
 
@@ -2059,9 +2098,9 @@ el('bewaar').addEventListener('click', () => {
   }
   const lijst = [r, ...bewaardeRoutes()].slice(0, 50)
   if (zetBewaardeRoutes(lijst)) {
-    el('bewaar').textContent = '★ Bewaard'
+    el('bewaar').innerHTML = ico('bewaar') + 'Bewaard'
     setTimeout(() => {
-      el('bewaar').textContent = '★ Bewaar'
+      el('bewaar').innerHTML = ico('bewaar') + 'Bewaar'
     }, 2000)
     tekenBewaard()
   }
@@ -2158,6 +2197,8 @@ for (const plek of [document.body]) {
 }
 
 // ---------- Rechtermuisknop / lang drukken op de kaart ----------
+/** Het pictogram vóór een regel in het kaartmenu: het eerste teken van de tekst. */
+const MENUICO = { '↪': 'route', '🌿': 'omweg', '📍': 'start', '🏁': 'eind', '➕': 'plus', '🚉': 'station', '⟳': 'rondje', '🔍': 'zoek', '📋': 'kopie' }
 function sluitMenu() {
   el('kaartmenu').hidden = true
 }
@@ -2245,7 +2286,11 @@ kaart.on('contextmenu', (e) => {
     const knop = document.createElement('button')
     knop.type = 'button'
     knop.setAttribute('role', 'menuitem')
-    knop.textContent = o[0]
+    const [, symbool, tekst] = o[0].match(/^(\S+)\s+(.*)$/) || []
+    if (MENUICO[symbool]) {
+      knop.innerHTML = ico(MENUICO[symbool])
+      knop.append(document.createTextNode(tekst))
+    } else knop.textContent = o[0]
     knop.addEventListener('click', o[1])
     menu.appendChild(knop)
   }
