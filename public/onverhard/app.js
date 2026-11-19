@@ -66,7 +66,7 @@ function korrelStijl(klasse) {
 }
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false }
+const staat = { modus: 'rondje', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false }
 const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
 const tekenModus = () => TEKENMODI.has(staat.modus)
 /** de tekening die bij deze modus hoort: een gebied (vlak) of een lijn */
@@ -407,7 +407,14 @@ function tekenPuntenlijst() {
   else el('plan').textContent = n > 1 ? 'Plan rondje via keerpunt' : 'Plan rondje'
 }
 
+/** Op een lege kaart één zin en een knop (in plaats van een intro); weg zodra er een punt, tekening of route is. */
+function werkWelkom() {
+  el('welkom').hidden = !!(staat.punten.length || uitslag || staat.modus === 'tekenen' || tekening() || tekenen)
+}
+el('welkomLocatie').addEventListener('click', () => el('locatie').click())
+
 function puntenGewijzigd() {
+  werkWelkom()
   if (staat.modus === 'rondje' && staat.punten.length > 2) staat.punten = [staat.punten[0], staat.punten[staat.punten.length - 1]]
   if ((tekenModus() || staat.modus === 'station') && staat.punten.length > 1) staat.punten = staat.punten.slice(-1)
   if (staat.modus === 'tekenen') staat.punten = []
@@ -456,6 +463,7 @@ let netGetekend = 0 // de tik waarmee je stopt met tekenen is geen startpunt
 let schets = null // { punten, lijn } tijdens het tekenen
 
 function tekenTekening(vers = false) {
+  werkWelkom()
   tekenLaag.clearLayers()
   const t = tekening()
   if (!t || !t.length) return
@@ -481,6 +489,7 @@ function startTekenen(soort) {
   kaart.getContainer().classList.add('tekent')
   el('tekenVrij').setAttribute('aria-pressed', String(soort === 'vrij'))
   el('tekenVierkant').setAttribute('aria-pressed', String(soort === 'rechthoek'))
+  werkWelkom()
   tekenPuntenlijst()
 }
 
@@ -491,6 +500,7 @@ function stopTekenen() {
   kaart.getContainer().classList.remove('tekent')
   el('tekenVrij').setAttribute('aria-pressed', 'false')
   el('tekenVierkant').setAttribute('aria-pressed', 'false')
+  werkWelkom()
 }
 
 /** Ligt een punt [lat, lon] binnen (of hooguit 150 m buiten) een getekend vlak? */
@@ -2074,7 +2084,7 @@ el('terug').addEventListener('click', ongedaanMaken)
 // sneltoetsen 1-6 in de volgorde op het scherm (A naar B, Rondje, Naar station, In gebied, Elke straat, Tekenen)
 const MODI = [...document.querySelectorAll('#modus [data-modus]')].map((b) => b.dataset.modus)
 document.addEventListener('keydown', (e) => {
-  if (el('intro').open || el('foto').open || el('hulp').open) return
+  if (el('foto').open || el('hulp').open) return
   const doel = e.target
   const typen = doel && (doel.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(doel.tagName))
   const cmd = e.ctrlKey || e.metaKey
@@ -2121,7 +2131,7 @@ document.addEventListener('keydown', (e) => {
     onthoud()
     staat.punten.pop()
     puntenGewijzigd()
-  } else if (e.key === '?') openIntro()
+  } else if (e.key === '?') el('uitleg').click()
   else return
   e.preventDefault()
 })
@@ -2413,73 +2423,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') sluitMenu()
 })
 
-// ---------- Kennismaking ----------
-const INTRO = 'onverhard.intro'
-let introDia = 0
-function toonDia(i) {
-  introDia = i
-  const dias = [...document.querySelectorAll('.intro-dia')]
-  dias.forEach((d, k) => {
-    d.hidden = k !== i
-    // animaties opnieuw starten: de svg even vervangen door een kopie
-    if (k === i) {
-      const svg = d.querySelector('svg')
-      svg.replaceWith(svg.cloneNode(true))
-    }
-  })
-  document.querySelectorAll('.intro-stippen i').forEach((s, k) => s.classList.toggle('aan', k === i))
-  el('introVerder').textContent = i === dias.length - 1 ? 'Aan de slag' : 'Verder'
-  const teller = document.querySelector(`.intro-dia[data-dia="${i}"] .teller`)
-  if (teller) telOp(teller)
-}
-function telOp(tekst) {
-  if (!tekst) return
-  const start = performance.now() + 1000
-  const stap = (nu) => {
-    const t = Math.max(0, Math.min(1, (nu - start) / 1600))
-    tekst.textContent = `${Math.round(13 * (1 - (1 - t) ** 3))} km`
-    if (t < 1 && el('intro').open) requestAnimationFrame(stap)
-  }
-  requestAnimationFrame(stap)
-}
-function sluitIntro() {
-  if (introDia < document.querySelectorAll('.intro-dia').length - 1) Gebruik.log('intro_skip', { dia: introDia + 1 })
-  el('intro').close()
-  try {
-    localStorage.setItem(INTRO, '1')
-  } catch {
-    // zonder opslag zie je hem de volgende keer weer
-  }
-}
-function openIntro() {
-  if (!el('intro').open) el('intro').showModal()
-  toonDia(0)
-}
-el('introVerder').addEventListener('click', () => {
-  if (introDia >= document.querySelectorAll('.intro-dia').length - 1) sluitIntro()
-  else toonDia(introDia + 1)
-})
-el('introSla').addEventListener('click', sluitIntro)
-el('intro').addEventListener('cancel', (e) => {
-  e.preventDefault()
-  sluitIntro()
-})
-el('intro').addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight' && introDia < 4) toonDia(introDia + 1)
-  if (e.key === 'ArrowLeft' && introDia > 0) toonDia(introDia - 1)
-})
-// vegen op de telefoon
-let veegX = null
-el('intro').addEventListener('pointerdown', (e) => {
-  veegX = e.clientX
-})
-el('intro').addEventListener('pointerup', (e) => {
-  if (veegX === null) return
-  const dx = e.clientX - veegX
-  veegX = null
-  if (dx < -40 && introDia < document.querySelectorAll('.intro-dia').length - 1) toonDia(introDia + 1)
-  else if (dx > 40 && introDia > 0) toonDia(introDia - 1)
-})
 // uitleg met voorbeelden
 const VOORBEELDEN = {
   station: 'p=52.0116,4.3571&station=15',
@@ -2558,10 +2501,6 @@ el('hulp').addEventListener('click', (e) => {
   onthoud()
   location.hash = `${VOORBEELDEN[v]}&plan=1` // de app laadt de link opnieuw en plant meteen
 })
-el('hulpIntro').addEventListener('click', () => {
-  el('hulp').close()
-  openIntro()
-})
 
 // ---------- Start ----------
 const hash = laad()
@@ -2602,14 +2541,6 @@ window.addEventListener('hashchange', () => {
   const h = new URLSearchParams(location.hash.slice(1))
   if (h.get('p') || h.get('t')) location.reload()
 })
-// de eerste keer (zonder gedeelde link): even kennismaken
-let introGezien = true
-try {
-  introGezien = localStorage.getItem(INTRO) === '1'
-} catch {
-  // geen opslag: niet elke keer lastigvallen
-}
-if (!introGezien && !hash.get('p') && !hash.get('t')) openIntro()
 // #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
 if (hash.get('plan') && !el('plan').disabled) planNu()
 sheet = maakSheet({ kaart, main: document.getElementById('paneel'), greep: el('sheetgreep'), bijWijziging: werkPiekbalk, bijGebruiker: (stand) => Gebruik.log('sheet_state', { stand }) })

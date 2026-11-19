@@ -296,8 +296,6 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
     mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
   const sk = await schoon.newPage()
   await sk.goto(basis)
-  await sk.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
-  await sk.goto(basis)
   await sk.click('[data-modus="station"]')
   assert.equal(await sk.locator('#naar3').isDisabled(), true, 'zonder startpunt kun je nog niet verder')
   await sk.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
@@ -310,6 +308,38 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   stap('stationsmodus via de knoppen: één startpunt, Verder, lengte, plannen')
 }
 
+// ---- lege kaart: geen intro meer, één zin en 'Gebruik mijn locatie' ----
+{
+  const schoon = await browser.newContext({
+    ...(mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }),
+    geolocation: { latitude: 52.0116, longitude: 4.3571 }, permissions: ['geolocation'],
+  })
+  const wp = await schoon.newPage()
+  await wp.goto(basis)
+  await wp.waitForSelector('.maplibregl-canvas', { timeout: 20000 })
+  assert.equal(await wp.locator('dialog[open]').count(), 0, 'geen intro of ander venster bij de eerste keer')
+  assert.equal(await wp.locator('#intro').count(), 0, 'de intro is weg')
+  assert.equal(await wp.locator('#welkom').isVisible(), true, 'op de lege kaart staat de welkomstregel')
+  assert.equal((await wp.locator('#welkom p').textContent()).trim(), 'Hardlooprondjes over onverhard. Tik op de kaart waar je wilt starten, of:')
+  assert.equal(await wp.locator('[data-modus="rondje"]').getAttribute('aria-pressed'), 'true', 'een nieuwe gebruiker begint bij Rondje')
+  await wp.screenshot({ path: path.join(map, `nopaves_welkom_${soort}.png`) })
+  await wp.locator('#welkomLocatie').click()
+  await wp.waitForFunction(() => document.getElementById('welkom').hidden, null, { timeout: 15000 })
+  const log = await wp.evaluate(() => JSON.parse(localStorage.getItem('nopaves.log') || '[]'))
+  const naar3 = await wp.locator('#naar3').isDisabled()
+  assert.equal(naar3, false, 'met de locatie als start kun je verder')
+  // de uitleg: geen 'Intro opnieuw bekijken', en ? opent de uitleg
+  await wp.keyboard.press('?')
+  await wp.waitForSelector('#hulp[open]')
+  assert.doesNotMatch(await wp.locator('#hulp').textContent(), /Intro opnieuw/)
+  await wp.keyboard.press('Escape')
+  // opnieuw: de welkomstregel komt terug
+  await wp.locator('#opnieuw').click()
+  assert.equal(await wp.locator('#welkom').isVisible(), true, 'na opnieuw is de kaart weer leeg met de welkomstregel')
+  await schoon.close()
+  stap(`lege kaart: welkomstregel, Gebruik mijn locatie zet de start (${log.length} regels geteld), ? opent de uitleg`)
+}
+
 // ---- zoeken: treffers bij de start eerst (lat/lon naar PDOK), via het zoekveld ----
 {
   const schoon = await browser.newContext(
@@ -317,8 +347,6 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   const zp = await schoon.newPage()
   const vragen = []
   zp.on('request', (r) => /locatieserver/.test(r.url()) && vragen.push(r.url()))
-  await zp.goto(basis)
-  await zp.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
   await zp.goto(basis)
   await zp.click('[data-modus="station"]') // bij een station is er één punt: een treffer verplaatst de start
   await zp.evaluate(() => window.onverhard.kaart.setView([52.0116, 4.3571], 14))
@@ -351,8 +379,6 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
     const tekst = r.url() + (r.postData() || '')
     if (/plan_start|nopaves\.log|app_open/.test(tekst)) verzonden.push(r.url())
   })
-  await tp.goto(basis)
-  await tp.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
   await tp.goto(basis)
   await tp.waitForSelector('.maplibregl-canvas', { timeout: 20000 })
   await tp.click('[data-modus="rondje"]')
