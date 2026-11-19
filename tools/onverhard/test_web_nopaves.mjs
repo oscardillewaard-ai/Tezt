@@ -8,7 +8,8 @@ import path from 'node:path'
 
 const [map, soort = 'desktop'] = process.argv.slice(2)
 const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost' } : undefined
-const browser = await chromium.launch({ proxy, executablePath: process.env.CHROMIUM_PAD || undefined })
+// WebGL zonder grafische kaart (SwiftShader), anders blijft de kaart de gewone OpenStreetMap
+const browser = await chromium.launch({ proxy, executablePath: process.env.CHROMIUM_PAD || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const mobiel = soort === 'mobiel'
 const ctx = await browser.newContext(
   mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
@@ -19,6 +20,15 @@ page.on('console', (m) => m.type() === 'error' && fouten.push(m.text()))
 page.on('pageerror', (e) => fouten.push('PAGEERROR ' + e.message))
 const basis = process.env.ONVERHARD_URL || 'http://localhost:8765/onverhard/'
 const stap = (tekst) => console.log(`✓ ${soort}: ${tekst}`)
+
+// ---- de kaart zelf: Korrel (vectortegels), met de bronvermelding ----
+await page.goto(`${basis}#p=52.0116,4.3571&rondje=10`)
+await page.waitForSelector('.maplibregl-canvas', { timeout: 20000 })
+assert.equal(await page.locator('.maplibregl-canvas').count(), 1, 'de Korrel-kaart (WebGL) staat aan')
+assert.match(await page.locator('.leaflet-control-attribution').textContent(), /OpenFreeMap/, 'bronvermelding van OpenFreeMap')
+const basis_lagen = await page.evaluate(() => [...document.querySelectorAll('.leaflet-control-layers-base label')].map((l) => l.textContent.trim()))
+assert.deepEqual(basis_lagen, ['Korrel', 'OpenStreetMap', 'Luchtfoto (PDOK)'], 'Korrel staat bovenaan, de oude kaarten blijven kiesbaar')
+stap('kaart in Korrel (MapLibre), met OpenStreetMap en luchtfoto als alternatief')
 
 // ---- laden: geen zichtbare tekst, wel een poppetje op de balk ----
 await page.goto(`${basis}#p=52.0116,4.3571&rondje=10&plan=1`)

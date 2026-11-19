@@ -3,6 +3,7 @@
 
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
+import { korrelStijl as kaartStijl, koppelKorrels, kanWebgl, KAART_BRON } from './korrelkaart.js'
 import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
@@ -194,6 +195,11 @@ function zetThema(keuze) {
   el('thema').setAttribute('aria-label', `Thema: ${THEMA_TEKST[keuze][1]} (tik om te wisselen)`)
   el('thema').title = `Thema: ${THEMA_TEKST[keuze][1]}`
   leesKleuren()
+  if (korrelLaag && donker !== kaartDonker) {
+    kaartDonker = donker
+    if (kaart.hasLayer(korrelLaag)) korrelLaag.getMaplibreMap().setStyle(kaartStijl(donker))
+    else korrelLaag.options.style = kaartStijl(donker) // bij de volgende keer dat de laag aan gaat
+  }
   if (plan) herteken()
 }
 el('thema').addEventListener('click', () => {
@@ -206,7 +212,30 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
 
 // ---------- Kaart ----------
 const kaart = L.map('kaart', { maxZoom: 21 }).setView([52.1, 5.3], 8)
+// De kaart in Korrel (vectortegels met MapLibre). Zonder WebGL, of als de tegels niet laden, blijft de
+// gewone OpenStreetMap-kaart over.
+const donkerNu = () => document.documentElement.dataset.theme === 'dark'
+let korrelLaag = null
+let kaartDonker = donkerNu() // welke stijl er nu op de kaart staat
+if (kanWebgl() && window.maplibregl && L.maplibreGL) {
+  korrelLaag = L.maplibreGL({ style: kaartStijl(donkerNu()), attribution: KAART_BRON, interactive: false })
+  korrelLaag.on('add', () => {
+    const gl = korrelLaag.getMaplibreMap()
+    koppelKorrels(gl)
+    let geladen = false
+    gl.once('load', () => {
+      geladen = true
+    })
+    gl.on('error', () => {
+      if (geladen || !kaart.hasLayer(korrelLaag)) return
+      geladen = true // maar één keer terugvallen
+      kaart.removeLayer(korrelLaag)
+      lagen.OpenStreetMap.addTo(kaart)
+    })
+  })
+}
 const lagen = {
+  ...(korrelLaag ? { Korrel: korrelLaag } : {}),
   OpenStreetMap: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 21,
     maxNativeZoom: 19,
@@ -223,7 +252,7 @@ const bgtLaag = L.tileLayer(
   'https://service.pdok.nl/lv/bgt/wmts/v1_0/standaardvisualisatie/EPSG:3857/{z}/{x}/{y}.png',
   { minZoom: 17, maxZoom: 21, maxNativeZoom: 20, opacity: 0.8, attribution: 'BGT: Kadaster / PDOK' },
 )
-lagen.OpenStreetMap.addTo(kaart)
+;(korrelLaag || lagen.OpenStreetMap).addTo(kaart)
 L.control.layers(lagen, { 'Officiële kaart (vanaf zoom 17)': bgtLaag }).addTo(kaart)
 L.control.scale({ imperial: false }).addTo(kaart)
 kaart.createPane('alternatieven').style.zIndex = 390 // onder de gekozen route

@@ -1,13 +1,14 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent. Plannen zelf heeft internet nodig
 // (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v34'
+const CACHE = 'onverhard-v35'
 const SHELL = [
   './',
   'index.html',
   'styles.css',
   'app.js',
   'sheet.js',
+  'korrelkaart.js',
   'bronnen.js',
   'kern.js',
   'graaf.js',
@@ -15,6 +16,9 @@ const SHELL = [
   'hoogte.js',
   'vendor/leaflet.js',
   'vendor/leaflet.css',
+  'vendor/maplibre-gl.js',
+  'vendor/maplibre-gl.css',
+  'vendor/leaflet-maplibre-gl.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

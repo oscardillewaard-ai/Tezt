@@ -16,7 +16,7 @@ const python = args[0].endsWith('.json') ? JSON.parse(fs.readFileSync(args.shift
 const [hash, naam = 'web', mobiel] = args
 const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost' } : undefined
 // CHROMIUM_PAD: alleen nodig als de Playwright-versie van dit project geen eigen browser heeft
-const browser = await chromium.launch({ proxy, executablePath: process.env.CHROMIUM_PAD || undefined })
+const browser = await chromium.launch({ proxy, executablePath: process.env.CHROMIUM_PAD || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const ctx = await browser.newContext(
   mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
     : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })

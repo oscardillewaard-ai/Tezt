@@ -352,9 +352,20 @@ ondergrondstrook onder de score, de legenda en de tabel, en als dunne laag over
 de route zelf (stippen = onverhard, streepjes = half verhard, lange strepen =
 open verharding, asfalt blijft effen). De kleuren van de ondergrondklassen zijn
 dezelfde als voorheen (gevalideerd op kleurenblindheid); de korrel zit erbovenop.
-De ondergrondkaart zelf is nog de OpenStreetMap-rastertegel, met alleen een
-warme tint; die opnieuw tekenen in korrels vraagt vectortegels en is niet
-gedaan. De appiconen zijn gemaakt met dezelfde letter; het ontwerp en de
+De kaart zelf is ook Korrel (`korrelkaart.js`): vectortegels van OpenFreeMap
+(OpenMapTiles-schema) in een eigen MapLibre-stijl, via de plugin
+`maplibre-gl-leaflet` onder de Leaflet-lagen. Bos, gras, struweel, heide, zand,
+wetland en water hebben elk een korrel (de plaatjes worden in de browser
+getekend, in een licht en een donker thema). Asfalt is grijs en effen; wat
+onverhard is, is gestippeld: paden en ruiterpaden, karrensporen en elke weg of
+elk pad met `surface=unpaved`. Voet- en fietspaden zonder `surface` blijven grijs,
+omdat ze in de stad bijna altijd verhard zijn (de routeplanner behandelt ze
+trouwens ook als 'onbekend'). Een weg zonder `surface` telt als verhard. De
+bronvermelding van OpenFreeMap staat rechtsonder. Zonder WebGL, of als de
+tegels niet laden, valt de app terug op de OpenStreetMap-rastertegel; die en de
+PDOK-luchtfoto blijven via de laagknop te kiezen. De letters op de kaart zijn
+Noto Sans uit de lettertypedienst van OpenFreeMap (dus niet offline
+beschikbaar), de rest van de app werkt offline. De appiconen zijn gemaakt met dezelfde letter; het ontwerp en de
 twee andere richtingen (Streep en Riso) stonden op een voorstelpagina.
 
 **Interface**: tijdens het laden staat er geen tekst meer (alleen een poppetje
@@ -369,7 +380,9 @@ GPX, bewaren en link, of de hoofdknop van de stap.
 **Testen**: `node --test tools/onverhard/test_web_kern.mjs` (rekenkern),
 `npx oxlint public/onverhard`, en met de echte bronnen
 `CHROMIUM_PAD=/opt/pw-browsers/chromium node tools/onverhard/test_web_nopaves.mjs <map> [desktop|mobiel]`
-(met `cd public && python3 -m http.server 8765` ernaast).
+(met `cd public && python3 -m http.server 8765` ernaast). De test start Chromium met
+SwiftShader (`--use-angle=swiftshader`), zodat WebGL ook zonder grafische kaart werkt;
+zonder WebGL zou de kaart terugvallen op OpenStreetMap en slaagt de kaarttest niet.
 
 ## Webversie
 
