@@ -6,6 +6,7 @@ import * as K from '../../public/onverhard/kern.js'
 import * as G from '../../public/onverhard/graaf.js'
 import * as T from '../../public/onverhard/osmtegels.js'
 import * as H from '../../public/onverhard/hoogte.js'
+import * as Sheet from '../../public/onverhard/sheet.js'
 import zlib from 'node:zlib'
 
 const vierkant = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] })
@@ -765,4 +766,19 @@ test('nopavesScore: dubbel lopen, strand en een lang verhard stuk kosten punten'
   assert.ok(K.nopavesScore(verspreid).score > K.nopavesScore(aaneen).score)
   assert.equal(K.langsteVerhardeStuk(aaneen), 2000)
   assert.equal(K.langsteVerhardeStuk(verspreid), 100)
+})
+
+// ---------- Bottom sheet ----------
+test('bottom sheet: drie standen die oplopen, en een veeg kiest de volgende stand', () => {
+  const hs = Sheet.standHoogtes(844, 34)
+  assert.ok(hs.piek < hs.half && hs.half < hs.vol && hs.vol < 844)
+  assert.equal(hs.piek, 158 + 34)
+  assert.equal(Sheet.dichtsteStand(hs.piek + 10, hs), 'piek')
+  assert.equal(Sheet.dichtsteStand(hs.half - 30, hs), 'half')
+  assert.equal(Sheet.dichtsteStand(hs.vol, hs), 'vol')
+  // net boven het midden tussen piek en half, maar een snelle veeg omhoog gaat naar half
+  const midden = (hs.piek + hs.half) / 2 - 20
+  assert.equal(Sheet.dichtsteStand(midden, hs), 'piek')
+  assert.equal(Sheet.dichtsteStand(midden, hs, 0.6), 'half')
+  assert.equal(Sheet.dichtsteStand(hs.half, hs, -1.2), 'piek') // snel omlaag
 })

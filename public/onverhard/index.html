@@ -29,7 +29,8 @@
   <body>
     <div class="app">
       <div id="kaart" aria-label="Kaart: tik om punten te zetten"></div>
-      <main>
+      <main id="paneel">
+        <button type="button" class="sheetgreep" id="sheetgreep" aria-label="Paneel groter of kleiner" aria-expanded="true"><span></span></button>
         <header>
           <div>
             <h1>Onverhard</h1>
@@ -42,6 +43,8 @@
             <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
           </div>
         </header>
+
+        <div class="piekbalk" id="piekbalk" aria-live="polite"></div>
 
         <nav class="stapper" id="stapper" aria-label="Stappen">
           <button type="button" data-stap="1"><span class="stapnr" data-nr="1"></span><span>Soort</span></button>
@@ -120,18 +123,24 @@
             <label class="vinkje" id="doodveld" hidden><input type="checkbox" id="dood" checked /> Doodlopende straten overslaan</label>
             <div id="instellingen">
               <h3 class="subkop">Instellingen <small id="instSamenvatting"></small></h3>
-              <label class="veld">
-                <span>Soort paden</span>
-                <select id="trail">
+              <div class="veld">
+                <span>Ondergrond</span>
+                <div class="keuze klein" id="ondergrond" role="group" aria-label="Ondergrond">
+                  <button type="button" data-waarde="1" aria-pressed="true">🌲 Paadjes eerst</button>
+                  <button type="button" data-waarde="0" aria-pressed="false">🟤 Onverhard</button>
+                  <button type="button" data-waarde="a" aria-pressed="false">🛣️ Maakt niet uit</button>
+                </div>
+                <small class="vhint" id="ondergrondHint"></small>
+                <select id="trail" hidden aria-hidden="true" tabindex="-1">
                   <option value="1">Smalle paadjes eerst (trail)</option>
                   <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
                   <option value="a">Maakt niet uit (ook verhard)</option>
                 </select>
-              </label>
-              <label class="vinkje"><input type="checkbox" id="strand" checked /> Strand overslaan</label>
-              <label class="vinkje"><input type="checkbox" id="kaartje" /> Toegangskaart waterleidingduinen</label>
-              <label class="vinkje"><input type="checkbox" id="heuvels" /> Meer hoogtemeters</label>
-              <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /> Luchtfoto's bij twijfel</label>
+              </div>
+              <label class="vinkje"><input type="checkbox" id="strand" checked /><span class="vtekst"><b>🏖️ Strand overslaan</b><small>geen mul zand</small></span></label>
+              <label class="vinkje"><input type="checkbox" id="kaartje" /><span class="vtekst"><b>🎫 Toegangskaart-gebieden</b><small>ook betaalde natuur</small></span></label>
+              <label class="vinkje"><input type="checkbox" id="heuvels" /><span class="vtekst"><b>⛰️ Meer hoogtemeters</b><small>zoekt heuvels op</small></span></label>
+              <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /><span class="vtekst"><b>📷 Luchtfoto's bij twijfel</b></span></label>
               <details class="meer">
                 <summary>Meer</summary>
                 <label class="veld">
@@ -171,22 +180,22 @@
 
           <h2>Routes</h2>
           <ul class="opties" id="opties"></ul>
-          <div class="afspelen" id="afspeelbalk">
-            <button type="button" id="afspeel" class="hoofd">▶ Afspelen</button>
-            <div class="keuze klein" id="tempo" role="group" aria-label="Snelheid">
-              <button type="button" data-tempo="1" aria-pressed="true">1×</button>
-              <button type="button" data-tempo="2" aria-pressed="false">2×</button>
-              <button type="button" data-tempo="4" aria-pressed="false">4×</button>
-            </div>
-            <span class="afspeelstand" id="afspeelstand"></span>
-          </div>
           <div class="keuze tabs" id="tabs" role="tablist" aria-label="Details">
             <button type="button" data-tab="hoogte" aria-pressed="true">Hoogte</button>
             <button type="button" data-tab="ondergrond" aria-pressed="false">Ondergrond</button>
           </div>
           <div class="tabvlak" id="tab-hoogte">
           <div class="profiel" id="profiel" hidden>
-            <h2 id="profielkop">Hoogteprofiel</h2>
+            <div class="profielkop">
+              <h2 id="profielkop">Hoogteprofiel</h2>
+              <button type="button" id="afspeel" class="ikoon" aria-label="Route afspelen" title="Route afspelen">▶</button>
+              <div class="keuze klein" id="tempo" role="group" aria-label="Snelheid" hidden>
+                <button type="button" data-tempo="1" aria-pressed="true">1×</button>
+                <button type="button" data-tempo="2" aria-pressed="false">2×</button>
+                <button type="button" data-tempo="4" aria-pressed="false">4×</button>
+              </div>
+              <span class="afspeelstand" id="afspeelstand"></span>
+            </div>
             <div class="profielvlak" id="profielvlak"></div>
             <p class="noot" id="profielnoot"></p>
           </div>
@@ -219,9 +228,9 @@
           </details>
 
           <div class="knoppen eindknoppen">
-            <button type="button" class="hoofd" id="gpx">Download GPX</button>
-            <button type="button" id="bewaar">★ Bewaar</button>
-            <button type="button" id="deel">Kopieer link</button>
+            <button type="button" class="hoofd" id="gpx" title="Download GPX">⬇ GPX</button>
+            <button type="button" id="bewaar" title="Bewaar in je browser">★ Bewaar</button>
+            <button type="button" id="deel" title="Kopieer link">🔗 Link</button>
           </div>
           <div class="stapvoet">
             <button type="button" class="klein terugknop" data-naar="2">✎ Aanpassen</button>

@@ -1,12 +1,13 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent. Plannen zelf heeft internet nodig
 // (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v32'
+const CACHE = 'onverhard-v33'
 const SHELL = [
   './',
   'index.html',
   'styles.css',
   'app.js',
+  'sheet.js',
   'bronnen.js',
   'kern.js',
   'graaf.js',

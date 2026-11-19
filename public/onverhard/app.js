@@ -2,6 +2,7 @@
 // De rekenkern staat in kern.js, de bronnen en de planner in bronnen.js.
 
 import * as K from './kern.js'
+import { maakSheet } from './sheet.js'
 import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
@@ -55,6 +56,7 @@ let gekozen = 0
 const opKaart = new Set() // routes die op de kaart staan
 let bron = 'eind' // waar de routekleur naar kijkt
 let stopper = null // AbortController van de lopende planning
+let sheet = null // het paneel als bottom sheet op de telefoon (sheet.js)
 
 // ---------- Ongedaan maken ----------
 const terugStapel = []
@@ -622,7 +624,36 @@ function werkStapperBij() {
     b.classList.toggle('klaar', n !== stap && (n === 1 || (n === 2 && plaatsKlaar) || (n === 3 && !!uitslag) || (n === 4 && !!uitslag && stap < 4)))
     b.disabled = (n === 3 && !plaatsKlaar) || (n === 4 && !uitslag)
   }
+  werkPiekbalk()
 }
+
+/** De ene regel die je ziet als het paneel op de telefoon op piek staat: score, of de hoofdknop. */
+function werkPiekbalk() {
+  const balk = document.getElementById('piekbalk')
+  if (!balk) return
+  if (!sheet || !sheet.actief()) {
+    balk.innerHTML = ''
+    return
+  }
+  let h
+  if (stopper) h = '<span class="piekloop" aria-hidden="true">🏃</span><span class="psamen"></span><button type="button" data-proxy="stop">Stop</button>'
+  else if (stap === 4 && plan) {
+    h =
+      `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
+      `<span class="psamen"><b>${nl(plan.analyse.lengte / 1000)} km</b><small>${pct(plan.zacht.eind)} onverhard · ${veilig(plan.label)}</small></span>` +
+      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">⬇</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">★</button><button type="button" data-proxy="deel" aria-label="Kopieer link">🔗</button></span>'
+  } else if (stap === 2) {
+    h = `<span class="psamen"><b>${veilig(el('stap2kop').textContent)}</b></span><button type="button" class="hoofd" data-proxy="naar3" ${plaatsKlaar ? '' : 'disabled'}>Verder →</button>`
+  } else if (stap === 3) h = '<span class="psamen"><b>Klaar om te plannen</b></span><button type="button" class="hoofd" data-proxy="plan">Plan route</button>'
+  else h = '<span class="psamen"><b>Wat voor route?</b></span><button type="button" data-sheet="half">Kies ↑</button>'
+  balk.innerHTML = h
+}
+el('piekbalk').addEventListener('click', (e) => {
+  const knop = e.target.closest('button')
+  if (!knop || knop.disabled) return
+  if (knop.dataset.proxy) el(knop.dataset.proxy).click()
+  else if (knop.dataset.sheet && sheet) sheet.zet(knop.dataset.sheet)
+})
 
 /** Toon één stap: 1 soort, 2 waar, 3 opties, 4 route. */
 function toonStap(n, scroll = true) {
@@ -636,7 +667,10 @@ function toonStap(n, scroll = true) {
   werkStapperBij()
   // het paneel bovenaan in beeld (op de telefoon: net onder de kaart)
   if (!scroll) return
-  if (window.innerWidth <= 860) el('stapper').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (sheet && sheet.actief()) {
+    document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' })
+    if (sheet.stand() === 'piek' && n !== 4) sheet.zet('half')
+  } else if (window.innerWidth <= 860) el('stapper').scrollIntoView({ behavior: 'smooth', block: 'start' })
   else document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -671,9 +705,23 @@ el('grondig').addEventListener('change', () => {
   staat.grondig = Number(el('grondig').value)
   bewaar()
 })
+const ONDERGROND_HINT = { 1: 'liever singletrack en smalle paadjes', 0: 'alles wat onverhard is, ook brede zandwegen', a: 'ook asfalt is goed; alleen weinig heen en terug' }
+/** De schakelaar 'Ondergrond' volgt de (verborgen) keuzelijst waar de rest van de app op leunt. */
+function zetOndergrondKnoppen() {
+  const w = el('trail').value
+  for (const b of el('ondergrond').children) b.setAttribute('aria-pressed', String(b.dataset.waarde === w))
+  el('ondergrondHint').textContent = ONDERGROND_HINT[w]
+}
+el('ondergrond').addEventListener('click', (e) => {
+  const knop = e.target.closest('[data-waarde]')
+  if (!knop) return
+  el('trail').value = knop.dataset.waarde
+  el('trail').dispatchEvent(new Event('change', { bubbles: true }))
+})
 el('trail').addEventListener('change', () => {
   staat.trail = el('trail').value === '1'
   staat.alles = el('trail').value === 'a'
+  zetOndergrondKnoppen()
   bewaar()
 })
 el('strand').addEventListener('change', () => {
@@ -777,6 +825,7 @@ function zetVoortgang(deel) {
 
 function stopBezig() {
   stopper = null
+  werkPiekbalk()
   el('plan').hidden = false
   el('bezig').hidden = true
 }
@@ -1098,7 +1147,8 @@ function stopAfspelen(wissen = true) {
     afspeelLaag.clearLayers()
     el('afspeelstand').textContent = ''
   } else if (afspelen) afspelen.raf = null
-  el('afspeel').textContent = '▶ Afspelen'
+  el('afspeel').textContent = '▶'
+  el('tempo').hidden = true
 }
 
 function afspeelStap(nu) {
@@ -1117,7 +1167,7 @@ function afspeelStap(nu) {
   el('afspeelstand').textContent = `km ${nl(a.d / 1000, 1)}${typeof h === 'number' ? ` · ${Math.round(h)} m` : ''}`
   if (a.d >= a.totaal) {
     stopAfspelen(false)
-    el('afspeel').textContent = '↺ Nog eens'
+    el('afspeel').textContent = '↺'
     a.d = 0
     a.klaar = true
     return
@@ -1129,7 +1179,7 @@ function wisselAfspelen() {
   if (!plan) return
   if (afspelen && afspelen.raf) {
     stopAfspelen(false)
-    el('afspeel').textContent = '▶ Verder'
+    el('afspeel').textContent = '▶'
     return
   }
   if (!afspelen) {
@@ -1144,7 +1194,8 @@ function wisselAfspelen() {
   }
   if (afspelen.klaar) afspelen.klaar = false
   afspelen.laatst = 0
-  el('afspeel').textContent = '❚❚ Pauze'
+  el('afspeel').textContent = '❚❚'
+  el('tempo').hidden = false
   afspelen.raf = requestAnimationFrame(afspeelStap)
 }
 el('afspeel').addEventListener('click', wisselAfspelen)
@@ -1272,14 +1323,14 @@ function tekenOpties() {
     kies.type = 'button'
     kies.className = 'kies'
     kies.setAttribute('aria-pressed', String(i === gekozen))
-    let regel = `${nl(o.km)} km · ${pct(o.zacht)} onverhard · ${pct(o.paadjes)} smalle paadjes`
+    let regel = `${pct(o.zacht)} onverhard · ${pct(o.paadjes)} paadjes`
     if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
     if (o.stijgen !== null && o.stijgen !== undefined) regel += ` · ↗ ${Math.round(o.stijgen)} m`
     if (o.ronden > 1) regel += ` · ${o.ronden} rondjes`
     else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
-    const titel = o.ingelezen ? veilig(o.ingelezen) : `Route ${o.naam}${i === 0 ? '</b> · aanbevolen<b>' : ''}`
+    const titel = o.ingelezen ? veilig(o.ingelezen) : `${nl(o.km)} km${i === 0 && uitslag.opties.length > 1 ? '</b> · aanbevolen<b>' : ''}`
     kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span><span class="badge ${scoreKlasse(o.score)}" title="Nopav.es-score: ${veilig(o.label)}">${o.score}</span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
@@ -1345,8 +1396,10 @@ function tekenTabel() {
 function zoomNaar(van, tot) {
   const pts = []
   for (const [lijn, s] of lijnen) if (s.tot > van && s.van < tot) pts.push(...lijn.getLatLngs())
+  const opSheet = sheet && sheet.actief()
+  if (opSheet) sheet.zet('piek') // eerst het paneel omlaag, dan past het stuk boven het paneel
   if (pts.length) kaart.fitBounds(L.latLngBounds(pts).pad(0.15))
-  if (window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (!opSheet && window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function tekenZachteStukken() {
@@ -1483,9 +1536,11 @@ function tekenTwijfels() {
     }
     li.addEventListener('click', () => {
       if (!twijfelLijn[s.nr]) return
+      const opSheet = sheet && sheet.actief()
+      if (opSheet) sheet.zet('piek')
       kaart.once('moveend', () => twijfelLijn[s.nr].openPopup(s.midden))
       kaart.fitBounds(twijfelLijn[s.nr].getBounds().pad(0.6), { maxZoom: 19, animate: false })
-      if (window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: 'smooth' })
+      if (!opSheet && window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: 'smooth' })
     })
     lijst.appendChild(li)
   }
@@ -1503,6 +1558,7 @@ function tekenKern() {
     (keuze().hoogte
       ? `<div><b>↗ ${Math.round(keuze().hoogte.stijgen)} m</b><span>hoogte&shy;meters</span></div>`
       : `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`)
+  werkPiekbalk()
 }
 
 /** De gekozen route zoals maakPlan hem gaf (met hoogte en rondjes). */
@@ -1537,11 +1593,14 @@ function tekenProfiel() {
   const h = keuze().hoogte
   const blok = el('profiel')
   profielLaag.clearLayers()
+  blok.hidden = false
+  el('profielvlak').hidden = el('profielnoot').hidden = !h || h.afstand.length < 3
   if (!h || h.afstand.length < 3) {
-    blok.hidden = true
+    // geen hoogtes: wel de afspeelknop, geen grafiek
+    el('profielkop').textContent = 'Route afspelen'
+    profielNaar = null
     return
   }
-  blok.hidden = false
   profielNaar = null
   el('profielkop').textContent = `Hoogteprofiel · ↗ ${Math.round(h.stijgen)} m · ↘ ${Math.round(h.dalen)} m`
   el('profielnoot').textContent = `${Math.round(h.min)}–${Math.round(h.max)} m · ${h.bron === 'AHN' ? 'AHN' : 'SRTM (grof)'}`
@@ -1634,6 +1693,7 @@ function herteken() {
 
 function toonResultaat(nieuw) {
   stopAfspelen()
+  if (nieuw && sheet && sheet.actief()) sheet.zet('piek') // de route meteen groot in beeld
   stap = 4
   for (const k of [1, 2, 3]) el(`stap${k}`).hidden = true
   el('resultaat').hidden = false
@@ -1651,7 +1711,7 @@ function toonResultaat(nieuw) {
   tekenZachteStukken()
   tekenTwijfels()
   kleurRoute()
-  if (nieuw) el(window.innerWidth <= 860 ? 'stapper' : 'resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (nieuw && !(sheet && sheet.actief())) el(window.innerWidth <= 860 ? 'stapper' : 'resultaat').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 el('gpx').addEventListener('click', () => {
@@ -1672,12 +1732,12 @@ el('deel').addEventListener('click', async () => {
   const link = deelLink()
   try {
     await navigator.clipboard.writeText(link)
-    el('deel').textContent = 'Link gekopieerd'
+    el('deel').textContent = '✓ Gekopieerd'
   } catch {
     prompt('Kopieer deze link:', link)
   }
   setTimeout(() => {
-    el('deel').textContent = 'Kopieer link'
+    el('deel').textContent = '🔗 Link'
   }, 2000)
 })
 
@@ -2135,6 +2195,7 @@ if (el('law').value !== String(staat.law)) {
 el('grondig').value = String(staat.grondig)
 if (el('grondig').value !== String(staat.grondig)) el('grondig').value = '2'
 el('trail').value = staat.alles ? 'a' : staat.trail ? '1' : '0'
+zetOndergrondKnoppen()
 el('strand').checked = staat.strand
 el('kaartje').checked = !!staat.kaartje
 el('heuvels').checked = !!staat.heuvels
@@ -2167,8 +2228,11 @@ try {
 if (!introGezien && !hash.get('p') && !hash.get('t')) openIntro()
 // #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
 if (hash.get('plan') && !el('plan').disabled) planNu()
+sheet = maakSheet({ kaart, main: document.getElementById('paneel'), greep: el('sheetgreep'), bijWijziging: werkPiekbalk })
+werkPiekbalk()
+
 // voor de end-to-end-test
-window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute } }
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})

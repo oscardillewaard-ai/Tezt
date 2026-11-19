@@ -70,6 +70,52 @@ const waterregel = await page.locator('#waterregel').textContent()
 assert.match(waterregel, /Langste stuk zonder water/)
 await page.screenshot({ path: path.join(map, `nopaves_resultaat_${soort}.png`) })
 
+// ---- bottom sheet (alleen telefoon) ----
+if (mobiel) {
+  const info = () => page.evaluate(() => {
+    const m = document.getElementById('paneel').getBoundingClientRect()
+    const k = document.getElementById('kaart').getBoundingClientRect()
+    return { stand: window.onverhard.sheet.stand(), paneel: Math.round(m.height), kaart: Math.round(k.height), kaartBreed: Math.round(k.width), venster: innerHeight, scrollY, breedte: document.documentElement.scrollWidth }
+  })
+  let i = await info()
+  assert.equal(i.stand, 'piek', 'na het plannen staat het paneel op piek')
+  assert.equal(i.kaart, i.venster, 'de kaart is schermvullend')
+  assert.ok(i.paneel < 200, `piek is laag (${i.paneel}px)`)
+  assert.equal(i.breedte, 390, 'geen horizontaal scrollen')
+  assert.equal(await page.locator('#piekbalk .pscore').textContent(), String(score), 'piekbalk toont de score')
+  assert.ok(await page.locator('#piekbalk [data-proxy="gpx"]').isVisible(), 'knoppen op piek')
+  await page.screenshot({ path: path.join(map, 'nopaves_sheet_piek.png') })
+  const standen = [i.paneel]
+  // invalidateSize wordt aangeroepen als de stand verandert
+  await page.evaluate(() => {
+    window.__invalidate = 0
+    const orig = window.onverhard.kaart.invalidateSize.bind(window.onverhard.kaart)
+    window.onverhard.kaart.invalidateSize = (...a) => { window.__invalidate += 1; return orig(...a) }
+  })
+  for (const verwacht of ['half', 'vol', 'piek']) {
+    await page.locator('#sheetgreep').click()
+    await page.waitForTimeout(450)
+    i = await info()
+    assert.equal(i.stand, verwacht, `tik op het handvat → ${verwacht}`)
+    assert.equal(i.kaart, i.venster, `kaart blijft schermvullend op ${verwacht}`)
+    standen.push(i.paneel)
+    await page.screenshot({ path: path.join(map, `nopaves_sheet_${verwacht}.png`) })
+  }
+  assert.ok(standen[1] > standen[0] && standen[2] > standen[1] && standen[3] === standen[0], `hoogtes ${standen}`)
+  assert.ok((await page.evaluate(() => window.__invalidate)) >= 3, 'invalidateSize bij elke standwissel')
+  // slepen aan het handvat: omhoog veegt naar half
+  const g = await page.locator('#sheetgreep').boundingBox()
+  await page.mouse.move(g.x + g.width / 2, g.y + 10)
+  await page.mouse.down()
+  for (let s = 1; s <= 8; s++) await page.mouse.move(g.x + g.width / 2, g.y + 10 - s * 40, { steps: 2 })
+  await page.mouse.up()
+  await page.waitForTimeout(450)
+  assert.notEqual((await info()).stand, 'piek', 'omhoog slepen opent het paneel')
+  // de piekbalk-knoppen werken door naar de echte knoppen
+  await page.evaluate(() => window.onverhard.sheet.zet('piek'))
+  stap(`bottom sheet: standen ${standen.join(' < ')} px, kaart schermvullend, na het plannen op piek`)
+}
+
 assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], 'geen consolefouten')
 await browser.close()
 console.log(`klaar (${soort})`)
