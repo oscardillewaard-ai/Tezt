@@ -2,7 +2,7 @@
 // eroverheen in drie standen (piek, half, vol). Op breder dan GROOT_PX blijft het een zijpaneel.
 export const GROOT_PX = 700
 export const STANDEN = ['piek', 'half', 'vol']
-const PIEK_PX = 158 // handvat, kopbalk en één regel (score, of de hoofdknop)
+const PIEK_PX = 180 // handvat, kopbalk en de piekbalk (bij een route twee regels: score en knoppen, km en ondergrond)
 
 /** Hoogte in pixels per stand voor een venster van deze hoogte. */
 export function standHoogtes(vensterHoogte, veiligOnder = 0) {

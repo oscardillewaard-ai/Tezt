@@ -585,6 +585,11 @@ details.meer > summary { cursor: pointer; margin-top: 12px; color: var(--inkt-2)
   .piekbalk .pscore.s-laag { background: #7a2a22; color: #fff; }
   .piekbalk .pknoppen { display: flex; gap: 6px; flex: none; }
   .piekbalk button { min-height: 44px; min-width: 44px; padding: 0 12px; }
+  /* resultaat: regel 1 score, label en knoppen; regel 2 km en ondergrond over de hele breedte */
+  main[data-sheet="piek"] .piekbalk { flex-wrap: wrap; row-gap: 6px; }
+  .piekbalk .pregel { flex: 1 0 100%; font: 500 12px/1.3 var(--mono); color: var(--inkt-2); }
+  .piekbalk .pscore ~ .psamen { flex: 1 1 0; }
+  .piekbalk .pscore ~ .psamen b { line-height: 1; overflow-wrap: normal; }
   .piekbalk .piekloop { font-size: 22px; animation: heen-en-weer-mini 1.2s ease-in-out infinite alternate; }
   @keyframes heen-en-weer-mini { from { transform: translateX(0) scaleX(-1); } to { transform: translateX(120px) scaleX(-1); } }
 }
@@ -773,3 +778,6 @@ header > div:first-child { flex: 1 1 auto; }
 /* waarom-regel bij de score: waar het getal vandaan komt */
 .kern .score { flex-wrap: wrap; }
 .kern .score small.waarom { flex-basis: 100%; margin-top: 2px; font: 500 11px/1.35 var(--mono); color: var(--balk-tekst); opacity: .9; }
+
+/* piekbalk bij een route: een lang label ('Puur onverhard') mag over twee regels naast de score, nooit afgekapt */
+@media (max-width: 700px) { .piekbalk .pscore ~ .psamen b { font-size: 20px; } }

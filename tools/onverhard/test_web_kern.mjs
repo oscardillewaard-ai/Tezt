@@ -773,7 +773,7 @@ test('nopavesScore: dubbel lopen, strand en een lang verhard stuk kosten punten'
 test('bottom sheet: drie standen die oplopen, en een veeg kiest de volgende stand', () => {
   const hs = Sheet.standHoogtes(844, 34)
   assert.ok(hs.piek < hs.half && hs.half < hs.vol && hs.vol < 844)
-  assert.equal(hs.piek, 158 + 34)
+  assert.equal(hs.piek, 180 + 34)
   assert.equal(Sheet.dichtsteStand(hs.piek + 10, hs), 'piek')
   assert.equal(Sheet.dichtsteStand(hs.half - 30, hs), 'half')
   assert.equal(Sheet.dichtsteStand(hs.vol, hs), 'vol')

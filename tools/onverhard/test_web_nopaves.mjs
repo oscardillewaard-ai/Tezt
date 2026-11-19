@@ -154,6 +154,30 @@ if (mobiel) {
   assert.equal(i.breedte, 390, 'geen horizontaal scrollen')
   assert.equal(await page.locator('#piekbalk .pscore').textContent(), String(score), 'piekbalk toont de score')
   assert.ok(await page.locator('#piekbalk [data-proxy="gpx"]').isVisible(), 'knoppen op piek')
+  // twee regels, niets afgekapt, alles binnen het paneel; ook met het langste label
+  for (const label of [null, 'Puur onverhard']) {
+    if (label) await page.evaluate((l) => { document.querySelector('#piekbalk .psamen b').textContent = l }, label)
+    const pb = await page.evaluate(() => {
+      const b = document.getElementById('piekbalk')
+      const r = b.getBoundingClientRect()
+      const m = document.getElementById('paneel').getBoundingClientRect()
+      const k = b.querySelector('.pknoppen').getBoundingClientRect()
+      const s = b.querySelector('.pscore').getBoundingClientRect()
+      const g = b.querySelector('.pregel').getBoundingClientRect()
+      return {
+        afgekapt: [...b.querySelectorAll('*')].filter((e) => e.scrollWidth > e.clientWidth + 1).length,
+        binnen: r.bottom <= m.bottom + 0.5,
+        knoppenNaastScore: Math.abs(k.top - s.top) < 8,
+        regel2Onder: g.top >= s.bottom - 1,
+        tekst: b.querySelector('.pregel').textContent,
+      }
+    })
+    assert.equal(pb.afgekapt, 0, 'piekbalk: niets afgekapt')
+    assert.ok(pb.binnen && pb.knoppenNaastScore && pb.regel2Onder, `piekbalk-indeling ${JSON.stringify(pb)}`)
+    assert.match(pb.tekst, /^[\d,]+ km · \d+% onverhard · \d+% half$/)
+  }
+  await page.evaluate(() => window.onverhard.sheet.zet('half'))
+  await page.evaluate(() => window.onverhard.sheet.zet('piek'))
   await page.screenshot({ path: path.join(map, 'nopaves_sheet_piek.png') })
   const standen = [i.paneel]
   // invalidateSize wordt aangeroepen als de stand verandert

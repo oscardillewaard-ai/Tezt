@@ -719,8 +719,10 @@ function werkPiekbalk() {
   else if (stap === 4 && plan) {
     h =
       `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
-      `<span class="psamen"><b>${nl(plan.analyse.lengte / 1000)} km</b><small>${ondergrondTekst(aandelen(plan.analyse))} · ${veilig(plan.label)}</small></span>` +
-      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>'
+      `<span class="psamen"><b>${veilig(plan.label)}</b></span>` +
+      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>' +
+      // tweede regel over de hele breedte: niets wordt afgekapt
+      `<span class="pregel">${nl(plan.analyse.lengte / 1000)} km · ${ondergrondTekst(aandelen(plan.analyse))}</span>`
   } else if (stap === 2) {
     h = `<span class="psamen"><b>${veilig(el('stap2kop').textContent)}</b></span><button type="button" class="hoofd" data-proxy="naar3" ${plaatsKlaar ? '' : 'disabled'}>Verder →</button>`
   } else if (stap === 3) h = '<span class="psamen"><b>Klaar om te plannen</b></span><button type="button" class="hoofd" data-proxy="plan">Plan route</button>'
