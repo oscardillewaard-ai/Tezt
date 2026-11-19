@@ -868,3 +868,69 @@ test('stations kiezen: afstandsband, een per windrichting, treinstation wint van
   const dubbel = G.ontdubbelStations([{ ...op(0, 7), naam: 'Delft' }, { ...op(0, 7.1), naam: 'Delft', trein: false }, { ...op(0, 9), naam: 'Delft' }])
   assert.equal(dubbel.length, 2)
 })
+
+// ---------- Groene omwegen ----------
+/** Een rechte asfaltweg van 1 km (10 stukken) met een onverharde boog van 1,6 km eromheen; plus een tweede weg ernaast. */
+function omwegGraaf() {
+  const p = (i, j) => ({ lat: 52 + j * 0.0009, lon: 5 + i * 0.00146 })
+  let id = 1
+  const el = []
+  for (let i = 0; i < 10; i++) el.push({ type: 'way', id: id++, tags: { highway: 'tertiary', surface: 'asphalt' }, geometry: [p(i, 5), p(i + 1, 5)] })
+  const boog = [p(0, 5), p(0, 4), p(0, 3), p(0, 2), p(1, 2), p(2, 2), p(3, 2), p(4, 2), p(5, 2), p(6, 2), p(7, 2), p(8, 2), p(9, 2), p(10, 2), p(10, 3), p(10, 4), p(10, 5)]
+  for (let k = 0; k < boog.length - 1; k++) el.push({ type: 'way', id: id++, tags: { highway: 'path', surface: 'sand' }, geometry: [boog[k], boog[k + 1]] })
+  const g = G.bouwGraaf(el, { trail: true })
+  const knoop = (q) => G.dichtsteKnoop(g, ...K.naarRd(q.lon, q.lat)).knoop
+  const segTussen = (a, b) => {
+    for (let j = g.begin[a]; j < g.begin[a + 1]; j++) if (g.buur[j] === b) return g.buurSeg[j]
+    return -1
+  }
+  const knopen = Array.from({ length: 11 }, (_, i) => knoop(p(i, 5)))
+  const segs = knopen.slice(1).map((b, i) => segTussen(knopen[i], b))
+  return { g, knopen, segs, p }
+}
+const aaneengesloten = (g, knopen, segs) => segs.every((s, i) => (g.van[s] === knopen[i] && g.naar[s] === knopen[i + 1]) || (g.van[s] === knopen[i + 1] && g.naar[s] === knopen[i]))
+
+test('groene omwegen: vindt de onverharde boog om een verhard stuk en past de limieten toe', () => {
+  const { g, knopen, segs } = omwegGraaf()
+  assert.ok(segs.every((s) => s >= 0) && aaneengesloten(g, knopen, segs))
+  const lijst = G.groeneOmwegen(g, knopen, segs, [0, knopen.length - 1])
+  assert.equal(lijst.length, 1)
+  const o = lijst[0]
+  assert.equal(o.ia, 0)
+  assert.equal(o.ib, 10)
+  // de boog is 1,6 km: 0,6 km extra, 1,6 km onverhard erbij
+  assert.ok(o.extraM > 500 && o.extraM < 700, `${o.extraM} m extra`)
+  assert.ok(o.winstOnverhardM > 1500 && o.winstOnverhardM < 1700, `${o.winstOnverhardM} m winst`)
+  assert.ok(o.puntenWinst > 50, `${o.puntenWinst} punten`)
+  assert.ok(aaneengesloten(g, o.knopen, o.segs))
+  // de omweg gaat over de boog, niet over de weg
+  assert.ok(o.segs.every((s) => g.factor[s] <= 1.0001 || !g.tagLijst[g.segTags[s]].includes('tertiary')))
+  assert.ok(o.segs.every((s) => !segs.includes(s)), 'mijdt segmenten die de route al gebruikt')
+  // maxExtra: 500 m is te weinig voor 600 m extra
+  assert.equal(G.groeneOmwegen(g, knopen, segs, [], { maxExtra: 500 }).length, 0)
+  // maxFactor: 1,6 km omweg voor 1 km weg is te veel bij factor 1,2
+  assert.equal(G.groeneOmwegen(g, knopen, segs, [], { maxFactor: 0.4 }).length, 0)
+  // een verhard stuk korter dan minVerhard (hier 1 km) krijgt geen omweg
+  assert.equal(G.groeneOmwegen(g, knopen, segs, [], { minVerhard: 1500 }).length, 0)
+  // een zelf neergezet punt midden in het stuk blijft: dat stuk valt af
+  assert.equal(G.groeneOmwegen(g, knopen, segs, [0, 5, 10]).length, 0)
+})
+
+test('groene omwegen: een route die al onverhard is krijgt er geen, en toepassen houdt de route aaneengesloten', () => {
+  const { g, knopen, segs } = omwegGraaf()
+  const [o] = G.groeneOmwegen(g, knopen, segs, [0, 10])
+  const r = G.pasOmwegToe(knopen, segs, [0, 10], o)
+  assert.ok(aaneengesloten(g, r.knopen, r.segs))
+  assert.equal(r.knopen[0], knopen[0])
+  assert.equal(r.knopen[r.knopen.length - 1], knopen[10])
+  assert.deepEqual(r.vast, [0, r.knopen.length - 1], 'begin en eind blijven vast, ook als de route langer werd')
+  assert.ok(r.segs.length > segs.length)
+  // opnieuw zoeken op de nieuwe route: niets meer te winnen
+  assert.deepEqual(G.groeneOmwegen(g, r.knopen, r.segs, r.vast), [])
+  // een route met twee verharde stukken ver uit elkaar (boog tussen): de weg vooruit, terug over de boog en weer de weg
+  const terug = [...knopen, ...o.knopen.slice().reverse().slice(1)]
+  const terugSegs = [...segs, ...o.segs.slice().reverse()]
+  assert.ok(aaneengesloten(g, terug, terugSegs))
+  const dubbel = G.groeneOmwegen(g, terug, terugSegs, [])
+  assert.deepEqual(dubbel, [], 'de boog is al gebruikt: dubbel lopen telt niet als omweg')
+})

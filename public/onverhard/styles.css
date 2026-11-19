@@ -599,3 +599,9 @@ details.meer > summary { cursor: pointer; margin-top: 12px; color: var(--inkt-2)
   @keyframes heen-en-weer-mini { from { transform: translateX(0) scaleX(-1); } to { transform: translateX(120px) scaleX(-1); } }
 }
 @media (max-width: 700px) and (prefers-reduced-motion: reduce) { main, .leaflet-bottom { transition: none; } .piekbalk .piekloop { animation: none; } }
+
+/* groene omwegen */
+.omwegknop { margin-top: 10px; width: 100%; font-weight: 600; }
+.omwegknop[aria-pressed="true"] { background: #0a8f2b; border-color: #0a8f2b; color: #fff; }
+.omwegchip { transform: translate(-50%, -50%); white-space: nowrap; min-height: 0; padding: 4px 9px; border-radius: 999px; border: 2px solid #fff; background: #0a8f2b; color: #fff;
+             font: 700 13px/1.2 var(--kop); letter-spacing: .03em; box-shadow: 0 2px 6px rgb(0 0 0 / .4); cursor: pointer; }

@@ -3,7 +3,7 @@
 
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
-import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -778,7 +778,7 @@ el('opnieuw').addEventListener('click', () => {
   gekozen = 0
   opKaart.clear()
   stopAfspelen()
-  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag, stationLaag]) laag.clearLayers()
+  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag, stationLaag, omwegLaag]) laag.clearLayers()
   el('resultaat').hidden = true
   toonFout('')
   bewaar()
@@ -1210,6 +1210,79 @@ el('tempo').addEventListener('click', (e) => {
   tempo = t
   for (const b of el('tempo').children) b.setAttribute('aria-pressed', String(Number(b.dataset.tempo) === t))
 })
+
+// ---------- Groene omwegen ----------
+const omwegLaag = L.layerGroup().addTo(kaart)
+let omwegModus = false
+
+const kanOmwegen = () => !!(uitslag && uitslag.graaf && keuze().knopen && staat.modus !== 'straten' && stap === 4)
+const plus = (n) => (n >= 0 ? '+' : '−') + nl(Math.abs(n), 1)
+
+/** Korte melding bij het resultaat die vanzelf weer weggaat. */
+function kortMelding(tekst) {
+  const p = document.createElement('p')
+  p.className = 'melding'
+  p.textContent = tekst
+  el('meldingen').appendChild(p)
+  setTimeout(() => p.remove(), 4000)
+}
+
+/** Teken de omwegen voor de gekozen route: groene stippellijnen met een chip; een tik past toe. */
+function tekenOmwegen() {
+  omwegLaag.clearLayers()
+  const knop = el('omwegen')
+  knop.hidden = !kanOmwegen()
+  knop.setAttribute('aria-pressed', String(omwegModus && !knop.hidden))
+  if (!omwegModus || knop.hidden) return
+  const lijst = zoekOmwegen(uitslag, keuze())
+  if (!lijst.length) {
+    omwegModus = false
+    knop.setAttribute('aria-pressed', 'false')
+    kortMelding('Geen groene omweg gevonden')
+    return
+  }
+  for (const o of lijst) {
+    const toepassen = () => omwegToepassen(o)
+    L.polyline(o.lijn, { color: '#0a8f2b', weight: 6, opacity: 0.95, dashArray: '2 9', lineCap: 'round', bubblingMouseEvents: false })
+      .on('click', toepassen)
+      .addTo(omwegLaag)
+    const mid = o.lijn[Math.floor(o.lijn.length / 2)]
+    const chip = L.marker(mid, {
+      icon: L.divIcon({ className: '', html: `<button type="button" class="omwegchip" title="Tik om deze omweg te lopen">${plus(o.extraM / 1000)} km · ≈ ${o.puntenWinst >= 0 ? '+' : '−'}${Math.abs(o.puntenWinst)} punten</button>`, iconSize: [0, 0] }),
+      keyboard: false, zIndexOffset: 1500,
+    }).addTo(omwegLaag)
+    chip.on('click', toepassen)
+  }
+}
+
+async function omwegToepassen(o) {
+  if (aanpassen || stopper) return
+  aanpassen = true
+  kaart.getContainer().classList.add('rekent')
+  try {
+    const nieuw = await pasRouteAan(uitslag, keuze(), { omweg: o })
+    if (!nieuw) {
+      toonFout('Deze omweg lukte niet.')
+      return
+    }
+    onthoud()
+    uitslag = { ...uitslag, opties: uitslag.opties.map((x, i) => (i === gekozen ? nieuw : x)) }
+    plan = details(nieuw, MIN_TWIJFEL)
+    toonFout('')
+    toonResultaat(false) // tekent ook de omwegen van de nieuwe route opnieuw
+  } catch (fout) {
+    toonFout(`Omweg toepassen lukte niet: ${fout.melding || fout.message}`)
+  } finally {
+    aanpassen = false
+    kaart.getContainer().classList.remove('rekent')
+  }
+}
+
+function wisselOmwegen() {
+  omwegModus = !omwegModus
+  tekenOmwegen()
+}
+el('omwegen').addEventListener('click', wisselOmwegen)
 
 // ---------- Stations (modus 'station') ----------
 const stationLaag = L.layerGroup().addTo(kaart)
@@ -1787,6 +1860,7 @@ function toonResultaat(nieuw) {
   tekenOpties()
   tekenWater()
   tekenStations()
+  tekenOmwegen()
   toonTab(tab)
   haalTijdenErbij()
   tekenAlternatieven()
@@ -1841,7 +1915,7 @@ function herstel(opname) {
     toonResultaat(false)
   } else {
     plan = null
-    for (const laag of [routeLaag, altLaag, profielLaag, waterLaag, stationLaag]) laag.clearLayers()
+    for (const laag of [routeLaag, altLaag, profielLaag, waterLaag, stationLaag, omwegLaag]) laag.clearLayers()
     el('resultaat').hidden = true
     if (stap === 4) toonStap(2)
   }
@@ -1890,6 +1964,7 @@ document.addEventListener('keydown', (e) => {
       stopTekenen()
       tekenPuntenlijst()
     } else if (stopper) stopper.abort()
+    else if (omwegModus) wisselOmwegen()
     return
   }
   if (typen || cmd || e.altKey) return
@@ -2098,6 +2173,10 @@ kaart.on('contextmenu', (e) => {
   }
   if (uitslag && uitslag.graaf && keuze().knopen && stap === 4) {
     opties.push(['↪ Route via hier', zet(() => versleepNaar(dichtsteIndex(e.latlng), p))])
+    if (kanOmwegen()) opties.push([omwegModus ? '🌿 Groene omwegen uit' : '🌿 Groene omwegen', () => {
+      sluitMenu()
+      wisselOmwegen()
+    }])
     opties.push(null)
   }
   if (staat.modus === 'route') {

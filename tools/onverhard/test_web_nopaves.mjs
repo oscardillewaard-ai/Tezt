@@ -70,6 +70,50 @@ const waterregel = await page.locator('#waterregel').textContent()
 assert.match(waterregel, /Langste stuk zonder water/)
 await page.screenshot({ path: path.join(map, `nopaves_resultaat_${soort}.png`) })
 
+// ---- groene omwegen ----
+{
+  // een rondje bij Rijswijk Buiten: lange verharde stukken met een onverhard alternatief ernaast
+  const og = await ctx.newPage()
+  await og.goto(`${basis}#p=52.04,4.32&rondje=10&plan=1`)
+  await og.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await og.waitForTimeout(2000)
+  const meet = () => og.evaluate(() => {
+    const p = window.onverhard.krijgPlan()
+    const o = p.opties[0]
+    return { score: o.score, zacht: o.zacht, dubbel: o.dubbel, km: o.km, aantal: p.opties.length }
+  })
+  const klik = (id) => og.evaluate((i) => document.getElementById(i).click(), id)
+  const voor = await meet()
+  assert.equal(await og.locator('#omwegen').isHidden(), false, 'knop Groene omwegen staat bij het resultaat')
+  await klik('omwegen')
+  await og.waitForTimeout(500)
+  const chips = await og.locator('.omwegchip').allTextContents()
+  console.log(`  omwegen op ${voor.km.toFixed(1)} km, score ${voor.score}, ${(100 * voor.zacht).toFixed(0)}% onverhard: ${chips.length ? chips.join(' | ') : 'geen'}`)
+  await og.screenshot({ path: path.join(map, `nopaves_omwegen_${soort}.png`) })
+  assert.ok(chips.length >= 1, 'bij Rijswijk Buiten is een groene omweg te vinden')
+  {
+    assert.ok(chips.every((c) => /[+−][\d,]+ km · ≈ [+−]\d+ punten/.test(c)), `chips: ${chips}`)
+    assert.equal(await og.locator('#omwegen').getAttribute('aria-pressed'), 'true')
+    await og.locator('.omwegchip').first().click({ force: true })
+    await og.waitForFunction((s) => window.onverhard.krijgPlan().opties[0].km !== s, voor.km, { timeout: 60000 })
+    await og.waitForTimeout(1500)
+    const na = await meet()
+    assert.ok(na.zacht > voor.zacht, `onverhard-% omhoog: ${(100 * voor.zacht).toFixed(1)} → ${(100 * na.zacht).toFixed(1)}`)
+    assert.ok(na.score >= voor.score, `score ${voor.score} → ${na.score}`)
+    assert.ok(na.dubbel <= 0.1, `dubbel gelopen blijft laag: ${voor.dubbel.toFixed(3)} → ${na.dubbel.toFixed(3)}`)
+    stap(`omweg toegepast: score ${voor.score} → ${na.score}, onverhard ${(100 * voor.zacht).toFixed(0)}% → ${(100 * na.zacht).toFixed(0)}%, ${voor.km.toFixed(1)} → ${na.km.toFixed(1)} km, dubbel ${(100 * na.dubbel).toFixed(1)}%`)
+    await og.evaluate(() => document.getElementById('terug').click())
+    await og.waitForFunction((s) => window.onverhard.krijgPlan().opties[0].km === s, voor.km, { timeout: 10000 })
+    assert.equal((await meet()).score, voor.score, '↶ haalt de omweg weg')
+    stap('↶ maakt de omweg ongedaan')
+  }
+  // Esc zet de modus uit
+  await og.keyboard.press('Escape')
+  await og.waitForTimeout(300)
+  assert.equal(await og.locator('.omwegchip').count(), 0, 'Esc: chips weg')
+  assert.equal(await og.locator('#omwegen').getAttribute('aria-pressed'), 'false')
+}
+
 // ---- bottom sheet (alleen telefoon) ----
 if (mobiel) {
   const info = () => page.evaluate(() => {

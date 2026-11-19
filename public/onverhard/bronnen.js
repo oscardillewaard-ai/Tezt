@@ -1581,11 +1581,12 @@ function optieVan(o, naam) {
  * legt de nieuwe route opnieuw langs de officiële kaart en het AHN.
  * Geeft een nieuwe optie, of null als het niet lukte.
  */
-export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null, weghalen = false }, signal) {
+export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null, weghalen = false, omweg = null }, signal) {
   const g = uitslag.graaf
   if (!g || !optie.knopen) return null
   let r
-  if (loslaten !== null) r = G.laatLos(g, optie.knopen, optie.segs, optie.vast, loslaten)
+  if (omweg) r = G.pasOmwegToe(optie.knopen, optie.segs, optie.vast || [0, optie.knopen.length - 1], omweg)
+  else if (loslaten !== null) r = G.laatLos(g, optie.knopen, optie.segs, optie.vast, loslaten)
   else if (weghalen) r = G.haalStukWeg(g, optie.knopen, optie.segs, optie.vast, i0)
   else {
     const doel = G.dichtsteKnoop(g, ...K.naarRd(punt[1], punt[0])).knoop
@@ -1596,6 +1597,20 @@ export async function pasRouteAan(uitslag, optie, { i0, punt, loslaten = null, w
   const nieuw = await maakOptieAf(uitslag, traject, r, optie.naam, optie.ronden, signal)
   if (optie.station) nieuw.station = optie.station
   return nieuw
+}
+
+/**
+ * Groene omwegen langs de route van deze optie (alleen waar de route op het eigen netwerk ligt: niet
+ * bij BRouter-uitslagen, en niet bij 'elke straat', waar dubbel lopen de bedoeling is). Geeft
+ * [{ia, ib, knopen, segs, extraM, winstOnverhardM, puntenWinst, lijn: [[lat, lon], ...]}].
+ */
+export function zoekOmwegen(uitslag, optie, opties = {}) {
+  const g = uitslag.graaf
+  if (!g || !optie.knopen || uitslag.modus === 'straten') return []
+  return G.groeneOmwegen(g, optie.knopen, optie.segs, optie.vast || [0, optie.knopen.length - 1], opties).map((o) => ({
+    ...o,
+    lijn: o.knopen.map((k) => [g.lat[k], g.lon[k]]),
+  }))
 }
 
 /** Een nieuw traject op het netwerk afronden tot een optie: ondergrond, score, water en hoogte. */
@@ -1820,6 +1835,7 @@ export async function maakPlan(opties) {
     meldingen,
     verzoeken: br.verzoeken + (bgt ? bgt.verzoeken : 0),
     graaf: plan.graaf || null, // om de route te kunnen verslepen
+    modus: opties.modus || null,
     stations: plan.stations || null, // kandidaat-stations (modus 'station')
     stationData: plan.stationData || null,
     bgt,

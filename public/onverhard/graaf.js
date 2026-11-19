@@ -1449,3 +1449,108 @@ export function kiesStations(start, stations, doel, { max = 6, van = 0.5, tot = 
   }
   return [...perSector.values()].sort((a, b) => a.straf - b.straf).slice(0, max)
 }
+
+// ---------- Groene omwegen ----------
+/**
+ * Verharde stukken langs een route waar een omweg over onverhard pad kan. Per stuk (minstens
+ * 'minVerhard' m verhard, stukken met minder dan 50 m onverhard ertussen samengevoegd, plus 100 m
+ * speling aan beide kanten) zoeken we de beste weg tussen begin en eind, met verhard ×6 en al
+ * gelopen ×8 (tegen dubbel lopen). Een omweg telt als hij hooguit 'maxExtra' meter en 'maxFactor' ×
+ * het stuk langer is, minstens 150 m extra onverhard oplevert, en minder verhard overlaat.
+ * Stukken waar je zelf een punt hebt neergezet (vast) slaan we over.
+ *
+ * Geeft hooguit 'aantal' omwegen die elkaar niet overlappen, de beste eerst:
+ * [{ia, ib, knopen, segs, extraM, winstOnverhardM, puntenWinst}]; ia en ib zijn knoopnummers op de
+ * route; de omweg vervangt knopen ia..ib. puntenWinst is een schatting van de score-winst: het aandeel
+ * onverhard en het dubbel lopen; paadjes en het langste verharde stuk tellen niet mee.
+ */
+export function groeneOmwegen(g, knopen, segs, vast = [], { minVerhard = 200, maxExtra = 3000, maxFactor = 4, aantal = 6 } = {}) {
+  if (segs.length < 2) return []
+  const zacht = onverhardeSegmenten(g)
+  const lengte = (s) => g.lengte[s]
+  const opgeteld = [0]
+  for (const s of segs) opgeteld.push(opgeteld[opgeteld.length - 1] + lengte(s))
+  const totaal = opgeteld[opgeteld.length - 1]
+  const gebruikt = new Uint8Array(g.lengte.length)
+  for (const s of segs) gebruikt[s] = 1
+  let zachtOud = 0
+  for (const s of segs) if (zacht[s]) zachtOud += lengte(s)
+  const dubbelOud = K.dubbelAandeel(knopen.map((k) => [g.x[k], g.y[k]]))
+
+  // 1. de verharde stukken (in segmentnummers [a, b) van de route)
+  const stukken = []
+  for (let i = 0; i < segs.length; ) {
+    if (zacht[segs[i]]) {
+      i++
+      continue
+    }
+    let j = i
+    while (j < segs.length && !zacht[segs[j]]) j++
+    const laatste = stukken[stukken.length - 1]
+    if (laatste && opgeteld[i] - opgeteld[laatste.b] < 50) laatste.b = j // minder dan 50 m onverhard ertussen
+    else stukken.push({ a: i, b: j })
+    i = j
+  }
+  const gekozen = []
+  for (const st of stukken) {
+    if (opgeteld[st.b] - opgeteld[st.a] < minVerhard) continue
+    // 2. 100 m speling aan beide kanten
+    let ia = st.a
+    let ib = st.b
+    while (ia > 0 && opgeteld[st.a] - opgeteld[ia] < 100) ia--
+    while (ib < segs.length && opgeteld[ib] - opgeteld[st.b] < 100) ib++
+    if (vast.some((k) => k > ia && k < ib)) continue // een zelf neergezet punt blijft
+    const oud = { meter: opgeteld[ib] - opgeteld[ia], zacht: 0, hard: 0 }
+    for (let i = ia; i < ib; i++) {
+      if (zacht[segs[i]]) oud.zacht += lengte(segs[i])
+      else oud.hard += lengte(segs[i])
+    }
+    // 3. de beste omweg tussen begin en eind
+    const straf = new Float32Array(g.lengte.length)
+    for (let s = 0; s < straf.length; s++) straf[s] = (zacht[s] ? 1 : 6) * (gebruikt[s] ? 8 : 1)
+    const van = knopen[ia]
+    const naar = knopen[ib]
+    if (van === naar) continue
+    const boom = dijkstra(g, van, { straf, doel: naar, maxKosten: (oud.meter + maxExtra) * 6 })
+    if (!Number.isFinite(boom.kosten[naar])) continue
+    const alt = pad(boom, naar)
+    const nieuw = { meter: 0, zacht: 0, hard: 0, dubbel: 0 }
+    for (const s of alt.segs) {
+      nieuw.meter += lengte(s)
+      if (zacht[s]) nieuw.zacht += lengte(s)
+      else nieuw.hard += lengte(s)
+      if (gebruikt[s]) nieuw.dubbel += lengte(s)
+    }
+    const extra = nieuw.meter - oud.meter
+    const winst = nieuw.zacht - oud.zacht
+    // 4. accepteren
+    if (extra > maxExtra || extra > maxFactor * oud.meter) continue
+    if (winst < 150 || nieuw.hard >= oud.hard) continue
+    if (nieuw.dubbel > 0.2 * nieuw.meter) continue
+    const totaalNieuw = totaal + extra
+    // schatting: 75 punten per aandeel onverhard erbij, min 100 per aandeel dat je dubbel loopt erbij
+    const samen = pasOmwegToe(knopen, segs, [], { ia, ib, knopen: alt.knopen, segs: alt.segs })
+    const dubbelNieuw = K.dubbelAandeel(samen.knopen.map((k) => [g.x[k], g.y[k]]))
+    const puntenWinst = Math.round(75 * ((zachtOud + winst) / totaalNieuw - zachtOud / totaal) - 100 * (dubbelNieuw - dubbelOud))
+    gekozen.push({ ia, ib, knopen: alt.knopen, segs: alt.segs, extraM: Math.round(extra), winstOnverhardM: Math.round(winst), puntenWinst })
+  }
+  // 5. de beste die elkaar niet overlappen
+  gekozen.sort((p, q) => q.winstOnverhardM - p.winstOnverhardM)
+  const uit = []
+  for (const o of gekozen) {
+    if (uit.length >= aantal) break
+    if (uit.every((u) => o.ib <= u.ia || o.ia >= u.ib)) uit.push(o)
+  }
+  return uit.sort((p, q) => p.ia - q.ia)
+}
+
+/** Vervang het stuk ia..ib van een route door een omweg; zelfde vorm als versleep(): {knopen, segs, vast}. */
+export function pasOmwegToe(knopen, segs, vast, omweg) {
+  const { ia, ib } = omweg
+  const verschuiving = omweg.segs.length - (ib - ia)
+  return {
+    knopen: [...knopen.slice(0, ia), ...omweg.knopen, ...knopen.slice(ib + 1)],
+    segs: [...segs.slice(0, ia), ...omweg.segs, ...segs.slice(ib)],
+    vast: [...vast.filter((k) => k <= ia), ...vast.filter((k) => k >= ib).map((k) => k + verschuiving)],
+  }
+}
