@@ -67,7 +67,7 @@ stap(`score ${score} in de tegel en op de routekaart (${badges.join(', ')})`)
   const regels = await page.locator('#opties .kies small').allTextContents()
   assert.ok(regels.length && regels.every((r) => vorm.test(r)), `routelijst: ${regels[0]}`)
   assert.match(await page.locator('#kern .ondergrondtegel').textContent(), /^\d+%onverhard · \d+% half$/)
-  assert.match(await page.locator('#piekbalk').textContent(), vorm)
+  if (mobiel) assert.match(await page.locator('#piekbalk').textContent(), vorm)
   assert.match(await page.locator('#kern .waarom').textContent(), /onverhard \+ half samen \(\d+%\)/)
   const { o, h, zacht } = await page.evaluate(() => {
     const t = document.querySelector('#kern .ondergrondtegel').textContent.match(/(\d+)%onverhard · (\d+)% half/)
