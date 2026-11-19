@@ -361,9 +361,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 #afspeel.ikoon { min-height: 38px; min-width: 38px; padding: 0 10px; font-size: 16px; background: var(--route); color: var(--route-inkt); border-color: var(--route-inkt); }
 .profielkop { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
 .profielkop h2 { margin: 0; flex: 1 1 auto; }
-.profielkop #tempo[hidden] { display: none; }
-#tempo { flex: none; }
-#tempo button { min-width: 44px; }
+.profielkop #afspeelsnelheid[hidden] { display: none; }
+#afspeelsnelheid { flex: none; }
+#afspeelsnelheid button { min-width: 44px; }
 .afspeelstand { font: 500 13px var(--mono); color: var(--inkt-2); }
 .loper { width: 30px; height: 30px; border-radius: 50%; background: var(--route); border: 3px solid var(--balk); display: grid; place-items: center;
          font-size: 16px; box-shadow: 0 2px 8px rgb(0 0 0 / .45); }

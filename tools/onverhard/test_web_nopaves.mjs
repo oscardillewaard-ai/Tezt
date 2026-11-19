@@ -412,6 +412,16 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
     if (mobiel) await tp.evaluate(() => window.onverhard.sheet.zet('vol'))
     await tp.locator('#tabs [data-tab="ondergrond"]').click()
     await Promise.all([tp.waitForEvent('download'), tp.locator('#gpx').click()])
+    // afspelen: de knoppen 1× 2× 4× heten Afspeelsnelheid (niet 'tempo', dat wordt straks je looptempo)
+    await tp.locator('#tabs [data-tab="hoogte"]').click()
+    await tp.locator('#afspeel').click()
+    const groep = tp.locator('#afspeelsnelheid')
+    assert.equal(await groep.isVisible(), true, 'afspeelsnelheid zichtbaar tijdens afspelen')
+    assert.equal(await groep.getAttribute('aria-label'), 'Afspeelsnelheid')
+    assert.equal(await tp.locator('#tempo').count(), 0, 'geen #tempo meer')
+    await groep.locator('[data-snelheid="4"]').click()
+    assert.equal(await groep.locator('[data-snelheid="4"]').getAttribute('aria-pressed'), 'true')
+    await tp.locator('#afspeel').click()
   }
   // [?] → Mijn gebruik
   if (mobiel) await tp.evaluate(() => window.onverhard.sheet.zet('piek'))
@@ -421,7 +431,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   assert.match(overzicht, /Rondje 1×/, overzicht)
   assert.match(overzicht, /tik 1×/)
   assert.match(overzicht, /5 km 1×/)
-  if (klaar.ok) assert.match(overzicht, /Geopend: tab ondergrond 1×/)
+  if (klaar.ok) assert.match(overzicht, /Geopend: .*tab ondergrond 1×.*afspelen 1×|Geopend: .*afspelen 1×.*tab ondergrond 1×/)
   await tp.locator('#gebruik').scrollIntoViewIfNeeded()
   await tp.screenshot({ path: path.join(map, `nopaves_gebruik_${soort}.png`) })
   // Kopieer als JSON: klembord, of (zonder klembord) een vak om zelf te kopiëren

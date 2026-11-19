@@ -1258,8 +1258,8 @@ function tekenHandvatten() {
 
 // ---------- Route afspelen ----------
 const afspeelLaag = L.layerGroup().addTo(kaart)
-let afspelen = null // { d, totaal, tempo, laatst, raf, xy, opgeteld, loper }
-let tempo = 1
+let afspelen = null // { d, totaal, laatst, raf, xy, opgeteld, loper }
+let afspeelSnelheid = 1 // 1×, 2× of 4× (niet te verwarren met je looptempo)
 const AFSPEEL_MS = 40000 // hele route in 40 s bij 1×
 
 function stopAfspelen(wissen = true) {
@@ -1270,7 +1270,7 @@ function stopAfspelen(wissen = true) {
     el('afspeelstand').textContent = ''
   } else if (afspelen) afspelen.raf = null
   el('afspeel').innerHTML = ico('play')
-  el('tempo').hidden = true
+  el('afspeelsnelheid').hidden = true
 }
 
 function afspeelStap(nu) {
@@ -1278,7 +1278,7 @@ function afspeelStap(nu) {
   if (!a) return
   const dt = a.laatst ? nu - a.laatst : 0
   a.laatst = nu
-  a.d = Math.min(a.totaal, a.d + (a.totaal / AFSPEEL_MS) * dt * tempo)
+  a.d = Math.min(a.totaal, a.d + (a.totaal / AFSPEEL_MS) * dt * afspeelSnelheid)
   const [x, y] = puntOpAfstand(a.xy, a.opgeteld, a.d)
   const [lon, lat] = K.naarWgs(x, y)
   a.loper.setLatLng([lat, lon])
@@ -1317,18 +1317,18 @@ function wisselAfspelen() {
   if (afspelen.klaar) afspelen.klaar = false
   afspelen.laatst = 0
   el('afspeel').innerHTML = ico('pauze')
-  el('tempo').hidden = false
+  el('afspeelsnelheid').hidden = false
   afspelen.raf = requestAnimationFrame(afspeelStap)
 }
 el('afspeel').addEventListener('click', () => {
   if (!afspelen) Gebruik.log('details_open', { deel: 'afspelen' })
   wisselAfspelen()
 })
-el('tempo').addEventListener('click', (e) => {
-  const t = Number(e.target.dataset.tempo)
+el('afspeelsnelheid').addEventListener('click', (e) => {
+  const t = Number(e.target.dataset.snelheid)
   if (!t) return
-  tempo = t
-  for (const b of el('tempo').children) b.setAttribute('aria-pressed', String(Number(b.dataset.tempo) === t))
+  afspeelSnelheid = t
+  for (const b of el('afspeelsnelheid').children) b.setAttribute('aria-pressed', String(Number(b.dataset.snelheid) === t))
 })
 
 // ---------- Groene omwegen ----------
