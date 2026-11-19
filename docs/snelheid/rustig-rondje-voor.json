@@ -1,0 +1,343 @@
+{
+ "rondje-10 Delft Centraal": {
+  "hash": "p=52.0116,4.3571&rondje=10",
+  "koud": {
+   "ok": 3,
+   "van": 3,
+   "totaal": 9809,
+   "eerste": null,
+   "fasen": {
+    "tegels": 1758,
+    "graaf": 669,
+    "route": 1601,
+    "bgt": 4481,
+    "ahn": 1307,
+    "water": 259
+   },
+   "bronnen": {
+    "tegels": {
+     "n": 61,
+     "kB": 11620,
+     "cache": 0
+    },
+    "bgt": {
+     "n": 124,
+     "kB": 21127,
+     "cache": 0
+    },
+    "ahn": {
+     "n": 29,
+     "kB": 241,
+     "cache": 0
+    }
+   },
+   "score": 50,
+   "km": 10.11,
+   "zacht": 54.3,
+   "router": "",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "warm": {
+   "ok": 3,
+   "van": 3,
+   "totaal": 5450,
+   "eerste": null,
+   "fasen": {
+    "tegels": 1455,
+    "graaf": 713,
+    "route": 1666,
+    "bgt": 433,
+    "ahn": 836,
+    "water": 198
+   },
+   "bronnen": {
+    "tegels": {
+     "n": 61,
+     "kB": 11620,
+     "cache": 0
+    },
+    "bgt": {
+     "n": 124,
+     "kB": 21127,
+     "cache": 4
+    },
+    "ahn": {
+     "n": 29,
+     "kB": 241,
+     "cache": 0
+    }
+   },
+   "score": 50,
+   "km": 10.11,
+   "zacht": 54.3,
+   "router": "",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "ruw": {
+   "koud": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 9776,
+     "meting": {
+      "totaal": 9625,
+      "fasen": {
+       "tegels": 1697,
+       "graaf": 492,
+       "route": 1401,
+       "bgt": 4481,
+       "ahn": 1307,
+       "water": 252
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 8574
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 0,
+        "ms": 23854
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 7441
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 10020,
+     "meting": {
+      "totaal": 9809,
+      "fasen": {
+       "tegels": 1758,
+       "graaf": 669,
+       "route": 1601,
+       "bgt": 4173,
+       "ahn": 1348,
+       "water": 259
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 8894
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 0,
+        "ms": 22516
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 7413
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 11994,
+     "meting": {
+      "totaal": 11802,
+      "fasen": {
+       "tegels": 2462,
+       "graaf": 707,
+       "route": 1650,
+       "bgt": 5373,
+       "ahn": 1300,
+       "water": 490
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 13391
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 0,
+        "ms": 26512
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 7434
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ],
+   "warm": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 5652,
+     "meting": {
+      "totaal": 5494,
+      "fasen": {
+       "tegels": 1455,
+       "graaf": 799,
+       "route": 1666,
+       "bgt": 447,
+       "ahn": 830,
+       "water": 198
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 8277
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 2,
+        "ms": 1711
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 4675
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 5621,
+     "meting": {
+      "totaal": 5450,
+      "fasen": {
+       "tegels": 1524,
+       "graaf": 713,
+       "route": 1672,
+       "bgt": 433,
+       "ahn": 836,
+       "water": 202
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 7677
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 4,
+        "ms": 1687
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 4696
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 4913,
+     "meting": {
+      "totaal": 4739,
+      "fasen": {
+       "tegels": 1400,
+       "graaf": 515,
+       "route": 1395,
+       "bgt": 343,
+       "ahn": 847,
+       "water": 158
+      },
+      "bronnen": {
+       "tegels": {
+        "n": 61,
+        "bytes": 11898889,
+        "cache": 0,
+        "ms": 6173
+       },
+       "bgt": {
+        "n": 124,
+        "bytes": 21634168,
+        "cache": 9,
+        "ms": 1336
+       },
+       "ahn": {
+        "n": 29,
+        "bytes": 246346,
+        "cache": 0,
+        "ms": 4707
+       }
+      }
+     },
+     "eersteMs": null,
+     "score": 50,
+     "km": 10.114026557478311,
+     "zacht": 0.5428987837486227,
+     "n": 2,
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ]
+  }
+ }
+}

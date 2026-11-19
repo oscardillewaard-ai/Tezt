@@ -1098,6 +1098,8 @@ async function planNu() {
     })
     if (!onthouden) onthoud() // zo brengt 'ongedaan maken' de vorige route terug
     const kiesWas = tussenGetoond && uitslag && uitslag.opties.length > 1 ? gekozen : 0
+    // stap 3: stonden dezelfde routes er al (alleen hoogte en water erbij)? dan alleen dat bijwerken
+    const alleenAanvulling = tussenGetoond && uitslag && !uitslag.voorlopig && uitslag.opties.length === resultaat.opties.length && uitslag.opties.every((o, i) => o === resultaat.opties[i])
     uitslag = resultaat
     gekozen = Math.min(kiesWas, uitslag.opties.length - 1)
     opKaart.clear()
@@ -1106,7 +1108,8 @@ async function planNu() {
     gelukt = 'ok'
     if (eersteMs === null) eersteMs = Math.round(performance.now() - t0)
     stopBezig() // eerst de voortgangsbalk weg, dan pas naar het resultaat scrollen (anders schuift het weg)
-    toonResultaat(!tussenGetoond)
+    if (alleenAanvulling) vulResultaatAan()
+    else toonResultaat(!tussenGetoond)
   } catch (fout) {
     gelukt = fout.name === 'AbortError' ? 'gestopt' : 'fout'
     if (fout.name === 'AbortError' && tussenGetoond) {
@@ -2116,6 +2119,18 @@ function herteken() {
   kleurRoute()
   tekenBalken()
   tekenTabel()
+}
+
+/** Alleen wat hoogte en water veranderen (stap 3): de route zelf staat er al. */
+function vulResultaatAan() {
+  tekenKern()
+  el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
+  tekenOpties()
+  tekenWater()
+  tekenStations()
+  if (UI_NIEUW) el('andereRoute').hidden = uitslag.opties.length < 2
+  if (!el('profiel').closest('[hidden]') && (!UI_NIEUW || el('details').open)) toonTab(tab)
+  haalTijdenErbij()
 }
 
 function toonResultaat(nieuw) {
