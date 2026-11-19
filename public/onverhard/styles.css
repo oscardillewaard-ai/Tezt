@@ -156,7 +156,6 @@ button.hoofd:hover { filter: brightness(1.05); background: var(--route); }
 #bezig #stop { margin-top: 4px; }
 .balkje { height: 6px; background: var(--vlak-2); border-radius: 3px; overflow: hidden; }
 .balkje i { display: block; height: 100%; width: 0; background: var(--route); transition: width .2s; }
-#status { margin: 6px 0; color: var(--inkt-2); min-height: 1.45em; }
 .fout { background: var(--fout-vlak); border: 1px solid var(--fout-rand); color: var(--fout-inkt); border-radius: 8px;
         padding: 10px 12px; margin-top: 12px; }
 .melding { background: var(--let-op-vlak); border: 1px solid var(--let-op-rand); border-radius: 8px; padding: 8px 12px;
@@ -403,14 +402,6 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 .rekent, .rekent * { cursor: progress !important; }
 
 /* water onderweg */
-.waterlijst { list-style: none; margin: 0; padding: 0; }
-.waterlijst li { display: grid; grid-template-columns: 30px 54px 1fr auto; align-items: center; gap: 8px; padding: 6px 0;
-                 border-bottom: 1px solid var(--rand); font-size: 14px; }
-.waterlijst .ico { font-size: 18px; text-align: center; }
-.waterlijst .km { font: 700 15px var(--kop); }
-.waterlijst small { display: block; color: var(--inkt-3); font: 500 11px var(--mono); }
-.waterlijst button { min-height: 34px; padding: 4px 10px; font-size: 13px; }
-#waterMeer { margin-top: 8px; font-size: 14px; }
 .waterico { font-size: 15px; line-height: 24px; text-align: center; width: 26px; height: 26px; border-radius: 50%;
             background: var(--vlak); border: 2px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
 .waterico.water { background: #d9f0ff; border-color: #1565c0; }
@@ -427,12 +418,29 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 @keyframes puls { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.3); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .loper::after { animation: none; } }
 
-.waterfilter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
-.waterfilter button { min-height: 34px; padding: 4px 10px; border-radius: 999px; font-size: 14px; }
-.waterfilter button[aria-pressed="true"] { background: var(--balk); color: var(--route); border-color: var(--balk); }
-.waterlijst .open { color: #2f7a35; font-weight: 600; }
-.waterlijst .dicht { color: var(--fout-inkt); font-weight: 600; }
-:root[data-theme="dark"] .waterlijst .open { color: #7fd38a; }
+.leaflet-popup .open { color: #2f7a35; font-weight: 600; }
+.leaflet-popup .dicht { color: var(--fout-inkt); font-weight: 600; }
+
+/* kaartlagen-knop rechtsboven op de kaart */
+.kaartlagen { display: flex; flex-direction: column; background: var(--vlak); border: 2px solid rgb(0 0 0 / .3); border-radius: 6px; overflow: hidden; }
+.kaartlagen[hidden] { display: none; }
+.kaartlagen button { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 46px; min-height: 40px; padding: 2px 6px;
+                     border: 0; border-radius: 0; background: var(--vlak); color: var(--inkt); font-size: 18px; opacity: .55; }
+.kaartlagen button + button { border-top: 1px solid var(--rand); }
+.kaartlagen button[aria-pressed="true"] { opacity: 1; background: var(--route); }
+.kaartlagen small { font: 700 12px var(--kop); }
+
+/* laden: een poppetje dat over de balk loopt, zonder tekst */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.baan { --p: 0; position: relative; padding-top: 24px; }
+.baan .balkje { height: 8px; }
+.looppop { position: absolute; top: 0; left: calc(var(--p) * (100% - 22px)); font-size: 20px; line-height: 22px; transition: left .2s; transform: scaleX(-1); }
+.baan.onbepaald .looppop { animation: heen-en-weer 1.8s ease-in-out infinite alternate; transition: none; }
+.baan.onbepaald .balkje i { width: 30%; animation: schuif 1.8s ease-in-out infinite alternate; }
+.baan:not(.onbepaald) .balkje i { width: calc(var(--p) * 100%); }
+@keyframes heen-en-weer { from { left: 0; } to { left: calc(100% - 22px); } }
+@keyframes schuif { from { margin-left: 0; } to { margin-left: 70%; } }
+@media (prefers-reduced-motion: reduce) { .baan.onbepaald .looppop, .baan.onbepaald .balkje i { animation: none; } }
 
 /* intro: soorten, tikken, aanpassen */
 .chip rect { fill: rgb(255 255 255 / .08); stroke: rgb(255 255 255 / .35); stroke-width: 1.5; }

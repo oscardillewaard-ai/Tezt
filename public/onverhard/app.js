@@ -643,9 +643,8 @@ function toonStap(n, scroll = true) {
 function toonTab(t) {
   tab = t
   for (const b of el('tabs').children) b.setAttribute('aria-pressed', String(b.dataset.tab === t))
-  for (const k of ['hoogte', 'water', 'ondergrond']) el(`tab-${k}`).hidden = k !== t
+  for (const k of ['hoogte', 'ondergrond']) el(`tab-${k}`).hidden = k !== t
   if (t === 'hoogte' && plan) tekenProfiel() // de breedte is pas bekend als het tabblad zichtbaar is
-  if (t === 'water') el('geenWater').hidden = !!(keuze().water && keuze().water.punten.length)
 }
 
 el('stapper').addEventListener('click', (e) => {
@@ -769,6 +768,13 @@ el('locatie').addEventListener('click', () => {
 })
 
 // ---------- Plannen ----------
+/** Voortgang van 0 tot 1, of null als we het niet weten (dan loopt het poppetje heen en weer). */
+function zetVoortgang(deel) {
+  const baan = el('baan')
+  baan.classList.toggle('onbepaald', deel === null)
+  baan.style.setProperty('--p', deel === null ? 0 : Math.max(0, Math.min(1, deel)))
+}
+
 function stopBezig() {
   stopper = null
   el('plan').hidden = false
@@ -790,7 +796,8 @@ async function planNu() {
   stopper = new AbortController()
   el('plan').hidden = true
   el('bezig').hidden = false
-  el('voortgang').style.width = '0'
+  zetVoortgang(null)
+  zetVoortgang(null)
   const status = (tekst) => {
     el('status').textContent = tekst
   }
@@ -817,11 +824,11 @@ async function planNu() {
       meld: (tekst) => {
         stap = tekst
         status(tekst + '…')
-        el('voortgang').style.width = '0'
+        zetVoortgang(null)
       },
       voortgang: (klaar, totaal) => {
         status(`${stap}: ${klaar} van ${totaal} kaarttegels`)
-        el('voortgang').style.width = `${(100 * klaar) / totaal}%`
+        zetVoortgang(klaar / totaal)
       },
     })
     onthoud() // zo brengt 'ongedaan maken' de vorige route terug
@@ -1151,9 +1158,7 @@ el('tempo').addEventListener('click', (e) => {
 // ---------- Water onderweg ----------
 const waterLaag = L.layerGroup().addTo(kaart)
 const WATER = { water: ['💧', 'Drinkwater'], horeca: ['☕', 'Horeca'], winkel: ['🛒', 'Winkel'], toilet: ['🚻', 'Toilet'], tank: ['⛽', 'Tankstation'] }
-let waterAlles = false
 const waterAan = new Set(['water', 'winkel']) // standaard alleen drinkwater en winkels; de rest met een tik erbij
-let waterOpKaart = true
 let tijdenGehaald = null // de water-uitslag waarvoor de openingstijden al gehaald zijn
 
 /** Korte tekst over open/dicht, of '' als er geen (bruikbare) tijden zijn. */
@@ -1165,75 +1170,60 @@ function openTekst(p) {
   return `<small class="dicht">nu dicht${o.vanaf ? ` · open om ${o.vanaf}` : ''}</small>`
 }
 
-function tekenWater() {
-  waterLaag.clearLayers()
-  const w = keuze().water
-  const blok = el('water')
-  if (!w) {
-    blok.hidden = true
-    return
-  }
-  blok.hidden = false
-  const aantalWater = w.punten.filter((p) => p.soort === 'water').length
-  el('waterkop').textContent = `Water onderweg · ${aantalWater} tap${aantalWater === 1 ? '' : 'punten'} · langste stuk zonder ${nl(w.langsteZonder / 1000, 1)} km`
-  const kanVia = !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
-  // filterknoppen per soort, met aantallen
-  const filter = el('waterfilter')
-  filter.innerHTML = ''
-  for (const [soort, [ico, naam]] of Object.entries(WATER)) {
+/** De knop rechtsboven op de kaart: per soort punt een tik om de laag aan of uit te zetten. */
+const kaartlagenKnop = L.control({ position: 'topright' })
+let kaartlagenVak = null
+kaartlagenKnop.onAdd = () => {
+  kaartlagenVak = L.DomUtil.create('div', 'kaartlagen leaflet-bar')
+  kaartlagenVak.hidden = true
+  L.DomEvent.disableClickPropagation(kaartlagenVak)
+  L.DomEvent.disableScrollPropagation(kaartlagenVak)
+  return kaartlagenVak
+}
+kaartlagenKnop.addTo(kaart)
+
+function tekenKaartlagen(w) {
+  kaartlagenVak.innerHTML = ''
+  const soorten = w ? Object.entries(WATER).filter(([soort]) => w.punten.some((p) => p.soort === soort)) : []
+  kaartlagenVak.hidden = !soorten.length
+  for (const [soort, [ico, naam]] of soorten) {
     const n = w.punten.filter((p) => p.soort === soort).length
-    if (!n) continue
     const knop = document.createElement('button')
     knop.type = 'button'
-    knop.className = 'klein'
     knop.setAttribute('aria-pressed', String(waterAan.has(soort)))
-    knop.textContent = `${ico} ${naam} ${n}`
+    knop.setAttribute('aria-label', `${naam}: ${n}`)
+    knop.title = `${naam} (${n})`
+    knop.innerHTML = `<span>${ico}</span><small>${n}</small>`
     knop.addEventListener('click', () => {
       if (waterAan.has(soort)) waterAan.delete(soort)
       else waterAan.add(soort)
       tekenWater()
+      haalTijdenErbij() // openingstijden pas ophalen als een laag met winkels of horeca aangaat
     })
-    filter.appendChild(knop)
+    kaartlagenVak.appendChild(knop)
   }
-  const kaartKnop = document.createElement('button')
-  kaartKnop.type = 'button'
-  kaartKnop.className = 'klein'
-  kaartKnop.setAttribute('aria-pressed', String(waterOpKaart))
-  kaartKnop.textContent = waterOpKaart ? '📍 Op kaart' : '📍 Niet op kaart'
-  kaartKnop.addEventListener('click', () => {
-    waterOpKaart = !waterOpKaart
-    tekenWater()
-  })
-  filter.prepend(kaartKnop)
-  const gefilterd = w.punten.filter((p) => waterAan.has(p.soort))
-  const lijst = el('waterlijst')
-  lijst.innerHTML = ''
-  const tonen = waterAlles ? gefilterd : gefilterd.slice(0, 10)
-  for (const p of tonen) {
-    const [ico, soort] = WATER[p.soort]
-    const li = document.createElement('li')
-    li.innerHTML = `<span class="ico">${ico}</span><span class="km">km ${nl(p.km, 1)}</span><span>${veilig(p.naam || soort)}<small>${Math.round(p.afstand)} m van de route</small>${openTekst(p)}</span>`
-    if (kanVia) {
-      const knop = document.createElement('button')
-      knop.type = 'button'
-      knop.textContent = 'Via hier'
-      knop.addEventListener('click', () => versleepNaar(p.index, [p.lat, p.lon]))
-      li.appendChild(knop)
-    }
-    li.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'BUTTON') kaart.setView([p.lat, p.lon], Math.max(kaart.getZoom(), 16))
-    })
-    lijst.appendChild(li)
+}
+
+function tekenWater() {
+  waterLaag.clearLayers()
+  const w = keuze().water
+  const regel = el('waterregel')
+  tekenKaartlagen(w)
+  if (!w) {
+    regel.hidden = true
+    return
   }
-  el('waterMeer').hidden = waterAlles || gefilterd.length <= 10
-  for (const p of waterOpKaart ? gefilterd : []) {
+  regel.hidden = false
+  regel.textContent = `Langste stuk zonder water: ${nl(w.langsteZonder / 1000, 1)} km`
+  const kanVia = !!(uitslag.graaf && keuze().knopen) || staat.modus === 'route'
+  for (const p of w.punten.filter((p) => waterAan.has(p.soort))) {
     const [ico, soort] = WATER[p.soort]
     const m = L.marker([p.lat, p.lon], {
       icon: L.divIcon({ className: '', html: `<div class="waterico ${p.soort}">${ico}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       keyboard: false, zIndexOffset: 500,
     }).addTo(waterLaag)
     const inhoud = document.createElement('div')
-    inhoud.innerHTML = `<b>${veilig(p.naam || soort)}</b><br>${soort} · km ${nl(p.km, 1)} · ${Math.round(p.afstand)} m van de route${p.open ? `<br>${veilig(p.open)}` : ''}<br>`
+    inhoud.innerHTML = `<b>${veilig(p.naam || soort)}</b><br>${soort} · km ${nl(p.km, 1)} · ${Math.round(p.afstand)} m van de route${openTekst(p) ? `<br>${openTekst(p)}` : ''}${p.open ? `<br><small>${veilig(p.open)}</small>` : ''}<br>`
     if (kanVia) {
       const knop = document.createElement('button')
       knop.type = 'button'
@@ -1249,7 +1239,7 @@ function tekenWater() {
 }
 async function haalTijdenErbij() {
   const w = keuze().water
-  if (!w || tijdenGehaald === w || !w.punten.some((p) => p.soort !== 'water')) return
+  if (!w || tijdenGehaald === w || ![...waterAan].some((s) => s !== 'water' && w.punten.some((p) => p.soort === s))) return
   tijdenGehaald = w
   try {
     if (await haalOpeningstijden(w.punten)) tekenWater()
@@ -1258,10 +1248,6 @@ async function haalTijdenErbij() {
   }
 }
 
-el('waterMeer').addEventListener('click', () => {
-  waterAlles = true
-  tekenWater()
-})
 
 function kleurRoute() {
   for (const [lijn, s] of lijnen) lijn.setStyle({ color: KLEUR[s[bron]] })
@@ -1870,6 +1856,7 @@ async function openBewaard(r) {
   stopper = new AbortController()
   el('plan').hidden = true
   el('bezig').hidden = false
+  zetVoortgang(null)
   try {
     const resultaat = await bekijkRoute({ coords: r.traject.coords.map((c) => [c[0], c[1], null]), segs: r.traject.segs, punten: r.traject.punten || [] }, `★ ${r.naam}`, {
       signal: stopper.signal,
@@ -1899,6 +1886,7 @@ async function leesGpxBestand(bestand) {
   stopper = new AbortController()
   el('plan').hidden = true
   el('bezig').hidden = false
+  zetVoortgang(null)
   let stap = ''
   try {
     const tekst = await bestand.text()
@@ -1908,11 +1896,11 @@ async function leesGpxBestand(bestand) {
       meld: (t) => {
         stap = t
         el('status').textContent = t + '…'
-        el('voortgang').style.width = '0'
+        zetVoortgang(null)
       },
       voortgang: (klaar, totaal) => {
         el('status').textContent = `${stap}: ${klaar} van ${totaal}`
-        el('voortgang').style.width = `${(100 * klaar) / totaal}%`
+        zetVoortgang(klaar / totaal)
       },
     })
     onthoud()

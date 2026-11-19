@@ -158,8 +158,8 @@
               <button type="button" class="hoofd" id="plan">Plan route</button>
             </div>
             <div id="bezig" hidden>
-              <div class="balkje"><i id="voortgang"></i></div>
-              <p id="status" role="status"></p>
+              <div class="baan" id="baan" aria-hidden="true"><span class="looppop">🏃</span><div class="balkje"><i id="voortgang"></i></div></div>
+              <p id="status" class="sr-only" role="status" aria-live="polite"></p>
               <button type="button" id="stop">Stop</button>
             </div>
           </div>
@@ -182,7 +182,6 @@
           </div>
           <div class="keuze tabs" id="tabs" role="tablist" aria-label="Details">
             <button type="button" data-tab="hoogte" aria-pressed="true">Hoogte</button>
-            <button type="button" data-tab="water" aria-pressed="false">Water</button>
             <button type="button" data-tab="ondergrond" aria-pressed="false">Ondergrond</button>
           </div>
           <div class="tabvlak" id="tab-hoogte">
@@ -191,17 +190,8 @@
             <div class="profielvlak" id="profielvlak"></div>
             <p class="noot" id="profielnoot"></p>
           </div>
+          <p class="noot" id="waterregel" hidden></p>
           </div>
-          <div class="tabvlak" id="tab-water" hidden>
-          <div class="water" id="water" hidden>
-            <h2 id="waterkop">Water onderweg</h2>
-            <div class="waterfilter" id="waterfilter" role="group" aria-label="Soorten tonen"></div>
-            <ul class="waterlijst" id="waterlijst"></ul>
-            <button type="button" id="waterMeer" class="klein" hidden>Meer</button>
-          </div>
-          <p class="noot" id="geenWater" hidden>Geen water gevonden langs deze route.</p>
-          </div>
-
           <div class="tabvlak" id="tab-ondergrond" hidden>
           <div class="keuze klein" id="bron" role="group" aria-label="Kleur de route naar">
             <button type="button" data-bron="eind" aria-pressed="true">Eindoordeel</button>
