@@ -4,9 +4,15 @@ export const GROOT_PX = 700
 export const STANDEN = ['piek', 'half', 'vol']
 const PIEK_PX = 158 // handvat, kopbalk en één regel (score, of de hoofdknop)
 
-/** Hoogte in pixels per stand voor een venster van deze hoogte. */
-export function standHoogtes(vensterHoogte, veiligOnder = 0) {
-  return { piek: PIEK_PX + veiligOnder, half: Math.round(vensterHoogte * 0.52), vol: Math.round(vensterHoogte * 0.9) }
+/**
+ * Hoogte in pixels per stand voor een venster van deze hoogte. Met 'piekPx' (de gemeten inhoud van
+ * de piek, bv. de plankaart) is de piek zo hoog als die inhoud, en half altijd een stuk hoger.
+ */
+export function standHoogtes(vensterHoogte, veiligOnder = 0, piekPx = null) {
+  const vol = Math.round(vensterHoogte * 0.9)
+  const piek = Math.min(Math.round(vensterHoogte * 0.62), (piekPx ?? PIEK_PX) + veiligOnder)
+  const half = Math.min(vol - 40, Math.max(Math.round(vensterHoogte * 0.52), piek + 120))
+  return { piek, half, vol }
 }
 
 /** De stand die het dichtst bij deze hoogte ligt; met een veeg (px/ms, omhoog positief) schuift de keuze mee. */
@@ -17,14 +23,14 @@ export function dichtsteStand(hoogte, hoogtes, snelheid = 0) {
   return beste
 }
 
-export function maakSheet({ kaart, main, greep, bijWijziging = () => {} }) {
+export function maakSheet({ kaart, main, greep, bijWijziging = () => {}, piekHoogte = () => null, beginStand = 'half' }) {
   const smal = matchMedia(`(max-width: ${GROOT_PX}px)`)
   const probe = document.createElement('div')
   probe.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom)'
   document.body.appendChild(probe)
-  let stand = 'half'
+  let stand = beginStand
   let hoogte = 0
-  const hoogtes = () => standHoogtes(window.innerHeight, parseFloat(getComputedStyle(probe).paddingBottom) || 0)
+  const hoogtes = () => standHoogtes(window.innerHeight, parseFloat(getComputedStyle(probe).paddingBottom) || 0, piekHoogte())
   const zetHoogte = (px) => {
     hoogte = px
     document.documentElement.style.setProperty('--sheet-h', `${Math.round(px)}px`)
@@ -98,5 +104,11 @@ export function maakSheet({ kaart, main, greep, bijWijziging = () => {} }) {
     fitBounds(grenzen, smal.matches ? { paddingBottomRight: [0, hoogte], ...opties } : opties)
 
   if (smal.matches) zet(stand)
-  return { zet, volgende, actief: () => smal.matches, stand: () => stand, hoogte: () => hoogte }
+  /** De inhoud van de piek veranderde: hoogte opnieuw zetten zonder de stand te wisselen. */
+  const herbereken = () => {
+    if (!smal.matches || sleep) return
+    zetHoogte(hoogtes()[stand])
+    kaartBijwerken()
+  }
+  return { zet, volgende, herbereken, actief: () => smal.matches, stand: () => stand, hoogte: () => hoogte }
 }

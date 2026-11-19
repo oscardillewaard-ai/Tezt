@@ -951,3 +951,16 @@ test('teller: ringbuffer van hooguit 500 regels, tellingen en wissen', () => {
   assert.doesNotThrow(() => Teller.log('x', {}, stuk))
   assert.deepEqual(Teller.lees(stuk), [])
 })
+
+test('GPX zonder tijdstempels (Strava ziet dat anders als activiteit)', () => {
+  const gpx = K.maakGpx({ coords: [[4.3, 52, 1.5], [4.31, 52, null]], punten: [[52, 4.3], [52, 4.31]] }, 'x', new Date())
+  assert.ok(!/<time>/.test(gpx))
+})
+
+test('sheet: de piek past zich aan de plankaart aan, half blijft hoger', () => {
+  const hs = Sheet.standHoogtes(844, 0, 330)
+  assert.equal(hs.piek, 330)
+  assert.ok(hs.half >= hs.piek + 120 && hs.half < hs.vol)
+  assert.equal(Sheet.standHoogtes(844, 0, 900).piek, Math.round(844 * 0.62), 'nooit hoger dan 62% van het scherm')
+  assert.equal(Sheet.standHoogtes(844, 34).piek, 158 + 34, 'zonder meting de vaste piek')
+})

@@ -9,6 +9,8 @@ import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarSt
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
+// UX fase 2: de plankaart is de standaard; de oude interface blijft (tijdelijk) bereikbaar met ?ui=oud.
+const UI_NIEUW = new URLSearchParams(location.search).get('ui') !== 'oud'
 const THEMA = 'onverhard.thema'
 const MIN_TWIJFEL = 30 // twijfelstukken korter dan dit (m) worden niet apart genoemd
 const MAX_FOTOS = 12
@@ -116,7 +118,9 @@ function onthoud() {
 }
 function zetTerugKnop() {
   const knop = document.getElementById('terug')
-  if (knop) knop.disabled = !terugStapel.length
+  if (!knop) return
+  knop.disabled = !terugStapel.length
+  if (UI_NIEUW) knop.hidden = !terugStapel.length
 }
 
 // voorkeuren die de teller volgt (pref_change); km apart (km_change)
@@ -326,7 +330,10 @@ function tekenPunten() {
     marker.on('dragstart', onthoud)
     marker.on('dragend', () => {
       const { lat, lng } = marker.getLatLng()
-      if (i === 0) Teller.log('start_moved', { m: Math.round(kaart.distance(staat.punten[0], [lat, lng])) })
+      if (i === 0) {
+        Teller.log('start_moved', { m: Math.round(kaart.distance(staat.punten[0], [lat, lng])) })
+        startNaam = 'op de kaart'
+      }
       staat.punten[i] = [lat, lng]
       puntenGewijzigd()
     })
@@ -466,8 +473,13 @@ function voegPuntToe(p, bron = 'tik') {
   }
   toonFout('')
   onthoud()
-  if (!staat.punten.length || staat.modus === 'station' || tekenModus()) startBron = bron
-  if (staat.modus === 'rondje') staat.punten = staat.punten.length ? [staat.punten[0], p] : [p]
+  const keerpunt = staat.modus === 'rondje' && !UI_NIEUW && staat.punten.length // oude interface: 2e tik = keerpunt
+  if ((!staat.punten.length || staat.modus !== 'route') && !keerpunt) {
+    startBron = bron
+    startNaam = bron === 'zoek' ? zoekNaam : bron === 'gps' ? 'Mijn locatie' : 'op de kaart'
+  }
+  // nieuwe interface: een tik verplaatst de start van een rondje (geen keerpunt)
+  if (staat.modus === 'rondje') staat.punten = keerpunt ? [staat.punten[0], p] : [p]
   else if (staat.modus === 'station' || tekenModus()) staat.punten = [p]
   else staat.punten.push(p)
   puntenGewijzigd()
@@ -633,10 +645,14 @@ function verbergZoek() {
   el('zoekresultaten').hidden = true
   zoekTreffers = []
 }
+let zoekNaam = ''
 function kiesTreffer(t) {
+  zoekNaam = t.naam
+  if (UI_NIEUW) el('zoekplek').hidden = true
   el('zoek').value = ''
   verbergZoek()
-  kaart.setView(t.punt, Math.max(kaart.getZoom(), 15))
+  if (UI_NIEUW) toonOpKaart(t.punt, Math.max(kaart.getZoom(), 15))
+  else kaart.setView(t.punt, Math.max(kaart.getZoom(), 15))
   voegPuntToe(t.punt, 'zoek')
 }
 async function zoek(tekst) {
@@ -725,6 +741,7 @@ function werkStapperBij() {
 function werkPiekbalk() {
   const balk = document.getElementById('piekbalk')
   if (!balk) return
+  werkPlankaart()
   if (!sheet || !sheet.actief()) {
     balk.innerHTML = ''
     return
@@ -735,8 +752,11 @@ function werkPiekbalk() {
     h =
       `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
       `<span class="psamen"><b>${veilig(plan.label)}</b><small>${nl(plan.analyse.lengte / 1000, 1)} km · ${ondergrondTekst(aandelen(plan.analyse))}</small></span>` +
-      '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>'
-  } else if (stap === 2) {
+      (UI_NIEUW
+        ? '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '<span class="knoptekst2">GPX</span></button></span>'
+        : '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>')
+  } else if (vasteSoort()) h = '' // de plankaart zelf staat in de piek
+  else if (stap === 2) {
     h = `<span class="psamen"><b>${veilig(el('stap2kop').textContent)}</b></span><button type="button" class="hoofd" data-proxy="naar3" ${plaatsKlaar ? '' : 'disabled'}>Verder →</button>`
   } else if (stap === 3) h = '<span class="psamen"><b>Klaar om te plannen</b></span><button type="button" class="hoofd" data-proxy="plan">Plan route</button>'
   else h = '<span class="psamen"><b>Wat voor route?</b></span><button type="button" data-sheet="half">Kies ↑</button>'
@@ -751,6 +771,7 @@ el('piekbalk').addEventListener('click', (e) => {
 
 /** Toon één stap: 1 soort, 2 waar, 3 opties, 4 route. */
 function toonStap(n, scroll = true) {
+  if (UI_NIEUW && n === 1) n = 2 // de soort kies je op de plankaart
   if (n === 4 && !uitslag) n = 3
   if (n === 3 && !plaatsKlaar) n = 2
   stap = n
@@ -763,7 +784,7 @@ function toonStap(n, scroll = true) {
   if (!scroll) return
   if (sheet && sheet.actief()) {
     document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' })
-    if (sheet.stand() === 'piek' && n !== 4) sheet.zet('half')
+    if (sheet.stand() === 'piek' && n !== 4 && !vasteSoort()) sheet.zet('half')
   } else if (window.innerWidth <= 860) el('stapper').scrollIntoView({ behavior: 'smooth', block: 'start' })
   else document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -868,6 +889,8 @@ el('opnieuw').addEventListener('click', () => {
   staat.punten = []
   staat.vlak = null
   staat.lijn = null
+  startNaam = ''
+  sluitToast()
   uitslag = null
   plan = null
   gekozen = 0
@@ -1027,7 +1050,19 @@ let lijnen = [] // [[polyline, stuk], ...]
 let korrels = [] // [[polyline, stuk], ...]: de korrel op de route
 let twijfelLijn = {}
 
+/** De wegsoort in gewone woorden, voor de korte regel in de popup. */
+const WEGSOORT = { footway: 'voetpad', path: 'pad', track: 'zandweg of bospad', cycleway: 'fietspad', bridleway: 'ruiterpad', steps: 'trap', pedestrian: 'voetgangersgebied', residential: 'woonstraat', living_street: 'woonerf', service: 'toegangsweg', unclassified: 'kleine weg', tertiary: 'weg', secondary: 'doorgaande weg', primary: 'hoofdweg' }
+function popupKort(s) {
+  const hw = K.tagsObject(s.tags[0] || '').highway
+  const delen = [s.eind]
+  if (hw) delen.push(WEGSOORT[hw] || hw)
+  delen.push(`${Math.round(s.tot - s.van)} m`)
+  return `<b>${veilig(delen.join(', '))}</b>${s.twijfel ? `<br><small>twijfel: ${veilig(s.twijfelTekst || 'bronnen oneens')}</small>` : ''}<details class="techniek"><summary>Techniek</summary>${popupLang(s)}</details>`
+}
 function popup(s) {
+  return UI_NIEUW ? popupKort(s) : popupLang(s)
+}
+function popupLang(s) {
   let h =
     `<b>Route ${plan.naam} · km ${nl(s.van / 1000)}–${nl(s.tot / 1000)}</b> · ${Math.round(s.tot - s.van)} m<br>` +
     `Eindoordeel: <b>${s.eind}</b><br>OpenStreetMap: ${s.osm}${s.osmZeker ? '' : ' (aanname)'}<br>` +
@@ -1583,7 +1618,7 @@ function tekenOpties() {
   const rondje = staat.modus === 'rondje'
   uitslag.opties.forEach((o, i) => {
     const li = document.createElement('li')
-    li.className = 'optie' + (i === gekozen ? ' gekozen' : '')
+    li.className = 'optie' + (i === gekozen ? ' gekozen' : '') + (o.station ? ' metstation' : '')
     const kies = document.createElement('button')
     kies.type = 'button'
     kies.className = 'kies'
@@ -1596,7 +1631,8 @@ function tekenOpties() {
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
     const titel = o.ingelezen ? veilig(o.ingelezen) : o.station ? `→ ${veilig(o.station)}</b> · ${nl(o.km)} km<b>` : `${nl(o.km)} km${i === 0 && uitslag.opties.length > 1 ? '</b> · aanbevolen<b>' : ''}`
-    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span><span class="badge ${scoreKlasse(o.score)}" title="Nopav.es-score: ${veilig(o.label)}">${o.score}</span>`
+    const letter = UI_NIEUW && o.station ? String(i + 1) : o.naam
+    kies.innerHTML = `<span class="letter">${letter}</span><span><b>${titel}</b><small>${regel}</small></span><span class="badge ${scoreKlasse(o.score)}" title="Nopav.es-score: ${veilig(o.label)}">${o.score}</span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
     toon.className = 'toon'
@@ -1606,7 +1642,8 @@ function tekenOpties() {
       else opKaart.delete(i)
       tekenAlternatieven()
     })
-    li.append(kies, toon)
+    if (UI_NIEUW) li.append(kies) // geen 'op kaart'-vinkjes: alle routes staan op de kaart, tik om te kiezen
+    else li.append(kies, toon)
     lijst.appendChild(li)
   })
 }
@@ -1836,6 +1873,7 @@ function tekenKern() {
   el('kern').innerHTML =
     `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span></div>` +
     `<p class="waarom"><b>Waarom</b> ${veilig(waaromTekst(plan.analyse, plan.score))}</p>` +
+    (tijdTekst() ? `<p class="tijdregel" id="tijdregel">${veilig(tijdTekst())}</p>` : '') +
     strookHtml() +
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
     `<div class="ondergrondtegel"><b>${pct(aandelen(plan.analyse).onv)}</b><span>onverhard · ${pct(aandelen(plan.analyse).half)} half</span></div>` +
@@ -1977,6 +2015,11 @@ function herteken() {
 
 function toonResultaat(nieuw) {
   stopAfspelen()
+  if (UI_NIEUW) {
+    uitslag.opties.forEach((_, i) => opKaart.add(i))
+    el('andereRoute').hidden = uitslag.opties.length < 2
+    if (nieuw) el('details').open = false
+  }
   if (nieuw && sheet && sheet.actief()) sheet.zet('piek') // de route meteen groot in beeld
   stap = 4
   for (const k of [1, 2, 3]) el(`stap${k}`).hidden = true
@@ -2018,12 +2061,8 @@ el('gpx').addEventListener('click', () => {
 })
 el('deel').addEventListener('click', async () => {
   const link = deelLink()
-  try {
-    await navigator.clipboard.writeText(link)
-    el('deel').innerHTML = ico('link') + 'Gekopieerd'
-  } catch {
-    prompt('Kopieer deze link:', link)
-  }
+  if (await kopieer(link)) el('deel').innerHTML = ico('link') + 'Gekopieerd'
+  else toonOmTeKopieren('Kopieer deze link:', link)
   setTimeout(() => {
     el('deel').innerHTML = ico('link') + 'Link'
   }, 2000)
@@ -2162,9 +2201,14 @@ function tekenBewaard() {
     weg.textContent = '✕'
     weg.setAttribute('aria-label', `Verwijder ${r.naam}`)
     weg.addEventListener('click', () => {
-      if (!confirm(`"${r.naam}" verwijderen?`)) return
-      zetBewaardeRoutes(bewaardeRoutes().filter((x) => x.id !== r.id))
+      const voor = bewaardeRoutes()
+      zetBewaardeRoutes(voor.filter((x) => x.id !== r.id))
       tekenBewaard()
+      toast(`Verwijderd: ${r.naam}`, [['Ongedaan maken', () => {
+        zetBewaardeRoutes(voor)
+        tekenBewaard()
+        sluitToast()
+      }]], 8000)
     })
     li.append(open, weg)
     ul.appendChild(li)
@@ -2175,8 +2219,7 @@ el('bewaar').addEventListener('click', () => {
   const o = keuze()
   const soort = { route: 'Route', rondje: 'Rondje', station: 'Naar station', gebied: 'Rondjes in gebied', straten: 'Elke straat', tekenen: 'Getekende route' }[staat.modus] || 'Route'
   const datum = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  const naam = prompt('Naam van de route', o.ingelezen ? o.ingelezen.replace(/^(★|GPX ·) /, '') : `${soort} ${nl(o.km, 0)} km · ${datum}`)
-  if (!naam) return
+  const naam = o.ingelezen ? o.ingelezen.replace(/^(★|GPX ·) /, '') : `${soort} ${nl(o.km, 0)} km · ${datum}`
   const r = {
     id: Date.now().toString(36),
     naam: naam.slice(0, 80),
@@ -2192,6 +2235,7 @@ el('bewaar').addEventListener('click', () => {
   const lijst = [r, ...bewaardeRoutes()].slice(0, 50)
   if (zetBewaardeRoutes(lijst)) {
     Teller.log('bewaar', { soort: staat.modus, km: Math.round(o.km * 10) / 10 })
+    toast(`Bewaard: ${r.naam}`, [['Naam wijzigen', (t) => wijzigNaam(t, r.id)]], 6000)
     el('bewaar').innerHTML = ico('bewaar') + 'Bewaard'
     setTimeout(() => {
       el('bewaar').innerHTML = ico('bewaar') + 'Bewaar'
@@ -2199,6 +2243,28 @@ el('bewaar').addEventListener('click', () => {
     tekenBewaard()
   }
 })
+/** De naam van een bewaarde route wijzigen, in de melding zelf (geen browservenster). */
+function wijzigNaam(t, id) {
+  clearTimeout(toastTimer)
+  const r = bewaardeRoutes().find((x) => x.id === id)
+  if (!r) return sluitToast()
+  t.innerHTML = ''
+  const vorm = document.createElement('form')
+  vorm.className = 'naamvorm'
+  vorm.innerHTML = '<input type="text" maxlength="80" aria-label="Naam van de route" /><button type="submit" class="klein hoofd">OK</button>'
+  const vak = vorm.querySelector('input')
+  vak.value = r.naam
+  vorm.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const naam = vak.value.trim().slice(0, 80)
+    if (naam) zetBewaardeRoutes(bewaardeRoutes().map((x) => (x.id === id ? { ...x, naam } : x)))
+    tekenBewaard()
+    toast(naam ? `Naam: ${naam}` : 'Naam niet gewijzigd', [], 2500)
+  })
+  t.appendChild(vorm)
+  vak.focus()
+  vak.select()
+}
 async function openBewaard(r) {
   if (stopper) return
   onthoud()
@@ -2364,11 +2430,8 @@ kaart.on('contextmenu', (e) => {
   opties.push(['📋 Kopieer coördinaten', async () => {
     sluitMenu()
     const tekst = `${p[0].toFixed(5)}, ${p[1].toFixed(5)}`
-    try {
-      await navigator.clipboard.writeText(tekst)
-    } catch {
-      prompt('Coördinaten:', tekst)
-    }
+    if (await kopieer(tekst)) toast(`Gekopieerd: ${tekst}`, [], 2500)
+    else toonOmTeKopieren('Coördinaten:', tekst)
   }])
   const menu = el('kaartmenu')
   menu.innerHTML = ''
@@ -2426,7 +2489,7 @@ function welkomZichtbaar() {
 function werkWelkom() {
   const w = el('welkom')
   if (!w) return
-  w.hidden = !(stap === 1 && !staat.punten.length && !tekening() && !uitslag && !stopper)
+  w.hidden = UI_NIEUW || !(stap === 1 && !staat.punten.length && !tekening() && !uitslag && !stopper)
 }
 el('welkom').addEventListener('click', (e) => e.stopPropagation())
 el('welkomLocatie').addEventListener('click', () => {
@@ -2484,6 +2547,485 @@ el('hulp').addEventListener('click', (e) => {
   location.hash = `${VOORBEELDEN[v]}&plan=1` // de app laadt de link opnieuw en plant meteen
 })
 
+// ---------- Nieuwe interface: de plankaart (UX fase 2) ----------
+// Rondje, Naar station en A naar B plan je op één kaart in de piek van het paneel: soort, start,
+// afstand, één regel voorkeuren en de hoofdknop. Tekenen, In gebied, Elke straat en GPX openen staan
+// onder "Meer" en houden hun eigen stappenplan. De oude interface blijft bereikbaar met ?ui=oud.
+const VAST = new Set(['rondje', 'station', 'route'])
+const SOORT_SLEUTEL = 'nopaves.soort'
+const PLANTEKST = { rondje: 'Plan rondje', station: 'Zoek routes naar stations', route: 'Plan route' }
+let startNaam = '' // hoe de start heet in de startregel: Mijn locatie, een zoektreffer, of op de kaart
+
+const vasteSoort = () => UI_NIEUW && VAST.has(staat.modus)
+function leesSoort() {
+  try {
+    const s = localStorage.getItem(SOORT_SLEUTEL)
+    return VAST.has(s) ? s : 'rondje'
+  } catch {
+    return 'rondje'
+  }
+}
+function bewaarSoort(s) {
+  try {
+    localStorage.setItem(SOORT_SLEUTEL, s)
+  } catch {
+    // zonder opslag onthouden we het niet
+  }
+}
+
+/** Tempo (seconden per km) als m:ss. */
+const tempoTekst = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`
+/** 'm:ss' of 'mss' naar seconden per km (2:30 tot 15:00), anders null. */
+function leesTempo(tekst) {
+  const cijfers = String(tekst).replace(/\D/g, '')
+  if (cijfers.length < 3) return null
+  const m = Number(cijfers.slice(0, -2))
+  const s = Number(cijfers.slice(-2))
+  if (s > 59) return null
+  const sec = m * 60 + s
+  return sec >= 150 && sec <= 900 ? sec : null
+}
+
+function voorkeurSamenvatting() {
+  const delen = [staat.alles ? 'Ook verhard' : staat.trail ? 'Paadjes' : 'Alles onverhard']
+  if (staat.strand) delen.push('strand overslaan')
+  if (staat.kaartje) delen.push('toegangskaart')
+  if (staat.heuvels) delen.push('meer hoogtemeters')
+  if (staat.modus === 'rondje' && staat.vorm === 'kronkel') delen.push('kronkelen')
+  if (staat.law !== 1) delen.push(staat.law <= 0.3 ? 'sterk LAW' : 'licht LAW')
+  if (staat.grondig !== 2) delen.push(staat.grondig === 0 ? '1 route, snel' : `${Math.max(1, staat.grondig)} ${staat.grondig === 1 ? 'route' : 'routes'}`)
+  if (staat.tempo) delen.push(`${tempoTekst(staat.tempo)}/km`)
+  return delen.join(' · ')
+}
+
+/** De startregel: waar je begint (of hoe je een start kiest). */
+function tekenStartregel() {
+  const r = el('startregel')
+  const n = staat.punten.length
+  const knoppen = '<span class="startknoppen"><button type="button" class="klein" data-start="locatie" aria-label="Gebruik mijn locatie">' + ico('locatie') + '</button><button type="button" class="klein" data-start="zoek" aria-label="Zoek een plek">' + ico('zoek') + '</button></span>'
+  let tekst
+  if (staat.modus === 'route') {
+    if (!n) tekst = '<b>Tik je start op de kaart</b><small>of gebruik je locatie of zoek</small>'
+    else if (n === 1) tekst = `<b>Start: ${veilig(startNaam || 'op de kaart')}</b><small>tik nu het eindpunt op de kaart</small>`
+    else tekst = `<b>Start: ${veilig(startNaam || 'op de kaart')}</b><small>${n > 2 ? `${n - 2} tussenpunt${n > 3 ? 'en' : ''} · ` : ''}eind op de kaart · sleep om te verschuiven</small>`
+  } else if (!n) tekst = '<b>Tik op de kaart of gebruik je locatie</b><small>daar begint je route</small>'
+  else tekst = `<b>Start: ${veilig(startNaam || 'op de kaart')}</b><small>sleep de pin om te verschuiven</small>`
+  r.innerHTML = `<span class="startico">${ico('start')}</span><span class="starttekst">${tekst}</span>${knoppen}`
+}
+
+function tekenAfstand() {
+  el('kmGetal').textContent = staat.km
+  el('kmMin').disabled = staat.km <= 2
+  el('kmPlus').disabled = staat.km >= 60
+  for (const b of el('snelkeuzes').children) b.setAttribute('aria-pressed', String(Number(b.dataset.km) === staat.km))
+}
+
+/** Alles van de plankaart bijwerken: zichtbaarheid, soort, start, afstand, voorkeuren, knop. */
+function werkPlankaart() {
+  if (!UI_NIEUW) return
+  const vast = VAST.has(staat.modus)
+  main.classList.toggle('vast', vast)
+  main.classList.toggle('meermodus', !vast)
+  el('plankaart').hidden = false
+  for (const b of el('soortkeuze').children) {
+    const s = b.dataset.soort
+    b.setAttribute('aria-pressed', String(s === 'meer' ? !vast : s === staat.modus))
+  }
+  const meerOpen = !vast || el('soortkeuze').querySelector('[data-soort="meer"]').getAttribute('aria-expanded') === 'true'
+  el('meerlijst').hidden = !meerOpen
+  for (const b of el('meerlijst').querySelectorAll('[data-meer]')) b.setAttribute('aria-pressed', String(b.dataset.meer === staat.modus))
+  el('pkregels').hidden = !vast
+  el('planKnop').hidden = !vast
+  if (vast) {
+    tekenStartregel()
+    el('afstandregel').hidden = staat.modus === 'route'
+    el('afstandnoot').hidden = staat.modus === 'route' || !el('afstandnoot').textContent
+    tekenAfstand()
+    const klaar = staat.modus === 'route' ? staat.punten.length >= 2 : staat.punten.length >= 1
+    el('planKnop').textContent = uitslag ? PLANTEKST[staat.modus].replace(/^Plan /, 'Plan opnieuw: ').replace('Zoek routes', 'Zoek opnieuw routes') : PLANTEKST[staat.modus]
+    el('planKnop').disabled = !klaar || !!stopper
+  }
+  el('voorkeurtekst').textContent = voorkeurSamenvatting()
+  el('nieuwKnop').hidden = !(uitslag || staat.punten.length || tekening())
+  // na het plannen staat de plankaart onder het resultaat (Aanpassen), ervoor bovenaan
+  const resultaat = el('resultaat')
+  if (uitslag && !resultaat.hidden) {
+    if (el('plankaart').previousElementSibling !== resultaat) resultaat.after(el('plankaart'))
+  } else if (el('plankaart').nextElementSibling !== el('invoer')) el('invoer').before(el('plankaart'))
+  el('plankaart').classList.toggle('aanpassen', !!uitslag && !resultaat.hidden)
+  if (sheet) requestAnimationFrame(() => sheet.herbereken())
+}
+
+/** Hoe hoog de piek moet zijn: tot en met de hoofdknop (plannen), anders de piekbalk. */
+function piekHoogte() {
+  if (!UI_NIEUW) return null
+  const toonPlankaart = vasteSoort() && !stopper && !(uitslag && !el('resultaat').hidden)
+  const eind = toonPlankaart ? el('planKnop') : el('piekbalk')
+  if (!eind || eind.offsetParent === null) return null
+  const boven = main.getBoundingClientRect().top - main.scrollTop
+  return Math.ceil(eind.getBoundingClientRect().bottom - boven + 12)
+}
+
+/** Zet een punt midden in het stuk kaart dat je ziet (boven het paneel). */
+function toonOpKaart(p, zoom) {
+  kaart.setView(p, zoom, { animate: false })
+  if (sheet && sheet.actief()) kaart.panBy([0, sheet.hoogte() / 2], { animate: false })
+}
+
+function kiesSoort(s) {
+  if (stopper) return
+  const meer = el('soortkeuze').querySelector('[data-soort="meer"]')
+  if (s === 'meer') {
+    const open = meer.getAttribute('aria-expanded') !== 'true'
+    meer.setAttribute('aria-expanded', String(open))
+    if (VAST.has(staat.modus)) {
+      el('meerlijst').hidden = !open
+      if (sheet && sheet.actief() && open && sheet.stand() === 'piek') sheet.zet('half')
+      werkPlankaart()
+    }
+    return
+  }
+  meer.setAttribute('aria-expanded', 'false')
+  bewaarSoort(s)
+  if (s !== staat.modus) {
+    const oud = staat.modus
+    zetModus(s)
+    // van A naar B naar een rondje: de start blijft, de rest niet
+    if (oud === 'route' || !VAST.has(oud)) staat.punten = staat.punten.slice(0, 1)
+    puntenGewijzigd()
+  }
+  if (stap === 4 || stap === 1) stap = 2
+  werkPlankaart()
+}
+
+function kiesMeer(wat) {
+  if (stopper) return
+  if (wat === 'gpx') return el('gpxBestand').click()
+  if (wat === 'mijn') {
+    const plek = el('mijnplek')
+    plek.hidden = !plek.hidden
+    if (!plek.hidden) plek.appendChild(el('mijnRoutes'))
+    tekenBewaard()
+    if (!bewaardeRoutes().length) plek.innerHTML = '<p class="noot">Nog geen bewaarde routes. Na het plannen: Bewaar.</p>'
+    if (sheet && sheet.actief() && sheet.stand() === 'piek') sheet.zet('half')
+    return
+  }
+  zetModus(wat)
+  toonStap(2)
+  werkPlankaart()
+}
+
+function zetKm(km) {
+  const nieuw = Math.max(2, Math.min(60, Math.round(Number(km) || staat.km)))
+  if (nieuw === staat.km) return tekenAfstand()
+  onthoud()
+  staat.km = nieuw
+  el('km').value = nieuw
+  bewaar()
+  tekenAfstand()
+}
+
+/** Vraag de locatie (alleen na een tik of als er al toestemming is) en zet de start daar. */
+function startOpLocatie(stil = false, alleenAls = null) {
+  if (!navigator.geolocation) return stil || toonFout('Deze browser geeft geen locatie door.')
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const p = [pos.coords.latitude, pos.coords.longitude]
+      if (!inNederland(p)) return stil || toonFout('Je staat buiten Nederland. De officiële kaart en de luchtfoto dekken alleen Nederland.')
+      if (stil && alleenAls !== null && JSON.stringify(staat.punten) !== alleenAls) return // intussen zelf een start gekozen
+      onthoud()
+      if (staat.modus === 'route') staat.punten = [p, ...staat.punten.slice(1)]
+      else staat.punten = [p]
+      startBron = 'gps'
+      startNaam = 'Mijn locatie'
+      puntenGewijzigd()
+      toonOpKaart(p, Math.max(kaart.getZoom(), 14))
+    },
+    () => stil || toonFout('Je locatie is niet beschikbaar. Geef de browser toestemming, of tik zelf een plek.'),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+  )
+}
+
+// ---- melding onderin (vervangt prompt/confirm) ----
+let toastTimer = null
+/** Korte melding met knoppen: [[tekst, actie], ...]. Blijft 'ms' staan (0 = tot je iets kiest). */
+function toast(tekst, acties = [], ms = 5000) {
+  const t = el('toast')
+  clearTimeout(toastTimer)
+  t.innerHTML = ''
+  const p = document.createElement('span')
+  p.className = 'toasttekst'
+  p.textContent = tekst
+  t.appendChild(p)
+  for (const [label, actie] of acties) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'klein'
+    b.textContent = label
+    b.addEventListener('click', () => actie(t))
+    t.appendChild(b)
+  }
+  t.hidden = false
+  if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms)
+  return t
+}
+const sluitToast = () => {
+  clearTimeout(toastTimer)
+  el('toast').hidden = true
+}
+/** Laat tekst zien om zelf te kopiëren (als het klembord niet mag), zonder browservenster. */
+function toonOmTeKopieren(label, tekst) {
+  const t = toast(label, [['Sluit', sluitToast]], 0)
+  const vak = document.createElement('input')
+  vak.type = 'text'
+  vak.readOnly = true
+  vak.value = tekst
+  vak.className = 'kopieervak'
+  t.insertBefore(vak, t.lastChild)
+  vak.focus()
+  vak.select()
+}
+
+// ---- tempo (voorkeur) ----
+function tekenTempo() {
+  el('tempoWaarde').textContent = staat.tempo ? `${tempoTekst(staat.tempo)} /km` : 'geen'
+  el('tempoWis').hidden = !staat.tempo
+  el('voorkeurtekst').textContent = voorkeurSamenvatting()
+}
+function zetTempo(sec) {
+  staat.tempo = sec === null ? null : Math.max(150, Math.min(900, sec))
+  bewaar()
+  tekenTempo()
+}
+function stapTempo(d) {
+  zetTempo((staat.tempo || 360) + (staat.tempo ? d : 0))
+}
+/** Vasthouden versnelt: eerst elke 400 ms, daarna elke 80 ms. */
+function houdVast(knop, actie) {
+  let timer = null
+  let snel = null
+  const stop = () => {
+    clearTimeout(timer)
+    clearInterval(snel)
+    timer = snel = null
+  }
+  knop.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return
+    e.preventDefault()
+    actie()
+    timer = setTimeout(() => {
+      snel = setInterval(actie, 80)
+    }, 400)
+  })
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) knop.addEventListener(ev, stop)
+  knop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      actie()
+    }
+  })
+}
+
+/** De tijdsindicatie bij een route (alleen met een tempo; geen correctie voor ondergrond of hoogte). */
+function tijdTekst() {
+  if (!staat.tempo || !plan) return ''
+  const min = Math.round((plan.analyse.lengte / 1000) * staat.tempo / 60)
+  const duur = min >= 60 ? `${Math.floor(min / 60)} u ${min % 60} min` : `${min} min`
+  let t = `ca. ${duur} (${tempoTekst(staat.tempo)}/km, vlak)`
+  if (keuze().station) {
+    const aankomst = new Date(Date.now() + min * 60000)
+    t += ` · aankomst ca. ${String(aankomst.getHours()).padStart(2, '0')}:${String(aankomst.getMinutes()).padStart(2, '0')} bij vertrek nu`
+  }
+  return t
+}
+
+// ---- terugknop op Android: eerst het paneel omlaag ----
+let sheetInGeschiedenis = false
+let negeerPop = false
+function sheetGeschiedenis(stand) {
+  if (!UI_NIEUW || !sheet || !sheet.actief()) return
+  if (stand !== 'piek' && !sheetInGeschiedenis) {
+    history.pushState({ nopavesSheet: 1 }, '')
+    sheetInGeschiedenis = true
+  } else if (stand === 'piek' && sheetInGeschiedenis) {
+    sheetInGeschiedenis = false
+    negeerPop = true
+    history.back()
+  }
+}
+window.addEventListener('popstate', () => {
+  if (negeerPop) {
+    negeerPop = false
+    return
+  }
+  if (!UI_NIEUW) return
+  if (el('voorkeuren').open) el('voorkeuren').close()
+  if (sheet && sheet.actief() && sheet.stand() !== 'piek') {
+    sheetInGeschiedenis = false
+    sheet.zet('piek')
+  }
+})
+
+function startNieuweUi() {
+  document.documentElement.dataset.ui = 'nieuw'
+  // de voortgang en de foutmelding horen bij de plankaart, niet bij stap 3
+  el('fout').after(el('bezig'))
+  el('plankaart').after(el('fout'))
+  // voorkeuren op één plek: de bestaande instellingen (met hun knoppen) in het venster
+  const vlak = el('voorkeurvlak')
+  vlak.prepend(el('instellingen'))
+  el('instellingen').after(el('vormveld'))
+  el('vormveld').hidden = false
+  el('instellingen').querySelector('.subkop').hidden = true
+  el('instellingen').querySelector('details.meer').open = true
+  // details van de route ingeklapt achter "Details ›"
+  const details = document.createElement('details')
+  details.className = 'blok details'
+  details.id = 'details'
+  details.innerHTML = '<summary>Details</summary><p class="noot">Ondergrond, hoogte, water, twijfelstukken en bronnen.</p>'
+  el('opties').after(details)
+  for (const id of ['tabs', 'tab-hoogte', 'tab-ondergrond', 'twijfelblok']) details.appendChild(el(id))
+  const andere = document.createElement('button')
+  andere.type = 'button'
+  andere.id = 'andereRoute'
+  andere.className = 'andereknop'
+  andere.innerHTML = ico('nogeens') + 'Andere route'
+  el('opties').after(andere)
+  andere.addEventListener('click', () => {
+    if (!uitslag || uitslag.opties.length < 2) return
+    kiesRoute((gekozen + 1) % uitslag.opties.length)
+  })
+  details.addEventListener('toggle', () => {
+    if (details.open && plan) toonTab(tab)
+  })
+  // kopknoppen: Nieuw in plaats van ↺, thema in de voorkeuren
+  el('nieuwKnop').addEventListener('click', () => el('opnieuw').click())
+  el('sluitSheet').addEventListener('click', () => sheet && sheet.zet('piek'))
+  // soort, meer, start, afstand
+  el('soortkeuze').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-soort]')
+    if (b) kiesSoort(b.dataset.soort)
+  })
+  el('meerlijst').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-meer]')
+    if (b) kiesMeer(b.dataset.meer)
+  })
+  el('startregel').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-start]')
+    if (!b) return
+    if (b.dataset.start === 'locatie') startOpLocatie()
+    else {
+      const plek = el('zoekplek')
+      if (!plek.firstChild) plek.appendChild(document.querySelector('.zoek'))
+      plek.hidden = !plek.hidden
+      if (!plek.hidden) {
+        if (sheet && sheet.actief() && sheet.stand() === 'piek') sheet.zet('half')
+        el('zoek').focus()
+      }
+    }
+  })
+  houdVast(el('kmMin'), () => zetKm(staat.km - 1))
+  houdVast(el('kmPlus'), () => zetKm(staat.km + 1))
+  el('snelkeuzes').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-km]')
+    if (b) zetKm(Number(b.dataset.km))
+  })
+  el('kmWaarde').addEventListener('click', () => {
+    el('kmWaarde').hidden = true
+    el('kmInvoer').hidden = false
+    el('kmInvoer').value = staat.km
+    el('kmInvoer').focus()
+    el('kmInvoer').select()
+  })
+  const kmKlaar = () => {
+    if (el('kmInvoer').hidden) return
+    zetKm(el('kmInvoer').value)
+    el('kmInvoer').hidden = true
+    el('kmWaarde').hidden = false
+  }
+  el('kmInvoer').addEventListener('change', kmKlaar)
+  el('kmInvoer').addEventListener('blur', kmKlaar)
+  el('kmInvoer').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      kmKlaar()
+    } else if (e.key === 'Escape') {
+      el('kmInvoer').hidden = true
+      el('kmWaarde').hidden = false
+    }
+  })
+  el('planKnop').addEventListener('click', () => {
+    if (!el('planKnop').disabled) planNu()
+  })
+  // voorkeuren
+  el('voorkeurregel').addEventListener('click', () => {
+    tekenTempo()
+    for (const b of el('themakeuze').children) b.setAttribute('aria-pressed', String(b.dataset.thema === themaKeuze()))
+    el('voorkeuren').showModal()
+  })
+  el('voorkeurenDicht').addEventListener('click', () => el('voorkeuren').close())
+  el('voorkeuren').addEventListener('click', (e) => {
+    if (e.target === el('voorkeuren')) el('voorkeuren').close()
+  })
+  el('voorkeuren').addEventListener('close', werkPlankaart)
+  el('voorkeurvlak').addEventListener('change', () => {
+    vatSamen()
+    el('voorkeurtekst').textContent = voorkeurSamenvatting()
+  })
+  el('themakeuze').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-thema]')
+    if (!b) return
+    zetThema(b.dataset.thema)
+    for (const k of el('themakeuze').children) k.setAttribute('aria-pressed', String(k === b))
+  })
+  houdVast(el('tempoMin'), () => stapTempo(-5))
+  houdVast(el('tempoPlus'), () => stapTempo(5))
+  el('tempoWis').addEventListener('click', () => zetTempo(null))
+  el('tempoWaarde').addEventListener('click', () => {
+    el('tempoWaarde').hidden = true
+    el('tempoInvoer').hidden = false
+    el('tempoInvoer').value = staat.tempo ? tempoTekst(staat.tempo) : ''
+    el('tempoInvoer').focus()
+    el('tempoInvoer').select()
+  })
+  // masker m:ss: alleen cijfers, de dubbele punt komt er vanzelf in
+  el('tempoInvoer').addEventListener('input', () => {
+    const c = el('tempoInvoer').value.replace(/\D/g, '').slice(0, 4)
+    el('tempoInvoer').value = c.length > 2 ? `${c.slice(0, -2)}:${c.slice(-2)}` : c
+  })
+  const tempoKlaar = () => {
+    if (el('tempoInvoer').hidden) return
+    const tekst = el('tempoInvoer').value.trim()
+    const sec = leesTempo(tekst)
+    if (!tekst) zetTempo(null)
+    else if (sec) zetTempo(sec)
+    el('tempoInvoer').hidden = true
+    el('tempoWaarde').hidden = false
+    tekenTempo()
+  }
+  el('tempoInvoer').addEventListener('blur', tempoKlaar)
+  el('tempoInvoer').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      tempoKlaar()
+    }
+  })
+  // soort bij het openen: uit een link, anders de laatste keuze
+  if (!hash.get('p') && !hash.get('t') && VAST.has(staat.modus) && staat.modus !== leesSoort()) {
+    staat.modus = leesSoort()
+    staat.punten = staat.punten.slice(0, 1)
+  }
+  if (staat.punten.length) startNaam = hash.get('p') ? 'uit de link' : 'op de kaart'
+  if (VAST.has(staat.modus) && stap !== 4) stap = 2
+  // start op je locatie als je daar al toestemming voor gaf (nooit vragen bij het openen, nooit plannen)
+  if (VAST.has(staat.modus) && !hash.get('p')) {
+    const bijOpen = JSON.stringify(staat.punten)
+    Teller.geoToestemming().then((g) => {
+      if (g === 'granted') startOpLocatie(true, bijOpen)
+    })
+  }
+}
+
 // ---------- Start ----------
 const hash = laad()
 zetThema(themaKeuze())
@@ -2513,6 +3055,7 @@ zetTerugKnop()
 tekenBewaard()
 if (tekenModus() && tekening()) kaart.fitBounds(L.latLngBounds(tekening()).pad(0.2))
 toonStap(staat.punten.length || tekening() ? (plaatsKlaar ? 3 : 2) : 1, false)
+if (UI_NIEUW) startNieuweUi()
 if (staat.punten.length > 1) kaart.fitBounds(L.latLngBounds(staat.punten).pad(0.2))
 else if (staat.punten.length === 1) kaart.setView(staat.punten[0], 13)
 // een gedeelde link opent terwijl de app al open staat: opnieuw beginnen met die punten
@@ -2522,11 +3065,16 @@ window.addEventListener('hashchange', () => {
 })
 // #...&plan=1 start meteen (handig voor een gedeelde link en voor de test)
 if (hash.get('plan') && !el('plan').disabled) planNu()
-sheet = maakSheet({ kaart, main: document.getElementById('paneel'), greep: el('sheetgreep'), bijWijziging: (stand) => {
+sheet = maakSheet({ kaart, main: document.getElementById('paneel'), greep: el('sheetgreep'), piekHoogte, beginStand: UI_NIEUW ? 'piek' : 'half', bijWijziging: (stand) => {
   werkPiekbalk()
-  if (sheetKlaar) Teller.log('sheet_state', { stand })
+  el('sluitSheet').hidden = !(UI_NIEUW && stand === 'vol')
+  if (sheetKlaar) {
+    Teller.log('sheet_state', { stand })
+    sheetGeschiedenis(stand)
+  }
 } })
 sheetKlaar = true
+werkPlankaart()
 werkPiekbalk()
 
 Teller.geoToestemming().then((geo) => Teller.log('app_open', { weergave: Teller.weergave(), geo }))

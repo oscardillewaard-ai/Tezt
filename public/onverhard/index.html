@@ -36,6 +36,10 @@
         <symbol id="i-horeca" viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2"/></symbol>
         <symbol id="i-toilet" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4.5 4h5M14.5 4h5M7 12H4.5M17 12h2.5"/><circle cx="12" cy="8" r="0.1"/></symbol>
         <symbol id="i-tank" viewBox="0 0 24 24"><path d="M5 20V5h9v15M4 20h11M14 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V9l-2.5-2.5M8 8h3"/></symbol>
+        <symbol id="i-sluit" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+        <symbol id="i-locatie" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+        <symbol id="i-pijl" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
         <symbol id="i-station" viewBox="0 0 24 24"><path d="M6 4h12v12H6zM6 10h12M8 21l2-5M16 21l-2-5"/><path d="M9 13h.01M15 13h.01"/></symbol>
         <symbol id="i-omweg" viewBox="0 0 24 24"><path d="M3 19H21"/><path d="M3 19C6 5 18 5 21 19" stroke-dasharray="2.5 3"/></symbol>
         <symbol id="i-gpx" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
@@ -85,6 +89,8 @@
             <button type="button" id="terug" class="klein" aria-label="Ongedaan maken" title="Ongedaan maken (Ctrl+Z)" disabled>↶</button>
             <button type="button" id="opnieuw" class="klein" title="Opnieuw beginnen (N)" aria-label="Opnieuw beginnen">↺<span class="knoptekst"> Opnieuw</span></button>
             <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
+            <button type="button" id="nieuwKnop" class="klein alleen-nieuw" title="Nieuwe route (N)" hidden><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Nieuw</button>
+            <button type="button" id="sluitSheet" class="klein alleen-nieuw" aria-label="Paneel sluiten" hidden><svg class="ico" aria-hidden="true"><use href="#i-sluit"/></svg></button>
           </div>
         </header>
 
@@ -97,6 +103,39 @@
           <button type="button" data-stap="4"><span class="stapnr" data-nr="4"></span><span>Route</span></button>
         </nav>
         <p class="fout" id="fout" role="alert" hidden></p>
+
+        <section id="plankaart" class="plankaart" hidden aria-label="Plan een route">
+          <div class="segment" id="soortkeuze" role="group" aria-label="Soort route">
+            <button type="button" data-soort="rondje" aria-pressed="true">Rondje</button>
+            <button type="button" data-soort="station" aria-pressed="false">Station</button>
+            <button type="button" data-soort="route" aria-pressed="false">A naar B</button>
+            <button type="button" data-soort="meer" aria-pressed="false" aria-expanded="false">Meer</button>
+          </div>
+          <div class="meerlijst" id="meerlijst" hidden>
+            <button type="button" data-meer="tekenen"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg>Tekenen</button>
+            <button type="button" data-meer="gebied"><svg class="ico" aria-hidden="true"><use href="#i-gebied"/></svg>In gebied</button>
+            <button type="button" data-meer="straten"><svg class="ico" aria-hidden="true"><use href="#i-straten"/></svg>Elke straat</button>
+            <button type="button" data-meer="gpx"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg>GPX openen</button>
+            <button type="button" data-meer="mijn"><svg class="ico" aria-hidden="true"><use href="#i-bewaar"/></svg>Mijn routes</button>
+            <div class="mijnplek" id="mijnplek" hidden></div>
+          </div>
+          <div class="pkregels" id="pkregels">
+            <div class="startregel" id="startregel"></div>
+            <div class="zoekplek" id="zoekplek" hidden></div>
+            <div class="afstandregel" id="afstandregel">
+              <button type="button" class="stepknop" id="kmMin" aria-label="1 km korter"><svg class="ico" aria-hidden="true"><use href="#i-min"/></svg></button>
+              <button type="button" class="afstandwaarde" id="kmWaarde" aria-label="Afstand, tik om te typen"><b id="kmGetal">10</b> <span id="kmEenheid">km</span></button>
+              <input type="number" id="kmInvoer" class="afstandinvoer" min="2" max="60" step="1" inputmode="numeric" aria-label="Afstand in km (2 tot 60)" hidden />
+              <button type="button" class="stepknop" id="kmPlus" aria-label="1 km langer"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
+              <span class="snelkeuzes" id="snelkeuzes">
+                <button type="button" data-km="5">5</button><button type="button" data-km="10">10</button><button type="button" data-km="15">15</button><button type="button" data-km="20">20</button>
+              </span>
+            </div>
+            <p class="afstandnoot" id="afstandnoot" hidden></p>
+            <button type="button" class="voorkeurregel" id="voorkeurregel"><span id="voorkeurtekst">Paadjes</span><svg class="ico" aria-hidden="true"><use href="#i-pijl"/></svg></button>
+          </div>
+          <button type="button" class="hoofd planknop" id="planKnop">Plan rondje</button>
+        </section>
 
         <section id="invoer">
           <div class="stapvlak" id="stap1">
@@ -323,6 +362,33 @@
         <p class="noot" id="gebruikMelding" role="status"></p>
       </details>
     </dialog>
+    <dialog id="voorkeuren" class="voorkeuren" aria-label="Voorkeuren">
+      <div class="hulp-kop">
+        <h2>Voorkeuren</h2>
+        <button type="button" id="voorkeurenDicht" class="klein">Klaar</button>
+      </div>
+      <div class="voorkeurvlak" id="voorkeurvlak">
+        <div class="veld" id="tempoveld">
+          <span>Tempo <small>voor een tijdsindicatie; leeg = geen</small></span>
+          <div class="tempostepper">
+            <button type="button" class="stepknop" id="tempoMin" aria-label="5 seconden sneller"><svg class="ico" aria-hidden="true"><use href="#i-min"/></svg></button>
+            <button type="button" class="tempowaarde" id="tempoWaarde" aria-label="Tempo, tik om te typen">geen</button>
+            <input type="text" id="tempoInvoer" class="tempoinvoer" inputmode="numeric" autocomplete="off" placeholder="m:ss" maxlength="5" aria-label="Tempo in minuten en seconden per km" hidden />
+            <button type="button" class="stepknop" id="tempoPlus" aria-label="5 seconden langzamer"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
+            <button type="button" class="klein" id="tempoWis" hidden>Wis</button>
+          </div>
+        </div>
+        <div class="veld">
+          <span>Thema</span>
+          <div class="keuze klein" id="themakeuze" role="group" aria-label="Thema">
+            <button type="button" data-thema="auto" aria-pressed="true">Automatisch</button>
+            <button type="button" data-thema="licht" aria-pressed="false">Licht</button>
+            <button type="button" data-thema="donker" aria-pressed="false">Donker</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <div class="tip" id="tip"></div>
     <div class="kaartmenu" id="kaartmenu" role="menu" hidden></div>
     <dialog id="foto"><form method="dialog"><button aria-label="Sluiten">Sluiten</button></form><img alt="" /><p></p></dialog>
