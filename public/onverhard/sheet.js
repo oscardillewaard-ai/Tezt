@@ -17,7 +17,7 @@ export function dichtsteStand(hoogte, hoogtes, snelheid = 0) {
   return beste
 }
 
-export function maakSheet({ kaart, main, greep, bijWijziging = () => {} }) {
+export function maakSheet({ kaart, main, greep, bijWijziging = () => {}, bijGebruiker = () => {} }) {
   const smal = matchMedia(`(max-width: ${GROOT_PX}px)`)
   const probe = document.createElement('div')
   probe.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom)'
@@ -43,6 +43,11 @@ export function maakSheet({ kaart, main, greep, bijWijziging = () => {} }) {
     bijWijziging(nieuw)
   }
   const volgende = () => zet(STANDEN[(STANDEN.indexOf(stand) + 1) % STANDEN.length])
+  /** Een stand die de gebruiker zelf kiest (tik, slepen of pijltjes), niet de app. */
+  const kies = (nieuw) => {
+    zet(nieuw)
+    bijGebruiker(nieuw)
+  }
 
   // slepen aan het handvat; een tik wisselt de stand
   let sleep = null
@@ -69,15 +74,15 @@ export function maakSheet({ kaart, main, greep, bijWijziging = () => {} }) {
     sleep = null
     main.classList.remove('sleept')
     if (e.type === 'pointercancel' || s.beweeg < 6) {
-      if (e.type === 'pointerup') volgende()
+      if (e.type === 'pointerup') kies(STANDEN[(STANDEN.indexOf(stand) + 1) % STANDEN.length])
       else zet(stand)
-    } else zet(dichtsteStand(hoogte, hoogtes(), s.v))
+    } else kies(dichtsteStand(hoogte, hoogtes(), s.v))
   }
   greep.addEventListener('pointerup', los)
   greep.addEventListener('pointercancel', los)
   greep.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp') zet(STANDEN[Math.min(2, STANDEN.indexOf(stand) + 1)])
-    else if (e.key === 'ArrowDown') zet(STANDEN[Math.max(0, STANDEN.indexOf(stand) - 1)])
+    if (e.key === 'ArrowUp') kies(STANDEN[Math.min(2, STANDEN.indexOf(stand) + 1)])
+    else if (e.key === 'ArrowDown') kies(STANDEN[Math.max(0, STANDEN.indexOf(stand) - 1)])
   })
 
   const opnieuw = () => {

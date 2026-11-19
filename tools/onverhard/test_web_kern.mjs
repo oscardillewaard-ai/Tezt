@@ -7,6 +7,7 @@ import * as G from '../../public/onverhard/graaf.js'
 import * as T from '../../public/onverhard/osmtegels.js'
 import * as H from '../../public/onverhard/hoogte.js'
 import * as Sheet from '../../public/onverhard/sheet.js'
+import * as Gebruik from '../../public/onverhard/gebruik.js'
 import zlib from 'node:zlib'
 
 const vierkant = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] })
@@ -933,4 +934,72 @@ test('groene omwegen: een route die al onverhard is krijgt er geen, en toepassen
   assert.ok(aaneengesloten(g, terug, terugSegs))
   const dubbel = G.groeneOmwegen(g, terug, terugSegs, [])
   assert.deepEqual(dubbel, [], 'de boog is al gebruikt: dubbel lopen telt niet als omweg')
+})
+
+/** Een nep-localStorage voor de teller. */
+const nepOpslag = () => {
+  const m = new Map()
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m }
+}
+
+test('teller: ringbuffer van hooguit 500 regels, oudste eruit, en wissen', () => {
+  const o = nepOpslag()
+  Gebruik.zetOpslag(o)
+  for (let i = 0; i < 520; i++) assert.equal(Gebruik.log('plan_start', { i }, 1000 + i), true)
+  const regels = Gebruik.lees()
+  assert.equal(regels.length, Gebruik.MAX)
+  assert.equal(regels[0].d.i, 20, 'de eerste twintig zijn eruit')
+  assert.deepEqual(regels[499], { t: 1519, ev: 'plan_start', d: { i: 519 } })
+  assert.ok(o.m.has(Gebruik.SLEUTEL) && Gebruik.SLEUTEL === 'nopaves.log')
+  assert.equal(Gebruik.wis(), true)
+  assert.deepEqual(Gebruik.lees(), [])
+})
+
+test('teller: een kapotte of uitgezette opslag breekt niets', () => {
+  Gebruik.zetOpslag(null)
+  assert.equal(Gebruik.log('app_open'), false)
+  assert.deepEqual(Gebruik.lees(), [])
+  assert.equal(Gebruik.wis(), false)
+  const vol = nepOpslag()
+  vol.setItem = () => {
+    throw new Error('QuotaExceededError')
+  }
+  Gebruik.zetOpslag(vol)
+  assert.equal(Gebruik.log('gpx'), false)
+  const rommel = nepOpslag()
+  rommel.setItem(Gebruik.SLEUTEL, '{kapot')
+  Gebruik.zetOpslag(rommel)
+  assert.deepEqual(Gebruik.lees(), [])
+  assert.equal(Gebruik.log('gpx', {}, 5), true, 'kapotte inhoud wordt overschreven')
+  assert.equal(Gebruik.lees().length, 1)
+})
+
+test('teller: samenvatting telt per soort, start, voorkeur, onderdeel en planduur', () => {
+  const r = (ev, d, t = 0) => ({ t, ev, d })
+  const s = Gebruik.samenvatting([
+    r('app_open', { weergave: 'standalone', locatie: 'granted' }, 1),
+    r('plan_start', { soort: 'rondje', km: 10, start: 'gps' }),
+    r('plan_done', { ok: true, ms: 4000 }),
+    r('plan_start', { soort: 'rondje', km: 10, start: 'tik' }),
+    r('plan_done', { ok: true, ms: 8000 }),
+    r('plan_start', { soort: 'station', km: 15, start: 'gps' }),
+    r('plan_done', { ok: false, ms: 900, fout: 'PDOK' }),
+    r('pref_change', { sleutel: 'law', oud: 1, nieuw: 0.3 }),
+    r('details_open', { deel: 'tab tabel' }),
+    r('sheet_state', { stand: 'vol' }, 9),
+  ])
+  assert.equal(s.regels, 10)
+  assert.equal(s.van, 1)
+  assert.equal(s.tot, 9)
+  assert.deepEqual(s.perSoort, { rondje: 2, station: 1 })
+  assert.deepEqual(s.perStart, { gps: 2, tik: 1 })
+  assert.deepEqual(s.perAfstand, { '10 km': 2, '15 km': 1 })
+  assert.deepEqual(s.voorkeuren, { law: 1 })
+  assert.deepEqual(s.onderdelen, { 'tab tabel': 1 })
+  assert.deepEqual(s.sheet, { vol: 1 })
+  assert.deepEqual(s.weergave, { standalone: 1 })
+  assert.equal(s.planGelukt, 2)
+  assert.equal(s.planMislukt, 1)
+  assert.equal(s.planDuurMediaanMs, 6000, 'alleen geslaagde plannen tellen voor de wachttijd')
+  assert.equal(Gebruik.samenvatting([]).regels, 0)
 })

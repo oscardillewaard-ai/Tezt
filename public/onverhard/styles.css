@@ -762,3 +762,10 @@ header > div:first-child { flex: 1 1 auto; }
 .keuze.klein button .ico { margin: 0; width: 1.1em; height: 1.1em; }
 
 .leaflet-control-attribution { font-size: 10px; }
+
+/* Mijn gebruik (lokale teller) in de uitleg */
+#hulp .gebruik { display: grid; gap: 4px; margin: 6px 18px; font-size: 14px; }
+#hulp .gebruik p { margin: 0; }
+#hulp .gebruikknoppen { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 18px 0; }
+#hulp .gebruikknoppen button { font-size: 15px; padding: 6px 12px; }
+#hulp .gebruikjson { display: block; box-sizing: border-box; width: calc(100% - 36px); margin: 8px 18px 0; font: 500 11px/1.4 var(--mono, monospace); border: 2px solid var(--inkt); background: var(--vlak, #fff); color: var(--inkt); }

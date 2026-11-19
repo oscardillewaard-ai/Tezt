@@ -8,6 +8,7 @@ const SHELL = [
   'styles.css',
   'app.js',
   'sheet.js',
+  'gebruik.js',
   'korrelkaart.js',
   'bronnen.js',
   'kern.js',

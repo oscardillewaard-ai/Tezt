@@ -251,5 +251,82 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   stap('stationsmodus via de knoppen: één startpunt, Verder, lengte, plannen')
 }
 
+// ---- lokale teller "Mijn gebruik": alles via de knoppen, en er gaat niets het netwerk op ----
+{
+  const schoon = await browser.newContext(
+    mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
+  const tp = await schoon.newPage()
+  const verzonden = []
+  tp.on('request', (r) => {
+    const tekst = r.url() + (r.postData() || '')
+    if (/plan_start|nopaves\.log|app_open/.test(tekst)) verzonden.push(r.url())
+  })
+  await tp.goto(basis)
+  await tp.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
+  await tp.goto(basis)
+  await tp.waitForSelector('.maplibregl-canvas', { timeout: 20000 })
+  await tp.click('[data-modus="rondje"]')
+  // een echte tik op de kaart (Delft), niet via een link
+  await tp.evaluate(() => window.onverhard.kaart.setView([52.0116, 4.3571], 14))
+  await tp.waitForTimeout(400)
+  const k = await tp.locator('#kaart').boundingBox()
+  await tp.mouse.click(k.x + k.width / 2, k.y + (mobiel ? k.height * 0.3 : k.height / 2))
+  await tp.waitForTimeout(500)
+  await tp.locator('#naar3').click()
+  await tp.locator('#km').fill('5')
+  await tp.locator('#km').dispatchEvent('change')
+  await tp.locator('#plan').click()
+  await tp.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  const log = await tp.evaluate(() => JSON.parse(localStorage.getItem('nopaves.log') || '[]'))
+  const ev = log.map((r) => r.ev)
+  assert.ok(ev.includes('app_open'), `app_open geteld: ${ev}`)
+  const open = log.find((r) => r.ev === 'app_open').d
+  assert.ok(['browser', 'standalone'].includes(open.weergave) && typeof open.locatie === 'string', `app_open: ${JSON.stringify(open)}`)
+  assert.ok(ev.includes('km_change'), 'km_change geteld')
+  const start = log.find((r) => r.ev === 'plan_start').d
+  assert.equal(start.soort, 'rondje')
+  assert.equal(start.km, 5)
+  assert.equal(start.start, 'tik')
+  assert.match(start.voorkeuren, /^P.\|S.\|T.\|H.\|L[\d.]+\|R\d\|V.$/)
+  const klaar = log.find((r) => r.ev === 'plan_done').d
+  assert.equal(typeof klaar.ok, 'boolean')
+  assert.ok(klaar.ms > 0)
+  // GPX en de tab Ondergrond tellen mee
+  if (klaar.ok) {
+    if (mobiel) await tp.evaluate(() => window.onverhard.sheet.zet('vol'))
+    await tp.locator('#tabs [data-tab="ondergrond"]').click()
+    await Promise.all([tp.waitForEvent('download'), tp.locator('#gpx').click()])
+  }
+  // [?] → Mijn gebruik
+  if (mobiel) await tp.evaluate(() => window.onverhard.sheet.zet('piek'))
+  await tp.locator('#uitleg').click()
+  await tp.waitForSelector('#hulp[open]')
+  const overzicht = await tp.locator('#gebruik').textContent()
+  assert.match(overzicht, /Rondje 1×/, overzicht)
+  assert.match(overzicht, /tik 1×/)
+  assert.match(overzicht, /5 km 1×/)
+  if (klaar.ok) assert.match(overzicht, /Geopend: tab ondergrond 1×/)
+  await tp.locator('#gebruik').scrollIntoViewIfNeeded()
+  await tp.screenshot({ path: path.join(map, `nopaves_gebruik_${soort}.png`) })
+  // Kopieer als JSON: klembord, of (zonder klembord) een vak om zelf te kopiëren
+  await schoon.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(basis).origin }).catch(() => {})
+  await tp.locator('#gebruikKopieer').click()
+  await tp.waitForTimeout(300)
+  const json = (await tp.locator('#gebruikJson').isVisible())
+    ? await tp.locator('#gebruikJson').inputValue()
+    : await tp.evaluate(() => navigator.clipboard.readText())
+  assert.equal(JSON.parse(json).length, (await tp.evaluate(() => JSON.parse(localStorage.getItem('nopaves.log')).length)), 'de JSON is het hele logboek')
+  // Wis: twee keer tikken
+  await tp.locator('#gebruikWis').click()
+  assert.match(await tp.locator('#gebruikWis').textContent(), /Zeker/)
+  assert.notEqual(await tp.evaluate(() => localStorage.getItem('nopaves.log')), null, 'één tik wist nog niets')
+  await tp.locator('#gebruikWis').click()
+  assert.equal(await tp.evaluate(() => localStorage.getItem('nopaves.log')), null, 'twee tikken wissen het logboek')
+  assert.match(await tp.locator('#gebruik').textContent(), /Nog niets geteld/)
+  assert.deepEqual(verzonden, [], 'geen teller-gegevens in netwerkverzoeken')
+  await schoon.close()
+  stap(`teller: ${ev.length} gebeurtenissen (${[...new Set(ev)].join(', ')}), Mijn gebruik, Kopieer als JSON, Wis; niets verstuurd`)
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)
