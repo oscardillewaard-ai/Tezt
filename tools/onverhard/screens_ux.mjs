@@ -30,6 +30,29 @@ for (const thema of ['licht', 'donker']) {
   await page.evaluate(() => window.onverhard.sheet.zet('vol'))
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(map, `${label}_resultaat-vol_${thema}.png`) })
+  // nieuwe interface: minuten (met tempo) en Rondjes in een gebied
+  if (await page.locator('#plankaart').count()) {
+    await page.goto(basis)
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('onverhard.v1') || '{}')
+      Object.assign(s, { modus: 'rondje', tempo: 345, eenheid: 'min', minuten: 60, km: 10.4, punten: [] })
+      localStorage.setItem('onverhard.v1', JSON.stringify(s))
+    })
+    await page.goto(basis)
+    await page.waitForTimeout(1500)
+    await page.evaluate(() => window.onverhard.kaart.setView([52.13, 4.35], 14, { animate: false }))
+    await page.evaluate(() => {
+      const k = window.onverhard.kaart
+      const pt = k.latLngToContainerPoint([52.13, 4.35])
+      k.fire('contextmenu', { latlng: L.latLng(52.13, 4.35), originalEvent: { clientX: pt.x, clientY: 200, preventDefault() {} } })
+    })
+    await page.locator('#kaartmenu .gebiedzoek:not([disabled])').waitFor({ timeout: 30000 }).catch(() => {})
+    await page.waitForTimeout(800)
+    await page.screenshot({ path: path.join(map, `${label}_gebiedmenu_${thema}.png`) })
+    await page.locator('#kaartmenu .gebiedzoek:not([disabled])').click().catch(() => {})
+    await page.waitForTimeout(2000)
+    await page.screenshot({ path: path.join(map, `${label}_gebied-minuten_${thema}.png`) })
+  }
   await ctx.close()
   console.log('klaar', thema)
 }

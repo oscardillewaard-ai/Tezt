@@ -964,3 +964,35 @@ test('sheet: de piek past zich aan de plankaart aan, half blijft hoger', () => {
   assert.equal(Sheet.standHoogtes(844, 0, 900).piek, Math.round(844 * 0.62), 'nooit hoger dan 62% van het scherm')
   assert.equal(Sheet.standHoogtes(844, 34).piek, 158 + 34, 'zonder meting de vaste piek')
 })
+
+import * as Gebieden from '../../public/onverhard/gebieden.js'
+test('gebieden: punt in veelhoek, afsnijden met een cirkel rond de start', () => {
+  const vierkantLL = [[52.0, 4.0], [52.0, 4.2], [52.2, 4.2], [52.2, 4.0], [52.0, 4.0]]
+  assert.ok(Gebieden.puntInRing([4.1, 52.1], vierkantLL.map(([a, b]) => [b, a])))
+  assert.ok(!Gebieden.puntInRing([4.3, 52.1], vierkantLL.map(([a, b]) => [b, a])))
+  assert.ok(!Gebieden.puntInVeelhoek([4.1, 52.1], [vierkantLL.map(([a, b]) => [b, a]), [[4.05, 52.05], [4.15, 52.05], [4.15, 52.15], [4.05, 52.15]]]), 'in een gat telt niet')
+  // een groot gebied: wat overblijft is (bijna) de cirkel van 2 km
+  const r = Gebieden.gebiedRondStart(vierkantLL, [52.1, 4.1], 2000)
+  const rd = r.map(([la, lo]) => K.naarRd(lo, la))
+  let opp = 0
+  for (let i = 0; i < rd.length; i++) opp += rd[i][0] * rd[(i + 1) % rd.length][1] - rd[(i + 1) % rd.length][0] * rd[i][1]
+  assert.ok(Math.abs(Math.abs(opp / 2) - Math.PI * 2000 ** 2) / (Math.PI * 2000 ** 2) < 0.02, `oppervlak ${Math.abs(opp / 2)}`)
+  // start aan de rand: ongeveer een halve cirkel
+  const half = Gebieden.gebiedRondStart(vierkantLL, [52.1, 4.2], 2000)
+  assert.ok(half.every(([, lo]) => lo <= 4.2 + 1e-6), 'niets buiten het gebied')
+  // start ver buiten het gebied: niets
+  assert.equal(Gebieden.gebiedRondStart(vierkantLL, [53, 5], 2000), null)
+})
+
+test('gebieden: Natura 2000 zoeken met een nep-antwoord', async () => {
+  const antwoord = { features: [{ properties: { naam_n2k: 'Testduinen' }, geometry: { type: 'MultiPolygon', coordinates: [[[[4, 52], [4.2, 52], [4.2, 52.2], [4, 52.2], [4, 52]]]] } }] }
+  const haal = async (url) => {
+    assert.match(url, /natura2000\/items\?f=json&limit=10&bbox=4\.09900,52\.09900,4\.10100,52\.10100/)
+    return { ok: true, json: async () => antwoord }
+  }
+  const g = await Gebieden.zoekNatura2000(52.1, 4.1, undefined, haal)
+  assert.equal(g.naam, 'Testduinen')
+  assert.deepEqual(g.ring[0], [52, 4])
+  assert.equal(await Gebieden.zoekNatura2000(53.1, 4.1, undefined, async () => ({ ok: true, json: async () => antwoord })), null)
+  await assert.rejects(Gebieden.zoekNatura2000(52.1, 4.1, undefined, async () => ({ ok: false, status: 503 })))
+})

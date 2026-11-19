@@ -121,14 +121,14 @@
           </div>
           <div class="pkregels" id="pkregels">
             <div class="startregel" id="startregel"></div>
+            <div class="binnenchip" id="binnenchip" hidden><span>Binnen: <b id="binnenNaam"></b></span><button type="button" class="klein" id="binnenWeg" aria-label="Niet binnen dit gebied"><svg class="ico" aria-hidden="true"><use href="#i-sluit"/></svg></button></div>
             <div class="zoekplek" id="zoekplek" hidden></div>
             <div class="afstandregel" id="afstandregel">
               <button type="button" class="stepknop" id="kmMin" aria-label="1 km korter"><svg class="ico" aria-hidden="true"><use href="#i-min"/></svg></button>
-              <button type="button" class="afstandwaarde" id="kmWaarde" aria-label="Afstand, tik om te typen"><b id="kmGetal">10</b> <span id="kmEenheid">km</span></button>
-              <input type="number" id="kmInvoer" class="afstandinvoer" min="2" max="60" step="1" inputmode="numeric" aria-label="Afstand in km (2 tot 60)" hidden />
+              <span class="afstandvak"><button type="button" class="afstandwaarde" id="kmWaarde" aria-label="Afstand, tik om te typen"><b id="kmGetal">10</b></button><input type="number" id="kmInvoer" class="afstandinvoer" min="2" max="60" step="1" inputmode="numeric" aria-label="Afstand in km (2 tot 60)" hidden /><button type="button" class="eenheid" id="kmEenheid" aria-label="Eenheid: km (tik voor minuten)" disabled>km</button></span>
               <button type="button" class="stepknop" id="kmPlus" aria-label="1 km langer"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
               <span class="snelkeuzes" id="snelkeuzes">
-                <button type="button" data-km="5">5</button><button type="button" data-km="10">10</button><button type="button" data-km="15">15</button><button type="button" data-km="20">20</button>
+
               </span>
             </div>
             <p class="afstandnoot" id="afstandnoot" hidden></p>

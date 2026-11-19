@@ -146,9 +146,11 @@ export function leesOsmTegel(bytes, x, y, idStart = 0, { zoom = TEGEL_ZOOM, lage
       let tags = []
       let soort = 0
       let geom = []
+      let fid = 0
       while (!fl.klaar()) {
         const [n, t] = fl.veld()
-        if (n === 2 && t === 2) tags = packed(fl.stuk())
+        if (n === 1 && t === 0) fid = fl.varint()
+        else if (n === 2 && t === 2) tags = packed(fl.stuk())
         else if (n === 3 && t === 0) soort = fl.varint()
         else if (n === 4 && t === 2) geom = packed(fl.stuk())
         else fl.sla(t)
@@ -202,6 +204,10 @@ export function leesOsmTegel(bytes, x, y, idStart = 0, { zoom = TEGEL_ZOOM, lage
           const { lat, lon } = naarLatLon(stukken[0][0][0], stukken[0][0][1])
           uit.push({ type: 'poi', id: ++id, soort: s2, naam: p['name:nl'] || p.name || '', lat, lon })
         }
+      } else if (naam === 'park' && soort === 3) {
+        // natuurgebieden: de naam staat ook op het vlak (gecontroleerd, zie VOORTGANG.md, controle e)
+        const ringen = stukken.filter((st) => st.length >= 4).map((st) => st.map(([gx, gy]) => naarLatLon(gx, gy)))
+        if (ringen.length) uit.push({ type: 'park', id: fid, klasse: p.class || '', naam: p['name:nl'] || p.name || '', ringen })
       } else if (naam === 'landcover' && soort === 3 && p.subclass === 'beach') {
         for (const st of stukken) if (st.length >= 4) uit.push({ type: 'way', id: ++id, tags: { natural: 'beach' }, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel' })
       }

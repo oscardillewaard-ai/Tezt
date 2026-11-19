@@ -28,7 +28,7 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 | UX fase 1: controles a–e | klaar |
 | UX fase 1: bouwen 1–8 | klaar (tag `na-ux-1`) |
 | UX fase 2 | klaar (tag `na-ux-2`) |
-| UX fase 3 | todo |
+| UX fase 3 | klaar (tag `na-ux-3`) |
 | Snelheid stap 0–6 | todo |
 
 ## Testen
@@ -201,8 +201,55 @@ het oude stappenplan testen, draaien nu met `?ui=oud`.
 
 Schermafbeeldingen: `docs/ux-voortgang/na-ux1_*` (voor) en `docs/ux-voortgang/na-ux2_*` (na).
 
+## UX fase 3: minuten en gebieden
+
+1. **Km of minuten**: met een tempo is de eenheid achter het getal tikbaar (km ⇄ min). In minuten:
+   stappen van 5 min, snelkeuzes 30 · 45 · 60 · 90, typen 10–360 min. De planner krijgt
+   km = minuten ÷ tempo (op 0,1 km). Eronder staan beide ("60 min ≈ 10,4 km"; in km-stand
+   "10 km ≈ 58 min"). Zonder tempo is de eenheid gewoon "km" (niet tikbaar); tempo wissen zet de
+   eenheid terug op km. Opgeslagen in `onverhard.v1` (`tempo`, `eenheid`, `minuten`).
+2. **Rondjes in dit gebied** (`gebieden.js`): lang drukken (of rechtsklik) zet bovenaan het
+   kaartmenu meteen "Gebied zoeken…", dat wordt "Rondjes in <naam>" of verdwijnt. De tik is de
+   start; in de plankaart staat de chip "Binnen: <naam> [x]". Plannen gaat via de bestaande
+   In-gebied-planning (`planGebied`) met als vlak: het gebied **afgesneden met een cirkel met straal
+   L/2** rond de start (Sutherland-Hodgman tegen een 64-hoek, in RD, vereenvoudigd op 10 m).
+   - Bron: **PDOK Natura 2000** (OGC API Features, bbox ±0,001° rond de tik, punt-in-veelhoek zelf,
+     gaten tellen niet). Werkt (CORS open). Terugval als die bron faalt: de laag `park` van
+     OpenFreeMap op zoom 12 (alleen een benoemd vlak met een beschermde klasse, kleinste eerst; de
+     naam komt van het vlak zelf, zie controle e). Keuze: bij een werkende Natura 2000-bron zonder
+     treffer komt er **niets** (dus geen terugval), zoals de beslisregel "benoemd beschermd gebied,
+     anders niets" vraagt.
+   - Het gebied (de ring) wordt niet in localStorage bewaard (de Veluwe-ring is ~85.000 punten);
+     na herladen is de chip weg. Een start buiten het gebied, een andere soort of Nieuw haalt de chip weg.
+   - In gebied (zelf tekenen) blijft onder Meer.
+
+**Test met 6 plekken** (`tools/onverhard/test_gebieden.mjs`, rechtsklik → menu-item → 10 km →
+Plan rondje; desktop, koude cache; ruwe cijfers in `docs/ux-voortgang/gebieden-ux3.json`):
+
+| Plek | Menu-item | Opzoeken | Plannen | Uitkomst | Gelukt |
+|---|---|---|---|---|---|
+| Meijendel & Berkheide | Meijendel & Berkheide | 611 ms | 16 s | 12.7 km, score 85 | ja |
+| Veluwe (Veluwezoom) | Veluwe | 1704 ms | 45 s | 12.7 km, score 91 | ja |
+| Schoorlse Duinen | Schoorlse Duinen | 568 ms | 16 s | 10.3 km, score 99 | ja |
+| Kennemerland-Zuid | Kennemerland-Zuid | 739 ms | 29 s | 14.2 km, score 75 | ja |
+| Loonse en Drunense Duinen | Loonse en Drunense Duinen & Leemkuilen | 696 ms | 26 s | 10.5 km, score 97 | ja |
+| Delftse Hout (geen beschermd gebied) | geen menu-item (goed) | 647 ms | – | – | ja |
+
+Kanttekeningen: de Veluwezoom heet in Natura 2000 "Veluwe" (het hele gebied); dat antwoord is
+3,2 MB en kost ~1,7–3 s. De rondjes zijn vaak langer dan gevraagd (12,7 km bij 10): dat is het
+gedrag van de bestaande In-gebied-planning (die rekent met rondes binnen het vlak), niet van deze
+stap. Open punt: dat verdient een eigen blik.
+
+Service worker `onverhard-v39` (gebieden.js erbij). Tests: 47 unit-tests (nieuw: punt-in-veelhoek,
+afsnijden, Natura 2000 met nep-antwoord), Playwright mobiel (30) en desktop (28) groen, met een blok
+"UX fase 3" (minuten via de knoppen; lang drukken in Meijendel, chip, plannen, ≥ 90% van de
+routepunten binnen het gebied, [x]; Delftse Hout geen menu-item).
+
+Schermafbeeldingen: `docs/ux-voortgang/na-ux3_*` (o.a. `gebiedmenu`, `gebied-minuten`); voor = `na-ux2_*`.
+
 ## Open punten
 
+- In-gebied-rondjes worden vaak 20–40% langer dan gevraagd (bestaand gedrag van `planGebied`).
 - **Op de planning voor later (verzoek gebruiker): hill repeat-modus.** Niet in deze opdracht.
 
 - "Delft Centraal" zoeken: de Locatieserver kent geen stations. Mogelijke vervolgstap: bij een

@@ -377,7 +377,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   // afstand: stepper, snelkeuze, typen
   await q.locator('#kmPlus').click()
   const km1 = Number(await q.locator('#kmGetal').textContent())
-  await q.locator('#snelkeuzes [data-km="15"]').click()
+  await q.locator('#snelkeuzes [data-waarde="15"]').click()
   assert.equal(await q.locator('#kmGetal').textContent(), '15')
   await q.locator('#kmMin').click()
   assert.equal(await q.locator('#kmGetal').textContent(), '14')
@@ -522,7 +522,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
 
   // station met tempo: aankomsttijd
   await q.locator('[data-soort="station"]').click()
-  await q.locator('#snelkeuzes [data-km="10"]').click()
+  await q.locator('#snelkeuzes [data-waarde="10"]').click()
   await q.locator('#planKnop').click()
   await q.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   assert.equal(await q.locator('#fout').textContent(), '')
@@ -539,6 +539,92 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   stap(`station met tempo: ${await q.locator('#tijdregel').textContent()}; popup "${pop.eerste}"`)
   assert.deepEqual(qf, [], 'geen paginafouten of browservensters')
   await pc.close()
+}
+
+// ---- UX fase 3: minuten en gebieden ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const c3 = await browser.newContext(opties)
+  const m = await c3.newPage()
+  const mf = []
+  m.on('pageerror', (e) => mf.push('PAGEERROR ' + e.message))
+  m.on('dialog', (d) => { mf.push('BROWSERVENSTER ' + d.message()); d.dismiss() })
+  await m.goto(basis)
+  await m.locator('[data-soort="rondje"]').click()
+  assert.ok(await m.locator('#kmEenheid').isDisabled(), 'zonder tempo geen minuten')
+  await m.locator('#voorkeurregel').click()
+  await m.locator('#tempoWaarde').click()
+  await m.locator('#tempoInvoer').pressSequentially('600')
+  await m.locator('#tempoInvoer').press('Enter')
+  await m.locator('#voorkeurenDicht').click()
+  await m.locator('#kmEenheid').click()
+  assert.equal(await m.locator('#kmEenheid').textContent(), 'min')
+  await m.locator('#snelkeuzes [data-waarde="60"]').click()
+  assert.equal(await m.locator('#afstandnoot').textContent(), '60 min ≈ 10,0 km', 'toon beide')
+  await m.locator('#kmPlus').click()
+  assert.equal(await m.locator('#afstandnoot').textContent(), '65 min ≈ 10,8 km')
+  assert.equal(await m.evaluate(() => JSON.parse(localStorage.getItem('onverhard.v1')).km), 10.8, 'de planner krijgt km = minuten ÷ tempo')
+  await m.locator('#kmEenheid').click()
+  assert.equal(await m.locator('#kmEenheid').textContent(), 'km')
+  assert.match(await m.locator('#afstandnoot').textContent(), /^11 km ≈ 66 min$/)
+  stap('afstand in minuten (met tempo 6:00): 60 min ≈ 10,0 km, +5 min, terug naar km')
+
+  // lang drukken in Meijendel: Rondjes in Meijendel & Berkheide
+  await m.evaluate(() => window.onverhard.kaart.setView([52.13, 4.35], 14, { animate: false }))
+  await m.waitForTimeout(300)
+  if (mobiel) {
+    await m.evaluate(() => {
+      const k = window.onverhard.kaart
+      const pt = k.latLngToContainerPoint([52.13, 4.35])
+      k.fire('contextmenu', { latlng: L.latLng(52.13, 4.35), originalEvent: { clientX: pt.x, clientY: pt.y, preventDefault() {} } })
+    })
+  } else {
+    const vak = await m.locator('#kaart').boundingBox()
+    const pt = await m.evaluate(() => window.onverhard.kaart.latLngToContainerPoint([52.13, 4.35]))
+    await m.mouse.click(vak.x + pt.x, vak.y + pt.y, { button: 'right' })
+  }
+  const item = m.locator('#kaartmenu .gebiedzoek:not([disabled])')
+  await item.waitFor({ timeout: 30000 })
+  assert.equal(await item.textContent(), 'Rondjes in Meijendel & Berkheide')
+  await item.click()
+  assert.ok(await m.locator('#binnenchip').isVisible(), 'chip Binnen')
+  assert.equal(await m.locator('#binnenNaam').textContent(), 'Meijendel & Berkheide')
+  assert.match(await m.locator('#startregel').textContent(), /Start: in Meijendel/)
+  await m.locator('#kmEenheid').click() // weer minuten: 60 min = 10 km
+  await m.locator('#snelkeuzes [data-waarde="60"]').click()
+  await m.locator('#planKnop').click()
+  await m.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  assert.equal(await m.locator('#fout').textContent(), '')
+  // de route blijft binnen het gebied (met de marge die In gebied ook toestaat)
+  const binnenDeel = await m.evaluate(() => {
+    const ring = window.onverhard.binnen().ring
+    const coords = window.onverhard.krijgPlan().traject.coords
+    const pip = ([x, y]) => {
+      let b = false
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [yi, xi] = ring[i]
+        const [yj, xj] = ring[j]
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) b = !b
+      }
+      return b
+    }
+    return coords.filter(pip).length / coords.length
+  })
+  assert.ok(binnenDeel >= 0.9, `de route ligt (bijna) helemaal in het gebied: ${(100 * binnenDeel).toFixed(0)}%`)
+  await m.locator('#binnenWeg').click()
+  assert.ok(await m.locator('#binnenchip').isHidden(), '[x] haalt het gebied weg')
+  // geen beschermd gebied: geen menu-item
+  await m.evaluate(() => window.onverhard.kaart.setView([52.017, 4.383], 15, { animate: false }))
+  await m.waitForTimeout(300)
+  await m.evaluate(() => {
+    const k = window.onverhard.kaart
+    const pt = k.latLngToContainerPoint([52.017, 4.383])
+    k.fire('contextmenu', { latlng: L.latLng(52.017, 4.383), originalEvent: { clientX: pt.x, clientY: pt.y, preventDefault() {} } })
+  })
+  await m.waitForFunction(() => !document.querySelector('#kaartmenu .gebiedzoek'), null, { timeout: 30000 })
+  assert.deepEqual(mf, [])
+  stap('lang drukken in Meijendel: "Rondjes in Meijendel & Berkheide", chip, plannen binnen het gebied; Delftse Hout: geen menu-item')
+  await c3.close()
 }
 
 await browser.close()
