@@ -29,7 +29,10 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 | UX fase 1: bouwen 1–8 | klaar (tag `na-ux-1`) |
 | UX fase 2 | klaar (tag `na-ux-2`) |
 | UX fase 3 | klaar (tag `na-ux-3`) |
-| Snelheid stap 0–6 | todo |
+| Snelheid stap 0 (meten) | klaar |
+| Snelheid stap 1–5 | klaar |
+| Snelheid stap 6 (eigen router) | bezig |
+| Hermeting na stap 6 | todo |
 
 ## Testen
 
@@ -246,6 +249,133 @@ afsnijden, Natura 2000 met nep-antwoord), Playwright mobiel (30) en desktop (28)
 routepunten binnen het gebied, [x]; Delftse Hout geen menu-item).
 
 Schermafbeeldingen: `docs/ux-voortgang/na-ux3_*` (o.a. `gebiedmenu`, `gebied-minuten`); voor = `na-ux2_*`.
+
+## Snelheid
+
+### Stap 0: meten
+
+Meetpunten in de app (`meting.js`): `performance.now()` om elke fase (tegels ophalen en lezen,
+graaf bouwen, route rekenen, BGT, AHN, water/POI's, BRouter) en per bron het aantal verzoeken,
+bytes en cachetreffers. `window.onverhard.meting.rapport()` geeft het overzicht van de laatste
+planning. Vaste testset in `tools/onverhard/benchmark_snelheid.mjs`: rondje 10 km en station 15 km
+vanaf Delft Centraal, 10 A-naar-B-paren rond Delft (5 van 2–5 km, 5 van 10–25 km), In gebied
+(voorbeeld Delftse Hout, 8 km) en Tekenen (voorbeeld). Per geval **5× koud** (nieuwe browsercontext:
+lege HTTP-cache en Cache Storage) en **5× warm** (zelfde context na één opwarmronde; pagina elke keer
+opnieuw geladen). Mediaan per fase in seconden. Fasen kunnen overlappen; "Totaal" is de wandklok
+van de hele planning. Desktop-Chromium (headless, SwiftShader) in de cloudomgeving, via de proxy,
+dus absolute tijden zijn hoger dan op een goede telefoonverbinding; de verhoudingen tellen.
+Ruwe cijfers: `docs/snelheid/nulmeting-rest.json` en `docs/snelheid/nulmeting-ab.json`.
+
+**Nulmeting** (code `5e548ec` = na UX fase 3 + meetpunten):
+
+| Geval | Cache | Totaal (s) | Eerste (s) | tegels | graaf | route | bgt | ahn | water | brouter | tegels n / kB / cache | ok |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| rondje-10 Delft Centraal | koud | 10,7 | – | 2,1 | 0,6 | 1,5 | 4,7 | 1,3 | 0,3 | – | 61 / 11620 / 0 | 5/5 |
+| rondje-10 Delft Centraal | warm | 5,7 | – | 2,0 | 0,6 | 1,5 | 0,4 | 0,8 | 0,2 | – | 61 / 11620 / 0 | 5/5 |
+| station-15 Delft Centraal | koud | 24,9 | – | 4,8 | 4,2 | 0,1 | 11,9 | 3,4 | 0,6 | – | 330 / 52215 / 12 | 5/5 |
+| station-15 Delft Centraal | warm | 24,8 | – | 3,2 | 4,0 | 0,1 | 13,9 | 2,9 | 0,7 | – | 330 / 52215 / 33 | 5/5 |
+| gebied Delftse Hout (voorbeeld, 8 km) | koud | 3,4 | – | 0,7 | 0,3 | 0,4 | 1,2 | 0,6 | 0,1 | – | 19 / 4396 / 0 | 5/5 |
+| gebied Delftse Hout (voorbeeld, 8 km) | warm | 2,5 | – | 0,6 | 0,3 | 0,4 | 0,8 | 0,3 | 0,1 | – | 19 / 4396 / 0 | 5/5 |
+| tekenen (voorbeeld) | koud | 2,1 | – | 0,6 | 0,0 | 0,0 | 0,7 | 0,6 | 0,2 | – | 12 / 2574 / 0 | 5/5 |
+| tekenen (voorbeeld) | warm | 1,0 | – | 0,4 | 0,1 | 0,0 | 0,4 | 0,2 | 0,1 | – | 12 / 2574 / 0 | 5/5 |
+| ab-kort-1 Delftse Hout | koud | 4,3 | – | 0,3 | – | – | 1,2 | 0,7 | 0,3 | 2,0 | 16 / 3474 / 1 | 5/5 |
+| ab-kort-1 Delftse Hout | warm | 2,9 | – | 0,2 | – | – | 0,1 | 0,2 | 0,2 | 2,3 | 16 / 3474 / 1 | 5/5 |
+| ab-kort-2 Den Hoorn | koud | 5,5 | – | 0,4 | – | – | 1,9 | 0,9 | 0,5 | 2,1 | 17 / 3799 / 1 | 5/5 |
+| ab-kort-2 Den Hoorn | warm | 3,4 | – | 0,2 | – | – | 0,2 | 0,5 | 0,2 | 2,4 | 17 / 3799 / 1 | 5/5 |
+| ab-kort-3 Delfgauw | koud | 6,4 | – | 0,3 | – | – | 2,2 | 1,1 | 0,5 | 2,2 | 20 / 3861 / 1 | 5/5 |
+| ab-kort-3 Delfgauw | warm | 3,8 | – | 0,2 | – | – | 0,3 | 0,6 | 0,2 | 2,4 | 20 / 3861 / 1 | 5/5 |
+| ab-kort-4 Nootdorp | koud | 6,5 | – | 0,4 | – | – | 2,7 | 1,3 | 0,4 | 2,1 | 26 / 5128 / 1 | 5/5 |
+| ab-kort-4 Nootdorp | warm | 4,0 | – | 0,2 | – | – | 0,3 | 0,8 | 0,3 | 2,5 | 26 / 5128 / 1 | 5/5 |
+| ab-kort-5 Schipluiden | koud | 6,3 | – | 0,4 | – | – | 2,5 | 1,1 | 0,4 | 2,1 | 24 / 3993 / 1 | 5/5 |
+| ab-kort-5 Schipluiden | warm | 3,7 | – | 0,2 | – | – | 0,3 | 0,8 | 0,2 | 2,3 | 24 / 3993 / 1 | 5/5 |
+| ab-lang-1 Rotterdam Centraal | koud | 11,3 | – | 0,6 | – | – | 4,9 | 2,1 | 0,7 | 3,2 | 44 / 9331 / 1 | 5/5 |
+| ab-lang-1 Rotterdam Centraal | warm | 6,0 | – | 0,4 | – | – | 0,6 | 1,5 | 0,5 | 3,3 | 44 / 9331 / 1 | 5/5 |
+| ab-lang-2 Scheveningen | koud | 16,5 | – | 0,8 | – | – | 7,5 | 1,9 | 0,9 | 5,7 | 48 / 13513 / 1 | 5/5 |
+| ab-lang-2 Scheveningen | warm | 8,9 | – | 0,4 | – | – | 0,9 | 1,5 | 0,6 | 5,5 | 48 / 13513 / 1 | 5/5 |
+| ab-lang-3 Zoetermeer | koud | 9,1 | – | 0,4 | – | – | 3,6 | 1,8 | 0,5 | 2,7 | 39 / 7448 / 1 | 5/5 |
+| ab-lang-3 Zoetermeer | warm | 5,5 | – | 0,3 | – | – | 0,4 | 1,3 | 0,4 | 3,3 | 39 / 7448 / 1 | 5/5 |
+| ab-lang-4 Maassluis | koud | 11,7 | – | 0,6 | – | – | 5,2 | 2,5 | 0,7 | 2,7 | 54 / 7734 / 1 | 5/5 |
+| ab-lang-4 Maassluis | warm | 5,9 | – | 0,3 | – | – | 0,5 | 2,1 | 0,4 | 2,8 | 54 / 7734 / 1 | 5/5 |
+| ab-lang-5 Leiden Centraal | koud | 18,4 | – | 1,0 | – | – | 9,1 | 3,6 | 1,1 | 4,2 | 72 / 12671 / 1 | 5/5 |
+| ab-lang-5 Leiden Centraal | warm | 8,7 | – | 0,6 | – | – | 0,9 | 3,1 | 0,7 | 3,5 | 72 / 12671 / 1 | 5/5 |
+
+
+Wat de meting zegt:
+- **BGT is overal de grootste post** (koud 35–50% van het totaal; 21 MB voor één rondje, 52 MB voor
+  Station 15 km). De HTTP-cache van de browser helpt er niet betrouwbaar bij (Station warm: 13,9 s).
+- Bij Station kosten **tegels (4,8 s) en graaf (4,2 s)** veel; bij A naar B is **BRouter** 2–6 s.
+- Met warme cache kost "tegels" bij een rondje nog 2 s: dat is het **lezen** van 11,6 MB tegels
+  (CPU), niet het netwerk.
+- **Graaf bouwen**: hoogstens 17% (Station), bij een rondje 6–11%. Dat is onder de 20%-grens, dus
+  **geen gebouwde graaf in IndexedDB** (stap 1).
+
+Volgorde van werken op grond hiervan: stap 1 (cache: BGT!) en 3 (eerder iets laten zien) eerst,
+dan 2, 4, 5, 6.
+
+### Stap 1: cache
+
+`datacache.js`: kaarttegels (OpenFreeMap), BGT-tegels en AHN-blokken eerst uit Cache Storage
+(`nopaves-data-v1`), met de opslagtijd in een eigen header. Ouder dan 7 dagen: wel gebruiken, op de
+achtergrond verversen (lage prioriteit, niet bij saveData). Ouder dan 30 dagen: niet meer gebruiken.
+Grens: 8000 items of 300 MB (via `navigator.storage.estimate`); daarboven gaat het oudste kwart weg
+(Cache Storage geeft de sleutels in volgorde van opslaan). App-bestanden blijven eerst netwerk (de
+service worker raakt cross-origin verzoeken niet aan); de service worker wist bij een update nu
+alleen nog oude `onverhard-*`-caches, niet de datacache. In Node (tests, benchmarks) doet de cache
+niets. Geen graaf in IndexedDB (zie stap 0). Daarnaast: BGT nu 10 tegels tegelijk (was 6).
+
+### Stap 2: vooraf ophalen
+
+Zodra de start van een rondje of stationsroute bekend is (tikken, locatie, zoeken, slepen, of de
+afstand verstellen), haalt de app na 600 ms rust de kaarttegels alvast op: rondje binnen L/2,
+station de stations (zoom 12) en de paden binnen L; dichtbij eerst, max 120 (rondje) of 160
+(station) tegels, 3 tegelijk, `priority: 'low'`, niet bij saveData. Daarbij de BGT-tegels binnen
+500 m van de start (max 25): daar komt elke route langs. Stopt als de start verandert of het
+plannen begint. Getest: na het tikken van de start ~73 tegels in ~4,5 s in de cache.
+
+### Stap 3: route A meteen
+
+`maakPlan` kent nu `tussentijds(deel)`: (1) zodra de eigen planner zijn rondjes/routes heeft, gaat
+de beste volgens OpenStreetMap als **voorlopige** route A naar het scherm (score en percentages met
+het label "voorlopig"); (2) na de officiële kaart alle routes (A · B · C), nog zonder hoogte en
+water; (3) het hele plan. Bovenaan staat een regel "Nog bezig: officiële kaart, andere routes,
+hoogte, water" met een Stopknop; in de piek staat hetzelfde in de tweede regel. Stoppen na een
+tussenresultaat laat dat resultaat staan, met de melding wat er ontbreekt. A naar B via BRouter
+krijgt alleen stap (2) (BRouter levert geen route zonder de BGT-keuze tussen alternatieven).
+
+### Stap 4: rekenwerker
+
+`rekenen.js` + `rekenwerker.js`: kaarttegels lezen, graaf bouwen en zoeken (rondjes, Dijkstra,
+in-gebied, elke straat, tekenen, A naar B) gebeuren in een module-Web Worker; de pagina krijgt een
+kopie van de graaf (voor verslepen en omwegen) en alleen kleine zoekresultaten. Stop roept
+`worker.terminate()` aan: getest, het plannen stopt binnen 3 s en de volgende planning start een
+nieuwe worker. In Node (zonder Worker) loopt hetzelfde gewoon in hetzelfde proces. Tijdens het
+wachten zoomt de kaart naar het gebied waar de route komt (rondje 0,3 × L rond de start, station
+0,7 × L, A naar B de punten, tekenen de tekening). Ook gerepareerd: de piek toonde de Stopknop pas
+na de eerste voortgangsmelding.
+
+### Stap 5: Naar station in ringen
+
+De tegels voor de paden naar de stations worden nu van dichtbij naar ver opgehaald (zelfde tegels,
+zelfde uitkomst). De echte ringen-aanpak (eerst alleen de beste max(4, aantal) kandidaten in eigen
+richtingen; is er een niet bereikbaar, dan de volgende erbij) staat achter **`?stations=ringen`**,
+omdat de uitkomst **niet altijd gelijk** blijft (`tools/onverhard/vergelijk_stations.mjs`, Node,
+echte bronnen, ruwe cijfers in `docs/snelheid/stap5-stations.json`):
+
+| Start | Tegels gewoon → ringen | Tijd | Zelfde routes? |
+|---|---|---|---|
+| Delft Centraal (15 km) | 241 → 162 | 14,3 → 8,3 s | nee: Maassluis West 17.14 km s30, Rotterdam Centraal 15.44 km s23 |
+| Utrecht Centraal (12 km) | 163 → 144 | 12,0 → 7,9 s | nee: Eiteren 13.88 km s31, Maarssen 8.69 km s14 |
+| Amersfoort (15 km) | 206 → 206 | 11,5 → 9,6 s | ja |
+| Haarlem (12 km) | 118 → 118 | 7,8 → 7,9 s | ja |
+| Den Bosch (15 km) | 115 → 115 | 5,3 → 3,7 s | ja |
+| Zwolle (20 km) | 252 → 488 | 11,3 → 13,1 s | nee: Wijhe 17.34 km s36 |
+
+Waarom niet gelijk: de app rekent nu routes naar alle (max 6) kandidaten en kiest daarna de beste 4
+op score en lengte. Stoppen na 4 bereikbare stations slaat kandidaten over die achteraf beter
+scoorden (Delft: Maassluis West valt weg, Rotterdam Centraal komt erin). Een snelle én gelijke
+variant vraagt een bovengrens op de score van een nog niet doorgerekende route, en die is er niet
+(de score kan tot 100 gaan). Vervolgstap als je de winst toch wilt: de regel "resultaat gelijk"
+loslaten voor Station en `?stations=ringen` standaard maken (scheelt in Delft 33% tegels, 6 s).
 
 ## Open punten
 

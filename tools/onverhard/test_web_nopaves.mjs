@@ -697,5 +697,48 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await cs.close()
 }
 
+// ---- Snelheid stap 6: A naar B met de eigen router, versleepbaar ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const c6 = await browser.newContext(opties)
+  const e = await c6.newPage()
+  const ef = []
+  e.on('pageerror', (x) => ef.push('PAGEERROR ' + x.message))
+  let brouter = 0
+  e.on('request', (r) => { if (/brouter\.de/.test(r.url())) brouter += 1 })
+  await e.goto(`${basis}?router=eigen`)
+  await e.locator('[data-soort="route"]').click()
+  await e.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  await e.waitForTimeout(450)
+  await e.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0170, 4.3830) }))
+  await e.locator('#planKnop').click()
+  await e.waitForFunction(() => (!document.getElementById('resultaat').hidden && !window.onverhard.bezig()) || !!document.getElementById('fout').textContent, null, { timeout: 300000 })
+  assert.equal(await e.locator('#fout').textContent(), '')
+  const info = await e.evaluate(() => ({ router: window.onverhard.uitslag().router, knopen: !!window.onverhard.uitslag().opties[0].knopen, km: window.onverhard.krijgPlan().opties[0].km }))
+  assert.equal(info.router, 'eigen', 'A naar B met de eigen router')
+  assert.equal(brouter, 0, 'geen BRouter-verzoeken')
+  assert.ok(info.knopen, 'de route ligt op het eigen netwerk (versleepbaar)')
+  // verslepen: een punt halverwege de route 80 px opzij trekken (alleen met een muis)
+  if (!mobiel) {
+    const voor = await e.evaluate(() => window.onverhard.krijgPlan().traject.coords.length)
+    const pt = await e.evaluate(() => {
+      const c = window.onverhard.krijgPlan().traject.coords
+      const [lon, lat] = c[Math.floor(c.length / 2)]
+      window.onverhard.kaart.setView([lat, lon], 16, { animate: false })
+      return window.onverhard.kaart.latLngToContainerPoint([lat, lon])
+    })
+    await e.waitForTimeout(500)
+    const vak = await e.locator('#kaart').boundingBox()
+    await e.mouse.move(vak.x + pt.x, vak.y + pt.y)
+    await e.mouse.down()
+    for (let i = 1; i <= 8; i++) await e.mouse.move(vak.x + pt.x + i * 10, vak.y + pt.y - i * 6)
+    await e.mouse.up()
+    await e.waitForFunction((n) => window.onverhard.krijgPlan().traject.coords.length !== n, voor, { timeout: 30000 })
+    stap(`eigen router: A naar B ${info.km.toFixed(2)} km zonder BRouter; route versleept`)
+  } else stap(`eigen router: A naar B ${info.km.toFixed(2)} km zonder BRouter, op het eigen netwerk`)
+  assert.deepEqual(ef, [])
+  await c6.close()
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)

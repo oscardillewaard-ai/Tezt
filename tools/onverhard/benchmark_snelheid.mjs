@@ -57,7 +57,9 @@ async function eenRun(ctx, hash) {
       if (pl) {
         for (const st of pl.analyse.stukken) {
           const t = (st.tags && st.tags[0]) || ''
-          const m = /highway=(motorway|trunk)(_link)?\b|access=(private|no)\b|foot=(no|private)\b/.exec(t)
+          // verboden: snelweg, foot=no/private, of access=no/private zonder foot=yes/designated/permissive
+          const lopenMag = /foot=(yes|designated|permissive)\b/.test(t)
+          const m = /highway=(motorway|trunk)(_link)?\b|foot=(no|private)\b/.exec(t) || (!lopenMag && /access=(private|no)\b/.exec(t))
           if (m) {
             verboden.m += st.tot - st.van
             verboden.soorten[m[0]] = (verboden.soorten[m[0]] || 0) + Math.round(st.tot - st.van)
