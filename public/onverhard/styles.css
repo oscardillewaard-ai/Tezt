@@ -757,3 +757,85 @@ header > div:first-child { flex: 1 1 auto; }
 .afspeelsnelheid .keuzelabel { font: 500 11px var(--mono); color: var(--inkt-2); padding: 0 8px; border-right: 2px solid var(--inkt); align-self: stretch; display: flex; align-items: center; }
 #gebruik table { width: 100%; }
 #gebruik td:last-child { text-align: right; font-family: var(--mono); }
+
+/* ---- UX fase 2: de plankaart (alleen in de nieuwe interface) ---- */
+[data-ui="nieuw"] #thema, [data-ui="nieuw"] #opnieuw, [data-ui="nieuw"] #resultaat > h2, [data-ui="nieuw"] #resultaat > .stapvoet { display: none; }
+main.vast #stapper, main.vast #invoer { display: none; }
+main.meermodus #stapper .stapnr[data-nr="1"] { opacity: .5; }
+.piekbalk:empty { display: none !important; }
+#nieuwKnop .ico, #sluitSheet .ico { margin: 0 .25em 0 0; width: 1em; height: 1em; }
+#sluitSheet .ico { margin: 0; }
+.plankaart { display: grid; gap: 8px; padding: 6px 0 10px; }
+.plankaart.aanpassen { margin-top: 18px; padding-top: 12px; border-top: 2px solid var(--inkt); }
+.plankaart.aanpassen::before { content: 'Aanpassen'; font: 900 20px/1 var(--kop); text-transform: uppercase; letter-spacing: .06em; }
+.segment { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid var(--inkt); background: var(--vlak); }
+.segment button { border: 0; border-right: 2px solid var(--inkt); border-radius: 0; min-height: 42px; padding: 4px 2px; font: 800 18px/1 var(--kop); background: transparent; color: var(--inkt); }
+.segment button:last-child { border-right: 0; }
+.segment button[aria-pressed="true"] { background: var(--route); color: var(--route-inkt); }
+.segment button[data-soort="meer"][aria-expanded="true"]:not([aria-pressed="true"]) { background: var(--vlak-2); }
+.meerlijst { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.meerlijst[hidden], .pkregels[hidden] { display: none; }
+.meerlijst > button { border-radius: 0; min-height: 40px; justify-content: flex-start; display: flex; align-items: center; gap: 6px; font: 700 17px/1 var(--kop); }
+.meerlijst > button[aria-pressed="true"] { background: var(--route); color: var(--route-inkt); }
+.meerlijst .mijnplek { grid-column: 1 / -1; }
+.pkregels { display: grid; gap: 8px; }
+.startregel { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 4px 4px 8px; border: 2px solid var(--inkt); background: var(--vlak); }
+.startico .ico { width: 22px; height: 22px; margin: 0; }
+.starttekst { flex: 1 1 auto; min-width: 0; }
+.starttekst b { display: block; font: 800 18px/1.1 var(--kop); }
+.starttekst small { display: block; font: 500 11px/1.3 var(--mono); color: var(--inkt-2); }
+.startknoppen { display: flex; gap: 4px; flex: none; }
+.startknoppen button { border-radius: 0; min-height: 36px; min-width: 40px; padding: 4px; }
+.startknoppen .ico { margin: 0; }
+.zoekplek .zoek { margin: 0; }
+.afstandregel { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.afstandregel[hidden] { display: none; }
+.stepknop { border-radius: 0; min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; flex: none; }
+.stepknop .ico { margin: 0; width: 20px; height: 20px; }
+.afstandwaarde { border-radius: 0; min-height: 44px; min-width: 88px; padding: 0 8px; background: var(--vlak); font: 600 14px var(--mono); }
+.afstandwaarde b { font: 900 28px/1 var(--kop); letter-spacing: -.02em; }
+.afstandinvoer { width: 88px; min-height: 44px; border: 2px solid var(--inkt); border-radius: 0; font: 900 24px var(--kop); text-align: center; background: var(--vlak); color: var(--inkt); }
+.snelkeuzes { display: flex; gap: 4px; margin-left: auto; }
+.snelkeuzes button { border-radius: 0; min-width: 38px; min-height: 36px; padding: 0 4px; font: 800 17px var(--kop); }
+.snelkeuzes button[aria-pressed="true"] { background: var(--balk); color: var(--accent-tekst); }
+.afstandnoot { margin: -4px 0 0; font: 500 12px var(--mono); color: var(--inkt-2); }
+.voorkeurregel { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 0; min-height: 36px; padding: 4px 8px; background: transparent; border-style: dashed; text-align: left; font: 600 14px/1.25 'Karla', sans-serif; }
+.voorkeurregel .ico { flex: none; margin: 0; }
+.planknop { width: 100%; min-height: 48px; border-radius: 0; }
+/* resultaat: compacte keuze A · B · C */
+[data-ui="nieuw"] #opties { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+[data-ui="nieuw"] #opties .optie { border: 0; padding: 0; margin: 0; background: none; }
+[data-ui="nieuw"] #opties .kies { display: flex; align-items: center; gap: 6px; border-radius: 0; min-height: 40px; padding: 2px 6px; }
+[data-ui="nieuw"] #opties .kies small, [data-ui="nieuw"] #opties .optie:not(.metstation) .kies > span:nth-child(2) { display: none; }
+[data-ui="nieuw"] #opties .metstation .kies > span:nth-child(2) b { font-size: 15px; }
+[data-ui="nieuw"] #opties .gekozen .kies { background: var(--route); color: var(--route-inkt); }
+.andereknop { border-radius: 0; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; }
+.andereknop[hidden] { display: none; }
+details.details { margin-top: 10px; }
+
+.kern p.tijdregel { grid-column: 1 / -1; margin: -2px 0 0; font: 700 13px var(--mono); }
+.leaflet-popup .techniek summary { cursor: pointer; font: 500 12px var(--mono); margin-top: 4px; }
+.knoptekst2 { margin-left: 4px; font: 900 17px var(--kop); }
+/* melding onderin */
+.toast { position: fixed; z-index: 2000; left: 16px; right: 16px; bottom: 16px; max-width: 520px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 12px; background: var(--inkt); color: var(--vlak); border: 2px solid var(--inkt); }
+.toast[hidden] { display: none; }
+.toast .toasttekst { flex: 1 1 160px; font: 600 15px/1.3 'Karla', sans-serif; }
+.toast button { border-radius: 0; background: var(--vlak); color: var(--inkt); border-color: var(--vlak); }
+.toast .kopieervak, .toast .naamvorm input { flex: 1 1 100%; min-height: 40px; border: 2px solid var(--vlak); border-radius: 0; padding: 4px 8px; font: 500 14px var(--mono); background: var(--vlak); color: var(--inkt); }
+.toast .naamvorm { display: flex; gap: 6px; flex: 1 1 100%; }
+.toast .naamvorm input { flex: 1 1 auto; }
+@media (max-width: 700px) { .toast { bottom: calc(var(--sheet-h, 0px) + 10px); } }
+/* voorkeuren */
+#voorkeuren { width: min(94vw, 520px); max-height: 88vh; padding: 0 0 16px; border-radius: 0; background: var(--vlak); color: var(--inkt); overflow: auto; border: 2px solid var(--inkt); }
+#voorkeuren::backdrop { background: rgb(10 18 12 / .6); }
+.voorkeurvlak { padding: 4px 18px 0; display: grid; gap: 10px; }
+.voorkeurvlak #instellingen { margin: 0; }
+.tempostepper { display: flex; align-items: center; gap: 6px; }
+.tempowaarde { border-radius: 0; min-height: 44px; min-width: 110px; font: 900 22px var(--kop); background: var(--vlak); }
+.tempoinvoer { width: 110px; min-height: 44px; border: 2px solid var(--inkt); border-radius: 0; font: 900 22px var(--kop); text-align: center; background: var(--vlak); color: var(--inkt); }
+@media (max-width: 700px) {
+  [data-ui="nieuw"] header { padding-top: 2px; }
+  [data-ui="nieuw"] header .sub { display: none; }
+  [data-ui="nieuw"] header .wm { font-size: 34px; }
+}

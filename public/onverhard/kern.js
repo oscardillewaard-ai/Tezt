@@ -1360,11 +1360,12 @@ export const rondjeOmtrek = (straal, rek = 1) => straal * vormOmtrek(rek)
 // ---------- GPX ----------
 const xmlVeilig = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
 
-export function maakGpx(traject, naam, tijd = new Date(), beschrijving = '') {
+export function maakGpx(traject, naam, _tijd = null, beschrijving = '') {
   const regels = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<gpx version="1.1" creator="nopaves-planner" xmlns="http://www.topografix.com/GPX/1/1">',
-    `  <metadata><name>${xmlVeilig(naam)}</name>${beschrijving ? `<desc>${xmlVeilig(beschrijving)}</desc>` : ''}<time>${tijd.toISOString().slice(0, 19)}Z</time></metadata>`,
+    // bewust geen <time>: Strava en andere apps zien een GPX met tijden als gelopen activiteit
+  `  <metadata><name>${xmlVeilig(naam)}</name>${beschrijving ? `<desc>${xmlVeilig(beschrijving)}</desc>` : ''}</metadata>`,
   ]
   traject.punten.forEach(([lat, lon], i) => {
     const label = i === 0 ? 'Start' : i === traject.punten.length - 1 ? 'Finish' : `Via ${i}`

@@ -27,7 +27,7 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 |---|---|
 | UX fase 1: controles a–e | klaar |
 | UX fase 1: bouwen 1–8 | klaar (tag `na-ux-1`) |
-| UX fase 2 | todo |
+| UX fase 2 | klaar (tag `na-ux-2`) |
 | UX fase 3 | todo |
 | Snelheid stap 0–6 | todo |
 
@@ -151,6 +151,55 @@ na Opnieuw, Mijn gebruik (tellingen, kopiëren, wissen) en geen enkel browserven
 
 Schermafbeeldingen (390 × 844): `docs/ux-voortgang/voor-ux1_*` en `docs/ux-voortgang/na-ux1_*`
 (leeg, resultaat piek/half/vol; licht en donker).
+
+## UX fase 2: de plankaart
+
+Gebouwd achter `?ui=nieuw`, en na groene tests de standaard gemaakt. De oude interface blijft
+bereikbaar met **`?ui=oud`** (tot het einde van de opdracht; zie de samenvatting voor wat er daarna
+weg kan).
+
+1. **Plankaart in de piek** (`#plankaart`, code in `app.js` onder "Nieuwe interface"): segmentknop
+   Rondje · Station · A naar B · Meer (laatste keuze in `nopaves.soort`); startregel met "Mijn
+   locatie" als `navigator.permissions.query` al `granted` zegt (pin zichtbaar en versleepbaar, kaart
+   op die plek, gecentreerd boven het paneel), anders "Tik op de kaart of gebruik je locatie": de
+   toestemmingsvraag komt pas na een tik op de locatieknop; afstand [−] 10 km [+] in stappen van 1 km
+   (vasthouden versnelt), snelkeuzes 5 · 10 · 15 · 20, tik op het getal om te typen (2–60), onthouden;
+   niet bij A naar B; één tikbare voorkeurregel; hoofdknop "Plan rondje" / "Zoek routes naar
+   stations" / "Plan route". Nooit automatisch plannen bij openen (getest: geen tegel- of
+   BRouter-verzoeken). De piekhoogte wordt gemeten tot en met de hoofdknop (`sheet.js`
+   `standHoogtes(…, piekPx)`, max 62% van het scherm; half blijft minstens 120 px hoger).
+   Keuze: in de nieuwe interface verplaatst een tweede tik de start van een rondje (geen keerpunt
+   meer; dat bestaat nog in `?ui=oud`). De zoekbalk zit achter het zoekpictogram in de startregel.
+2. **Voorkeuren op één plek** (`#voorkeuren`): ondergrond, strand, toegangskaart, hoogtemeters, vorm,
+   LAW, aantal routes, thema, tempo. Keuze: de bestaande bedieningselementen zijn naar het venster
+   verhuisd (zelfde ids en handlers, dus dezelfde opslag in `onverhard.v1`/`onverhard.thema`).
+3. **Geen stappenbalk** voor de drie frequente soorten. Onder Meer: Tekenen, In gebied, Elke straat
+   (met hun eigen stappenplan) en GPX openen; Mijn routes heeft daar een eigen plek.
+4. **Eén knop "Nieuw"** in plaats van ↺, "Nieuwe route" en "Aanpassen". Na het plannen staat de
+   plankaart onder het resultaat met de kop "Aanpassen" (half-stand). ↶ alleen als er iets ongedaan
+   te maken is.
+5. **Resultaat**: piek = score + label, km, "x% onverhard · y% half", GPX. Half/vol: Waarom,
+   compacte keuze A · B · C (stations 1–4; kiezen kan ook door op de route te tikken), "Andere
+   route" (volgende route; verborgen bij één route), "Details" ingeklapt (ondergrond, hoogte, water,
+   twijfelstukken, bronnen). Geen "op kaart"-vinkjes: alle routes staan op de kaart. Popup op de
+   route: eerst één regel ("open verharding, voetgangersgebied, 376 m"), techniek uitklapbaar.
+6. **Geen prompt/confirm meer** (ook niet in `?ui=oud`): Bewaar slaat direct op met de
+   voorgestelde naam en toont "Naam wijzigen" in een melding; verwijderen geeft "Verwijderd ·
+   Ongedaan maken"; Link en coördinaten kopiëren vallen terug op `execCommand('copy')` en anders een
+   selecteerbaar tekstvak in de melding.
+7. **Back op Android**: als het paneel omhoog gaat, komt er één `history.pushState` bij; Back zet het
+   paneel eerst op piek (en sluit het voorkeurenvenster). Sluitknop (✕) in de vol-stand.
+8. **Tempo**: voorkeur, standaard leeg; stepper [−] 5:45 /km [+] per 5 s, vasthouden versnelt
+   (400 ms, daarna elke 80 ms); tik voor vrije invoer met masker m:ss (`inputmode="numeric"`), 2:30–15:00.
+   Met tempo: "ca. 58 min (5:45/km, vlak)", bij stations "· aankomst ca. HH:MM bij vertrek nu".
+   Geen correctie voor ondergrond of hoogte. **GPX zonder tijdstempels**: ook de `<time>` in
+   `<metadata>` is weg (veiligste keuze).
+
+Service worker `onverhard-v38`. Tests: 45 unit-tests (nieuw: GPX zonder tijd, piekhoogte), Playwright
+mobiel (28 stappen) en desktop (26) groen; nieuw blok "UX fase 2" via de knoppen. De blokken die
+het oude stappenplan testen, draaien nu met `?ui=oud`.
+
+Schermafbeeldingen: `docs/ux-voortgang/na-ux1_*` (voor) en `docs/ux-voortgang/na-ux2_*` (na).
 
 ## Open punten
 

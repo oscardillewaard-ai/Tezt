@@ -230,15 +230,13 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await sp.screenshot({ path: path.join(map, `nopaves_station_${soort}.png`) })
 }
 
-// ---- stationsmodus via de knoppen (zoals je hem zelf gebruikt, niet via een link) ----
+// ---- stationsmodus via de knoppen van de oude interface (?ui=oud) ----
 {
   // een schone browser zonder bewaarde keuzes, zoals bij een nieuwe gebruiker
   const schoon = await browser.newContext(
     mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
   const sk = await schoon.newPage()
-  await sk.goto(basis)
-  await sk.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
-  await sk.goto(basis)
+  await sk.goto(`${basis}?ui=oud`) // de oude interface met het stappenplan
   await sk.click('[data-modus="station"]')
   assert.equal(await sk.locator('#naar3').isDisabled(), true, 'zonder startpunt kun je nog niet verder')
   await sk.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
@@ -259,7 +257,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   const wf = []
   w.on('pageerror', (e) => wf.push('PAGEERROR ' + e.message))
   w.on('dialog', (d) => { wf.push('DIALOOG ' + d.message()); d.dismiss() })
-  await w.goto(basis)
+  await w.goto(`${basis}?ui=oud`) // welkom en sneltoetsen horen bij de oude interface
   assert.equal(await w.locator('#intro').count(), 0, 'geen introslides meer')
   assert.ok(await w.locator('#welkom').isVisible(), 'welkom op de lege kaart')
   assert.match(await w.locator('#welkom').textContent(), /Hardlooprondjes over onverhard\. Tik op de kaart waar je wilt starten, of:/)
@@ -334,6 +332,213 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   assert.deepEqual(wf, [], 'geen paginafouten of browservensters')
   stap(`mijn gebruik: ${log.length} regels geteld, kopiëren en wissen werken`)
   await nieuw.close()
+}
+
+// ---- UX fase 2: de plankaart, alles via de knoppen ----
+{
+  const NIEUW = basis // de nieuwe interface is de standaard
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const pc = await browser.newContext({ ...opties, geolocation: { latitude: 52.0116, longitude: 4.3571 }, permissions: ['geolocation'], acceptDownloads: true })
+  const q = await pc.newPage()
+  const qf = []
+  q.on('pageerror', (e) => qf.push('PAGEERROR ' + e.message))
+  q.on('dialog', (d) => { qf.push('BROWSERVENSTER ' + d.type() + ': ' + d.message()); d.dismiss() })
+  let planVerzoeken = 0
+  q.on('request', (r) => { if (/openfreemap.*\/14\/|brouter/.test(r.url())) planVerzoeken += 1 })
+  await q.goto(NIEUW)
+  await q.waitForFunction(() => /Mijn locatie/.test(document.getElementById('startregel').textContent), null, { timeout: 15000 })
+  assert.ok(await q.locator('#plankaart').isVisible(), 'plankaart zichtbaar')
+  assert.ok(await q.locator('#stapper').isHidden(), 'geen stappenbalk bij een rondje')
+  assert.equal(await q.locator('.leaflet-marker-icon .punt').count(), 1, 'een zichtbare pin op je locatie')
+  assert.equal(await q.locator('[data-soort="rondje"]').getAttribute('aria-pressed'), 'true')
+  assert.equal((await q.locator('#planKnop').textContent()).trim(), 'Plan rondje')
+  await q.waitForTimeout(2500)
+  assert.ok(await q.locator('#resultaat').isHidden(), 'nooit automatisch plannen bij openen')
+  assert.equal(planVerzoeken, 0, 'geen planverzoeken bij openen')
+  if (mobiel) {
+    const pk = await q.evaluate(() => ({ stand: window.onverhard.sheet.stand(), knop: document.getElementById('planKnop').getBoundingClientRect().bottom, h: innerHeight }))
+    assert.equal(pk.stand, 'piek', 'de plankaart staat in de piek')
+    assert.ok(pk.knop <= pk.h, `de hoofdknop is zichtbaar in de piek (${Math.round(pk.knop)} ≤ ${pk.h})`)
+  }
+  stap('plankaart: Mijn locatie (toestemming was er al) met pin, geen stappenbalk, niet automatisch gepland')
+
+  // soort onthouden
+  await q.locator('[data-soort="station"]').click()
+  assert.equal((await q.locator('#planKnop').textContent()).trim(), 'Zoek routes naar stations')
+  await q.reload()
+  await q.waitForSelector('#plankaart:not([hidden])')
+  assert.equal(await q.locator('[data-soort="station"]').getAttribute('aria-pressed'), 'true', 'laatste soort onthouden')
+  await q.locator('[data-soort="route"]').click()
+  assert.ok(await q.locator('#afstandregel').isHidden(), 'geen afstand bij A naar B')
+  assert.equal((await q.locator('#planKnop').textContent()).trim(), 'Plan route')
+  await q.locator('[data-soort="rondje"]').click()
+  stap('segmentknop: Station en A naar B, laatste keuze onthouden')
+
+  // afstand: stepper, snelkeuze, typen
+  await q.locator('#kmPlus').click()
+  const km1 = Number(await q.locator('#kmGetal').textContent())
+  await q.locator('#snelkeuzes [data-km="15"]').click()
+  assert.equal(await q.locator('#kmGetal').textContent(), '15')
+  await q.locator('#kmMin').click()
+  assert.equal(await q.locator('#kmGetal').textContent(), '14')
+  await q.locator('#kmWaarde').click()
+  await q.locator('#kmInvoer').fill('99')
+  await q.locator('#kmInvoer').press('Enter')
+  assert.equal(await q.locator('#kmGetal').textContent(), '60', 'hooguit 60 km')
+  await q.locator('#kmWaarde').click()
+  await q.locator('#kmInvoer').fill('8')
+  await q.locator('#kmInvoer').press('Enter')
+  assert.equal(await q.locator('#kmGetal').textContent(), '8')
+  await q.reload()
+  await q.waitForSelector('#plankaart:not([hidden])')
+  assert.equal(await q.locator('#kmGetal').textContent(), '8', 'laatste afstand onthouden')
+  stap(`afstand: + (${km1}), 15, −, typen 99 → 60, typen 8 en onthouden`)
+
+  // voorkeuren op één plek
+  await q.locator('#voorkeurregel').click()
+  assert.ok(await q.locator('#voorkeuren').isVisible())
+  for (const id of ['ondergrond', 'strand', 'kaartje', 'heuvels', 'vorm', 'law', 'grondig', 'themakeuze', 'tempoWaarde']) assert.ok(await q.locator(`#voorkeuren #${id}`).count(), `voorkeur ${id} in het venster`)
+  if (await q.locator('#strand').isChecked()) await q.locator('#voorkeuren label:has(#strand)').click()
+  await q.locator('#themakeuze [data-thema="donker"]').click()
+  assert.equal(await q.evaluate(() => document.documentElement.dataset.theme), 'dark')
+  await q.locator('#themakeuze [data-thema="licht"]').click()
+  await q.locator('#tempoPlus').click()
+  assert.match(await q.locator('#tempoWaarde').textContent(), /6:00/)
+  await q.locator('#tempoPlus').click()
+  assert.match(await q.locator('#tempoWaarde').textContent(), /6:05/)
+  await q.locator('#tempoWaarde').click()
+  assert.equal(await q.locator('#tempoInvoer').getAttribute('inputmode'), 'numeric', 'numeriek toetsenbord')
+  await q.locator('#tempoInvoer').fill('')
+  await q.locator('#tempoInvoer').pressSequentially('545')
+  assert.equal(await q.locator('#tempoInvoer').inputValue(), '5:45', 'masker m:ss')
+  await q.locator('#tempoInvoer').press('Enter')
+  assert.match(await q.locator('#tempoWaarde').textContent(), /5:45/)
+  await q.locator('#voorkeurenDicht').click()
+  const regel = await q.locator('#voorkeurtekst').textContent()
+  assert.ok(!/strand overslaan/.test(regel) && /5:45\/km/.test(regel), `voorkeurregel: ${regel}`)
+  // strand weer aan (zoals de standaard)
+  await q.locator('#voorkeurregel').click()
+  await q.locator('#voorkeuren label:has(#strand)').click()
+  await q.locator('#voorkeurenDicht').click()
+  stap(`voorkeuren op één plek: ${regel}`)
+
+  // plannen met de hoofdknop
+  await q.locator('#planKnop').click()
+  await q.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  assert.equal(await q.locator('#fout').textContent(), '')
+  await q.waitForTimeout(800)
+  assert.match(await q.locator('#tijdregel').textContent(), /^ca\. \d+ min \(5:45\/km, vlak\)$/, 'tijdsindicatie met tempo')
+  assert.equal(await q.locator('#opties .toon').count(), 0, 'geen op-kaart-vinkjes')
+  assert.ok(await q.locator('#details').evaluate((d) => !d.open), 'Details ingeklapt')
+  if (mobiel) {
+    assert.match(await q.locator('#piekbalk').textContent(), /\d+% onverhard · \d+% half/)
+    assert.ok(await q.locator('#piekbalk [data-proxy="gpx"]').isVisible(), 'GPX in de piek')
+  }
+  const n = await q.locator('#opties .optie').count()
+  if (mobiel) await q.evaluate(() => window.onverhard.sheet.zet('half'))
+  if (n > 1) {
+    await q.locator('#andereRoute').click()
+    assert.equal(await q.evaluate(() => window.onverhard.krijgPlan().naam), 'B', 'Andere route kiest B')
+    await q.locator('#andereRoute').click()
+  }
+  await q.locator('#details > summary').click()
+  assert.ok(await q.locator('#tabs').isVisible(), 'Details open: ondergrond en hoogte')
+  await q.locator('#details > summary').click()
+  stap(`resultaat: tijd, ${n} routes compact, Andere route, Details ingeklapt`)
+
+  // GPX zonder tijdstempels
+  const [dl] = await Promise.all([q.waitForEvent('download'), q.locator('#gpx').click()])
+  const gpxTekst = (await import('node:fs')).readFileSync(await dl.path(), 'utf8')
+  assert.ok(!/<time>/.test(gpxTekst), 'GPX zonder tijden')
+  stap('GPX zonder <time>')
+
+  // bewaren zonder browservenster, naam wijzigen, verwijderen met ongedaan maken
+  await q.locator('#bewaar').click()
+  await q.waitForSelector('#toast:not([hidden])')
+  assert.match(await q.locator('#toast').textContent(), /Bewaard: Rondje/)
+  await q.locator('#toast button', { hasText: 'Naam wijzigen' }).click()
+  await q.locator('#toast input').fill('Mijn testrondje')
+  await q.locator('#toast button[type="submit"]').click()
+  assert.equal(await q.evaluate(() => JSON.parse(localStorage.getItem('onverhard.routes'))[0].naam), 'Mijn testrondje')
+  await q.locator('#deel').click()
+  await q.waitForTimeout(300)
+  assert.ok(/Gekopieerd/.test(await q.locator('#deel').textContent()) || await q.locator('#toast .kopieervak').isVisible(), 'link gekopieerd of zichtbaar om te kopiëren')
+  stap('Bewaar slaat direct op, Naam wijzigen in de melding, Link kopiëren zonder browservenster')
+
+  // Nieuw: één knop
+  assert.ok(await q.locator('#nieuwKnop').isVisible())
+  assert.equal(await q.locator('#opnieuw').isVisible(), false, '↺ weg in de nieuwe interface')
+  await q.locator('#nieuwKnop').click()
+  assert.ok(await q.locator('#resultaat').isHidden(), 'Nieuw: resultaat weg')
+  assert.ok(await q.locator('#terug').isVisible(), '↶ zichtbaar: er is iets ongedaan te maken')
+  assert.equal(await q.locator('[data-soort="rondje"]').getAttribute('aria-pressed'), 'true', 'soort blijft')
+
+  // Meer: mijn routes en verwijderen met ongedaan maken
+  await q.locator('[data-soort="meer"]').click()
+  await q.locator('[data-meer="mijn"]').click()
+  assert.match(await q.locator('#mijnplek').textContent(), /Mijn testrondje/)
+  await q.locator('#bewaardlijst li button.klein').first().click()
+  assert.match(await q.locator('#toast').textContent(), /Verwijderd/)
+  assert.equal(await q.evaluate(() => JSON.parse(localStorage.getItem('onverhard.routes')).length), 0)
+  await q.locator('#toast button', { hasText: 'Ongedaan maken' }).click()
+  assert.equal(await q.evaluate(() => JSON.parse(localStorage.getItem('onverhard.routes'))[0].naam), 'Mijn testrondje', 'ongedaan maken zet hem terug')
+  // Tekenen onder Meer houdt het eigen stappenplan
+  await q.locator('[data-meer="tekenen"]').click()
+  assert.ok(await q.locator('#stapper').isVisible(), 'Tekenen: eigen stappenplan')
+  assert.ok(await q.locator('#tekenpaneel').isVisible())
+  await q.locator('[data-soort="rondje"]').click()
+  assert.ok(await q.locator('#stapper').isHidden())
+  stap('Nieuw, ↶ alleen als er iets te herstellen is, Mijn routes en Tekenen onder Meer, verwijderen met Ongedaan maken')
+
+  // A naar B: twee tikken op de kaart, dan de knop
+  await q.locator('[data-soort="route"]').click()
+  await q.evaluate(() => { const k = window.onverhard.kaart; k.fire('click', { latlng: L.latLng(52.0116, 4.3571) }) })
+  await q.waitForTimeout(500)
+  await q.evaluate(() => { const k = window.onverhard.kaart; k.fire('click', { latlng: L.latLng(52.0, 4.37) }) })
+  assert.equal(await q.locator('#planKnop').isDisabled(), false, 'A naar B: met twee punten kun je plannen')
+  assert.match(await q.locator('#startregel').textContent(), /Start:/)
+  await q.locator('[data-soort="rondje"]').click()
+  stap('A naar B: start en eind op de kaart, dan Plan route')
+
+  // terugknop en sluitknop (telefoon)
+  if (mobiel) {
+    await q.evaluate(() => window.onverhard.sheet.zet('piek'))
+    await q.waitForTimeout(400)
+    await q.locator('#sheetgreep').click()
+    await q.waitForTimeout(400)
+    assert.equal(await q.evaluate(() => window.onverhard.sheet.stand()), 'half')
+    await q.goBack()
+    await q.waitForTimeout(400)
+    assert.equal(await q.evaluate(() => window.onverhard.sheet.stand()), 'piek', 'Back verkleint eerst het paneel')
+    assert.ok(q.url().includes('/onverhard/'), 'en blijft in de app')
+    await q.evaluate(() => window.onverhard.sheet.zet('vol'))
+    await q.waitForTimeout(400)
+    assert.ok(await q.locator('#sluitSheet').isVisible(), 'sluitknop in de vol-stand')
+    await q.locator('#sluitSheet').click()
+    await q.waitForTimeout(400)
+    assert.equal(await q.evaluate(() => window.onverhard.sheet.stand()), 'piek')
+    stap('terugknop verkleint eerst het paneel; sluitknop in de vol-stand')
+  }
+
+  // station met tempo: aankomsttijd
+  await q.locator('[data-soort="station"]').click()
+  await q.locator('#snelkeuzes [data-km="10"]').click()
+  await q.locator('#planKnop').click()
+  await q.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  assert.equal(await q.locator('#fout').textContent(), '')
+  assert.match(await q.locator('#tijdregel').textContent(), /aankomst ca\. \d\d:\d\d bij vertrek nu/)
+  const nummers = await q.locator('#opties .letter').allTextContents()
+  assert.equal(nummers[0], '1', `stations genummerd: ${nummers}`)
+  // popup op de route: eerst één korte regel
+  if (mobiel) await q.evaluate(() => window.onverhard.sheet.zet('piek'))
+  await q.evaluate(() => { const l = []; window.onverhard.kaart.eachLayer((x) => x.getPopup && x.getPopup() && x instanceof L.Polyline && l.push(x)); l[0].openPopup() })
+  await q.waitForSelector('.leaflet-popup-content')
+  const pop = await q.locator('.leaflet-popup-content').evaluate((e) => ({ eerste: e.querySelector('b').textContent, techniek: !!e.querySelector('details.techniek:not([open])') }))
+  assert.match(pop.eerste, /^[a-z ]+, .*\d+ m$/, `korte regel: ${pop.eerste}`)
+  assert.ok(pop.techniek, 'techniek ingeklapt')
+  stap(`station met tempo: ${await q.locator('#tijdregel').textContent()}; popup "${pop.eerste}"`)
+  assert.deepEqual(qf, [], 'geen paginafouten of browservensters')
+  await pc.close()
 }
 
 await browser.close()
