@@ -853,3 +853,9 @@ details.details { margin-top: 10px; }
 .binnenchip button { border-radius: 0; min-height: 34px; min-width: 36px; padding: 0; border-color: var(--heide); }
 .binnenchip .ico { margin: 0; }
 .kaartmenu .gebiedzoek:disabled { opacity: .6; }
+
+/* ---- snelheid stap 3: tussenresultaat ---- */
+.kern p.laadregel { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 8px; border: 2px dashed var(--inkt); font: 600 13px var(--mono); overflow: hidden; }
+.kern p.laadregel > span:nth-child(2) { flex: 1 1 auto; }
+.kern p.laadregel .piekloop { animation: none; }
+.kern i.voorlopig { font-style: normal; background: var(--let-op-vlak); color: var(--inkt); padding: 0 4px; border: 1px solid var(--let-op-rand); }

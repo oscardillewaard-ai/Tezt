@@ -73,6 +73,18 @@ export function verzoek(url, bytes, ms, cache = null) {
   bronnen.set(bron, b)
 }
 
+/** Verzoeken die in de rekenwerker zijn gedaan, bij deze meting optellen. */
+export function voegBronnenToe(andere = {}) {
+  for (const [bron, v] of Object.entries(andere)) {
+    const b = bronnen.get(bron) || { n: 0, bytes: 0, cache: 0, ms: 0 }
+    b.n += v.n
+    b.bytes += v.bytes
+    b.cache += v.cache
+    b.ms += v.ms
+    bronnen.set(bron, b)
+  }
+}
+
 export function rapport() {
   return {
     totaal: Math.round((eind ?? performance.now()) - begin),

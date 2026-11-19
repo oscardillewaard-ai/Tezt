@@ -996,3 +996,18 @@ test('gebieden: Natura 2000 zoeken met een nep-antwoord', async () => {
   assert.equal(await Gebieden.zoekNatura2000(53.1, 4.1, undefined, async () => ({ ok: true, json: async () => antwoord })), null)
   await assert.rejects(Gebieden.zoekNatura2000(52.1, 4.1, undefined, async () => ({ ok: false, status: 503 })))
 })
+
+import * as DC from '../../public/onverhard/datacache.js'
+test('datacache: welke adressen, hoe vers, en niets in Node', async () => {
+  assert.ok(DC.cachebaar('https://tiles.openfreemap.org/planet/20261115_080022_pt/14/8391/5401.pbf'))
+  assert.ok(!DC.cachebaar('https://tiles.openfreemap.org/planet'), 'de tegelbeschrijving niet (wisselt elke week)')
+  assert.ok(DC.cachebaar('https://api.pdok.nl/kadaster/bgt/ogc/v1/tiles/NetherlandsRDNewQuad/12/2071/1800?f=mvt'))
+  assert.ok(DC.cachebaar('https://service.pdok.nl/rws/ahn/wcs/v1_0?SERVICE=WCS&VERSION=2.0.1'))
+  assert.ok(!DC.cachebaar('https://brouter.de/brouter?lonlats=1'))
+  assert.ok(!DC.cachebaar('https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=x'))
+  const nu = 1e12
+  assert.deepEqual(DC.versheid(nu - 3600e3, nu), { bruikbaar: true, verversen: false })
+  assert.deepEqual(DC.versheid(nu - 8 * 24 * 3600e3, nu), { bruikbaar: true, verversen: true })
+  assert.equal(DC.versheid(nu - 31 * 24 * 3600e3, nu).bruikbaar, false, 'na 30 dagen niet meer')
+  if (typeof caches === 'undefined') assert.equal(await DC.uitCache('https://tiles.openfreemap.org/planet/x/14/1/1.pbf'), null)
+})

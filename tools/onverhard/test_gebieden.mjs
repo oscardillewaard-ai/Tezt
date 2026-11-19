@@ -46,7 +46,7 @@ for (const [naam, lat, lon] of GEBIEDEN) {
     r.chip = await p.locator('#binnenNaam').textContent()
     const t1 = Date.now()
     await p.locator('#planKnop').click()
-    await p.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+    await p.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
     r.planMs = Date.now() - t1
     r.fout = await p.locator('#fout').textContent()
     if (!r.fout) {
