@@ -1,0 +1,145 @@
+[
+ {
+  "naam": "Delft Centraal",
+  "km": 15,
+  "gewoon": {
+   "ms": 14330,
+   "tegels": 241,
+   "routes": [
+    "Zoetermeer 11.78 km s58",
+    "Zoetermeer Oost 13.26 km s47",
+    "Schiedam Centrum 14.15 km s40",
+    "Maassluis West 17.14 km s30"
+   ]
+  },
+  "ringen": {
+   "ms": 8323,
+   "tegels": 162,
+   "routes": [
+    "Zoetermeer 11.78 km s58",
+    "Zoetermeer Oost 13.26 km s47",
+    "Schiedam Centrum 14.15 km s40",
+    "Rotterdam Centraal 15.44 km s23"
+   ]
+  },
+  "gelijk": false
+ },
+ {
+  "naam": "Utrecht Centraal",
+  "km": 12,
+  "gewoon": {
+   "ms": 11951,
+   "tegels": 163,
+   "routes": [
+    "Bilthoven 12.04 km s51",
+    "Houten Castellum 14.24 km s39",
+    "Eiteren 13.88 km s31",
+    "Vleuten 8.82 km s28"
+   ]
+  },
+  "ringen": {
+   "ms": 7886,
+   "tegels": 144,
+   "routes": [
+    "Bilthoven 12.04 km s51",
+    "Houten Castellum 14.24 km s39",
+    "Vleuten 8.82 km s28",
+    "Maarssen 8.69 km s14"
+   ]
+  },
+  "gelijk": false
+ },
+ {
+  "naam": "Amersfoort",
+  "km": 15,
+  "gewoon": {
+   "ms": 11491,
+   "tegels": 206,
+   "routes": [
+    "Maarn 14.04 km s67",
+    "Den Dolder 12.48 km s65",
+    "Baarn 18.33 km s65",
+    "Nijkerk 12.49 km s17"
+   ]
+  },
+  "ringen": {
+   "ms": 9562,
+   "tegels": 206,
+   "routes": [
+    "Maarn 14.04 km s67",
+    "Den Dolder 12.48 km s65",
+    "Baarn 18.33 km s65",
+    "Nijkerk 12.49 km s17"
+   ]
+  },
+  "gelijk": true
+ },
+ {
+  "naam": "Haarlem",
+  "km": 12,
+  "gewoon": {
+   "ms": 7827,
+   "tegels": 118,
+   "routes": [
+    "Driehuis 13.20 km s66",
+    "Zandvoort aan Zee 8.65 km s57",
+    "Station 9.27 km s40",
+    "Halfweg-Zwanenburg 8.65 km s15"
+   ]
+  },
+  "ringen": {
+   "ms": 7901,
+   "tegels": 118,
+   "routes": [
+    "Driehuis 13.20 km s66",
+    "Zandvoort aan Zee 8.65 km s57",
+    "Station 9.27 km s40",
+    "Halfweg-Zwanenburg 8.65 km s15"
+   ]
+  },
+  "gelijk": true
+ },
+ {
+  "naam": "Den Bosch",
+  "km": 15,
+  "gewoon": {
+   "ms": 5323,
+   "tegels": 115,
+   "routes": [
+    "Boxtel 19.88 km s61"
+   ]
+  },
+  "ringen": {
+   "ms": 3710,
+   "tegels": 115,
+   "routes": [
+    "Boxtel 19.88 km s61"
+   ]
+  },
+  "gelijk": true
+ },
+ {
+  "naam": "Zwolle",
+  "km": 20,
+  "gewoon": {
+   "ms": 11314,
+   "tegels": 252,
+   "routes": [
+    "Dalfsen 16.14 km s51",
+    "Heino 16.12 km s45",
+    "Kampen Zuid 18.37 km s13"
+   ]
+  },
+  "ringen": {
+   "ms": 13057,
+   "tegels": 488,
+   "routes": [
+    "Dalfsen 16.14 km s51",
+    "Heino 16.12 km s45",
+    "Wijhe 17.34 km s36",
+    "Kampen Zuid 18.37 km s13"
+   ]
+  },
+  "gelijk": false
+ }
+]

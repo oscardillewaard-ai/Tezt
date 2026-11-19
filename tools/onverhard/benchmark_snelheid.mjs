@@ -52,7 +52,20 @@ async function eenRun(ctx, hash) {
     const fout = await p.locator('#fout').textContent()
     const r = await p.evaluate(() => {
       const pl = window.onverhard.krijgPlan()
-      return { meting: window.onverhard.meting.rapport(), eersteMs: window.onverhard.eersteMs ? window.onverhard.eersteMs() : null, score: pl ? pl.score : null, km: pl ? pl.analyse.lengte / 1000 : null, zacht: pl ? pl.zacht.eind : null, n: pl ? pl.opties.length : 0 }
+      // stukken waar je niet mag of kunt komen volgens de tags (de vectortegels missen een deel daarvan)
+      const verboden = { m: 0, soorten: {} }
+      if (pl) {
+        for (const st of pl.analyse.stukken) {
+          const t = (st.tags && st.tags[0]) || ''
+          const m = /highway=(motorway|trunk)(_link)?\b|access=(private|no)\b|foot=(no|private)\b/.exec(t)
+          if (m) {
+            verboden.m += st.tot - st.van
+            verboden.soorten[m[0]] = (verboden.soorten[m[0]] || 0) + Math.round(st.tot - st.van)
+          }
+        }
+      }
+      const u = window.onverhard.uitslag()
+      return { meting: window.onverhard.meting.rapport(), eersteMs: window.onverhard.eersteMs ? window.onverhard.eersteMs() : null, score: pl ? pl.score : null, km: pl ? pl.analyse.lengte / 1000 : null, zacht: pl ? pl.zacht.eind : null, n: pl ? pl.opties.length : 0, router: u && u.router, verboden: Math.round(verboden.m), verbodenSoorten: verboden.soorten }
     })
     return { ok: !fout, fout, wand: Date.now() - t0, ...r }
   } catch (e) {
@@ -83,6 +96,9 @@ function samenvatting(runs) {
     }])),
     score: mediaan(ok.map((r) => r.score)), km: ok.length ? Math.round(mediaan(ok.map((r) => r.km * 100)) ) / 100 : null,
     zacht: ok.length ? mediaan(ok.map((r) => Math.round(r.zacht * 1000))) / 10 : null,
+    router: [...new Set(ok.map((r) => r.router))].join('/'),
+    verboden: ok.length ? Math.max(...ok.map((r) => r.verboden || 0)) : null,
+    verbodenSoorten: Object.assign({}, ...ok.map((r) => r.verbodenSoorten || {})),
   }
 }
 

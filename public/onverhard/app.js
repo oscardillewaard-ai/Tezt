@@ -13,6 +13,9 @@ import { voorafOphalen, haalTegels, bekijkRoute, haalOpeningstijden, importeerGp
 const SLEUTEL = 'onverhard.v1'
 // UX fase 2: de plankaart is de standaard; de oude interface blijft (tijdelijk) bereikbaar met ?ui=oud.
 const UI_NIEUW = new URLSearchParams(location.search).get('ui') !== 'oud'
+// A naar B: welke router standaard (snelheid, stap 6; zie VOORTGANG.md). 'auto' = eigen router tot
+// EIGEN_ROUTER_MAX_M, daarboven en bij fouten BRouter.
+const STANDAARD_ROUTER = 'brouter'
 const THEMA = 'onverhard.thema'
 const MIN_TWIJFEL = 30 // twijfelstukken korter dan dit (m) worden niet apart genoemd
 const MAX_FOTOS = 12
@@ -1052,6 +1055,8 @@ async function planNu() {
       punten: rondje ? staat.punten.slice(0, 2) : station ? staat.punten.slice(0, 1) : staat.punten,
       rondjeKm: rondje || station || staat.modus === 'gebied' ? staat.km : null,
       binnen: binnenVlak ? binnen.naam : undefined,
+      ringen: new URLSearchParams(location.search).get('stations') === 'ringen', // stap 5: alleen op verzoek (uitkomst kan afwijken)
+      router: ['eigen', 'brouter', 'auto'].includes(new URLSearchParams(location.search).get('router')) ? new URLSearchParams(location.search).get('router') : STANDAARD_ROUTER, // stap 6
       law: staat.law,
       trail: staat.trail,
       alles: !!staat.alles,

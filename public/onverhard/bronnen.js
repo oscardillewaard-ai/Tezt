@@ -1169,6 +1169,78 @@ export async function planRondjeEigen(start, km, instel, bgt, aantalOpties, meld
   return { opties, waarschuwingen, doel, uitleg, eigen: true, gezocht, graaf }
 }
 
+// ---------- A naar B met de eigen router (snelheid, stap 6) ----------
+/** Rechte afstand (m) langs alle punten. */
+function rechteAfstand(punten) {
+  let m = 0
+  for (let i = 1; i < punten.length; i++) {
+    const [ax, ay] = K.naarRd(punten[i - 1][1], punten[i - 1][0])
+    const [bx, by] = K.naarRd(punten[i][1], punten[i][0])
+    m += Math.hypot(bx - ax, by - ay)
+  }
+  return m
+}
+export const EIGEN_ROUTER_MAX_M = 25000 // boven deze rechte afstand: BRouter (zie VOORTGANG.md, stap 6)
+
+/**
+ * Van A naar B (met tussenpunten) op de paden uit de kaarttegels, met dezelfde voorkeuren als een
+ * rondje. Tegels in een ellips per deel met de punten als brandpunten (grote as ~1,4 × de rechte
+ * afstand); geen route? dan stapsgewijs een grotere ellips. Geeft {opties, ...} zoals planRondjeEigen.
+ */
+export async function planRouteEigen(punten, instel, bgt, aantalOpties, meld = () => {}, signal) {
+  const waarschuwingen = []
+  const opbouw = { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap: 1.5 }
+  const opRing = (lijst) => {
+    const [la, lo] = punten[0]
+    const n = 2 ** T.TEGEL_ZOOM
+    const d = ([x, y]) => {
+      const lon = ((x + 0.5) / n) * 360 - 180
+      const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 0.5)) / n))) * 180) / Math.PI
+      return Math.hypot((lat - la) * 111320, (lon - lo) * 68000)
+    }
+    return lijst.map((t) => [d(t), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t)
+  }
+  let gevonden = null
+  let g = null
+  let knopen = null
+  for (const [factor, extra] of [[1.4, 600], [1.9, 1200], [2.6, 2500]]) {
+    const tegels = new Map()
+    for (let i = 1; i < punten.length; i++) for (const t of T.tegelsLangs(punten[i - 1], punten[i], { factor, extra })) tegels.set(t.join('/'), t)
+    meld(factor === 1.4 ? 'Paden tussen start en eind ophalen (OpenStreetMap)' : 'Nog geen route: in een groter gebied zoeken')
+    const elementen = instel.paden ? await R.viaElementen(instel.paden, { signal }) : await padenVan(opRing([...tegels.values()]), signal, instel.voortgang)
+    let ronde = 0
+    const res = await rondesMetGraaf({
+      elementen, opbouw, instel, bgt, meld, signal,
+      teksten: ['Route zoeken', 'Route opnieuw zoeken, nu zonder strand en afgesloten stukken'],
+      maakKandidaten: async (gr) => {
+        knopen = punten.map((p) => G.dichtsteKnoop(gr, ...K.naarRd(p[1], p[0])))
+        const ver = knopen.find((k) => k.knoop < 0 || k.afstand > 400)
+        if (ver) throw new BronFout(OSM_BRON, ver.knoop < 0 ? 'geen paden in de buurt van een punt' : `het dichtstbijzijnde pad ligt ${Math.round(ver.afstand)} m van een punt`)
+        const routes = await zoekOp('routesLangs', gr, [knopen.map((k) => k.knoop), { aantal: Math.max(1, aantalOpties) }], signal)
+        if (!routes.length) return []
+        if (instel.voorlopig && ronde++ === 0) {
+          const t0 = G.maakTraject(gr, routes[0].knopen, routes[0].segs, punten)
+          instel.voorlopig({ traject: t0, an: await analyseerRoute(t0, null), knopen: routes[0].knopen, segs: routes[0].segs, vast: routes[0].vast }, gr)
+        }
+        const uit = []
+        for (const [i, rt] of routes.entries()) {
+          meld(`Ondergrond van route ${LETTERS[i]} controleren`)
+          const traject = G.maakTraject(gr, rt.knopen, rt.segs, punten)
+          uit.push({ traject, an: await analyseerRoute(traject, bgt), knopen: rt.knopen, segs: rt.segs, vast: rt.vast })
+        }
+        return uit
+      },
+    })
+    if (res.lijst.length) {
+      gevonden = res.lijst
+      g = res.graaf
+      break
+    }
+  }
+  if (!gevonden) throw new BronFout('de eigen router', 'geen route gevonden tussen deze punten')
+  return { opties: gevonden, waarschuwingen, doel: null, uitleg: [], eigen: true, graaf: g }
+}
+
 // ---------- Naar een station: routes vanaf een plek naar treinstations in de buurt ----------
 /**
  * Routes van de start naar stations op ongeveer km kilometer, in verschillende richtingen. Eén
@@ -1198,22 +1270,36 @@ export async function planStations(instel, bgt, aantal, meld = () => {}, signal)
     for (const k of lijst) for (const t of T.tegelsLangs(start, [k.lat, k.lon])) m.set(t.join('/'), t)
     return m
   }
-  const gekozen = kandidaten.slice()
+  // stap 5 (ringen): eerst alleen de beste max(4, aantal) kandidaten (elk in een eigen richting), tegels
+  // van dichtbij naar ver; is een station niet bereikbaar, dan de volgende kandidaat erbij.
+  const ringen = !!instel.ringen && !instel.paden
+  const genoeg = Math.max(4, aantal)
+  const gekozen = ringen ? kandidaten.slice(0, genoeg) : kandidaten.slice()
+  const reserve = ringen ? kandidaten.slice(genoeg) : []
   let tegels = tegelsVoor(gekozen)
   while (tegels.size > 220 && gekozen.length > 1) {
     gekozen.splice(gekozen.indexOf(gekozen.reduce((a, b) => (b.afstand > a.afstand ? b : a))), 1)
     tegels = tegelsVoor(gekozen)
   }
+  const [sx, sy] = K.naarRd(start[1], start[0])
+  const opRing = (lijst) => {
+    const afstand = ([x, y]) => {
+      const n = 2 ** T.TEGEL_ZOOM
+      const lon = ((x + 0.5) / n) * 360 - 180
+      const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 0.5)) / n))) * 180) / Math.PI
+      return Math.hypot((lat - start[0]) * 111320, (lon - start[1]) * 68000)
+    }
+    return lijst.map((t) => [afstand(t), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t)
+  }
   let elementen = instel.paden ? await R.viaElementen(instel.paden, { signal }) : null
   if (!elementen) {
     meld('Paden naar de stations ophalen (OpenStreetMap)')
-    elementen = await padenVan([...tegels.values()], signal, instel.voortgang)
+    elementen = await padenVan(opRing([...tegels.values()]), signal, instel.voortgang)
   }
   // 4. graaf en routes
-  const [sx, sy] = K.naarRd(start[1], start[0])
   const opbouw = { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden, extraStranden: [], mijdPunten: [], snap: 1.5 }
   let data = null
-  const { lijst, graaf } = await rondesMetGraaf({
+  const zoekRoutes = () => rondesMetGraaf({
     elementen, opbouw, instel, bgt, meld, signal,
     teksten: ['Routes naar stations zoeken', 'Routes opnieuw zoeken, nu zonder strand en afgesloten stukken'],
     maakKandidaten: async (g) => {
@@ -1246,6 +1332,15 @@ export async function planStations(instel, bgt, aantal, meld = () => {}, signal)
       return uit
     },
   })
+  let { lijst, graaf } = await zoekRoutes()
+  // ringen: te weinig stations bereikbaar? de volgende kandidaat (en zijn tegels) erbij, hooguit twee keer
+  for (let extra = 0; ringen && lijst.length < genoeg && reserve.length && extra < 2; extra++) {
+    gekozen.push(reserve.shift())
+    tegels = tegelsVoor(gekozen)
+    meld('Verder kijken: meer paden naar stations ophalen')
+    elementen = await padenVan(opRing([...tegels.values()]), signal, instel.voortgang)
+    ;({ lijst, graaf } = await zoekRoutes())
+  }
   if (!lijst.length) throw new BronFout(OSM_BRON, 'geen route naar een station gevonden (te weinig paden ertussen?)')
   // 5. lengte: boven 1,3 × km valt af; beste score eerst, met een strafpunt per % buiten ±15%
   const rang = (k) => K.nopavesScore(k.an).score - 30 * Math.max(0, Math.abs(k.lengte - doel) / doel - 0.15)
@@ -1265,6 +1360,7 @@ export async function planStations(instel, bgt, aantal, meld = () => {}, signal)
     waarschuwingen, doel, uitleg: [], eigen: true, graaf,
     stations: lijst.map((k) => ({ ...k.kandidaat, km: k.lengte / 1000 })),
     stationData: data,
+    tegelsPaden: tegels.size,
   }
 }
 
@@ -1897,13 +1993,25 @@ export async function maakPlan(opties) {
   if (opties.modus === 'gebied') plan = await planGebied(tekenInstel, bgt, alternatieven, meld, opties.signal)
   else if (opties.modus === 'straten') plan = await planStraten(tekenInstel, bgt, meld, opties.signal)
   else if (opties.modus === 'tekenen') plan = await planTekening(tekenInstel, bgt, meld, opties.signal)
-  else if (opties.modus === 'station') plan = await planStations({ ...tekenInstel, stations: opties.stations }, bgt, alternatieven, meld, opties.signal)
+  else if (opties.modus === 'station') plan = await planStations({ ...tekenInstel, stations: opties.stations, ringen: opties.ringen }, bgt, alternatieven, meld, opties.signal)
   else if (opties.rondjeKm && opties.punten.length === 1 && (opties.law ?? 1) === 1 && opties.methode !== 'brouter') {
     try {
       plan = await planRondjeEigen(opties.punten[0], opties.rondjeKm, { trail: br.trail, alles: br.alles, strandMijden: br.strandMijden, kaartje: br.kaartje, vorm: opties.vorm, paden: opties.paden, voortgang: opties.voortgang, heuvels: opties.heuvels, voorlopig }, bgt, alternatieven, meld, opties.signal)
     } catch (fout) {
       if (afgebroken(fout)) throw fout
       vooraf.push('Paden niet op te halen; via BRouter gerekend')
+    }
+  }
+  // A naar B met de eigen router: op verzoek, of als standaard (zie EIGEN_ROUTER_MAX_M); niet met
+  // een LAW-voorkeur (die kent alleen BRouter). Mislukt hij, dan alsnog BRouter.
+  if (!plan && !opties.modus && !opties.rondjeKm && opties.punten.length >= 2 && (opties.law ?? 1) === 1 && opties.router !== 'brouter' &&
+      (opties.router === 'eigen' || (opties.router === 'auto' && rechteAfstand(opties.punten) <= EIGEN_ROUTER_MAX_M))) {
+    try {
+      plan = await planRouteEigen(opties.punten, { ...tekenInstel, voorlopig }, bgt, alternatieven, meld, opties.signal)
+      plan.router = 'eigen'
+    } catch (fout) {
+      if (afgebroken(fout)) throw fout
+      vooraf.push('Eigen router vond geen route; via BRouter gerekend')
     }
   }
   if (plan) {
@@ -1928,7 +2036,7 @@ export async function maakPlan(opties) {
     if (plan.graaf && o.knopen && o.knopen.length === o.traject.coords.length) {
       optie.knopen = o.knopen
       optie.segs = o.segs
-      optie.vast = [0, o.knopen.length - 1]
+      optie.vast = o.vast || [0, o.knopen.length - 1]
     }
     lijst.push(optie)
   }
@@ -1988,6 +2096,7 @@ export async function maakPlan(opties) {
     meldingen,
     verzoeken: br.verzoeken + (bgt ? bgt.verzoeken : 0),
     graaf: plan.graaf || null, // om de route te kunnen verslepen
+    router: plan.router || (plan.eigen ? 'eigen' : 'brouter'),
     modus: opties.modus || null,
     stations: plan.stations || null, // kandidaat-stations (modus 'station')
     stationData: plan.stationData || null,
