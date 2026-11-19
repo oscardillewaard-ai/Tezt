@@ -15,6 +15,9 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 
 - lokaal heet de integratielijn `main`; die push ik naar de sessiebranch `ccr-c02c1fc3-wix11n`,
   samen met de fasebranches (`ux-fase-1`, ...) en de tags (`na-ux-1`, ...);
+- **tags kunnen niet gepusht worden**: de git-proxy van deze omgeving weigert `refs/tags/*` (HTTP 403),
+  branches gaan wel. De tags (`voor-ux`, `na-ux-1`, ...) staan daarom lokaal én als branch
+  `terugzet/<tag>` op GitHub (bv. `terugzet/voor-ux`, `terugzet/na-ux-1`);
 - ik push **niet** zelf naar de livebranch, omdat de naam in de opdracht niet bestaat en een
   verkeerde gok de live site raakt. Live zetten is één commando (zie "Terugzetten en live zetten").
 
@@ -159,5 +162,6 @@ Schermafbeeldingen (390 × 844): `docs/ux-voortgang/voor-ux1_*` en `docs/ux-voor
 ## Terugzetten en live zetten
 
 - Alles terug: `git checkout voor-ux` (of een van de tags `na-ux-1`, `na-ux-2`, `na-ux-3`, `na-snelheid`).
-- Live zetten van een tag: `git push origin <tag>^{commit}:refs/heads/claude/gpx-ultrarace-trainingen-zf6zci`
+  Op GitHub (zonder de lokale tags): `git checkout origin/terugzet/voor-ux` enzovoort.
+- Live zetten van een tag: `git push origin origin/terugzet/<tag>:refs/heads/claude/gpx-ultrarace-trainingen-zf6zci`
   (GitHub Pages bouwt dan automatisch).
