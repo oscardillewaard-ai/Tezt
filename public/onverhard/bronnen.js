@@ -295,8 +295,10 @@ export function luchtfotoUrl(bb, pixels) {
 
 // ---------- Plaatsen zoeken ----------
 /** Zoek plekken in Nederland bij PDOK (Locatieserver): [{naam, soort, punt: [lat, lon]}]. */
-export async function zoekPlaats(tekst, signal) {
-  const url = `${LOCATIESERVER}?q=${encodeURIComponent(tekst)}&rows=7&fl=weergavenaam,type,centroide_ll`
+/** Zoek een plek. Met 'plek' ([lat, lon]: de start, anders het kaartmidden) staan treffers in de buurt bovenaan. */
+export async function zoekPlaats(tekst, signal, plek = null) {
+  let url = `${LOCATIESERVER}?q=${encodeURIComponent(tekst)}&rows=7&fl=weergavenaam,type,centroide_ll`
+  if (plek && plek.every(Number.isFinite)) url += `&lat=${plek[0].toFixed(5)}&lon=${plek[1].toFixed(5)}`
   const r = await fetch(url, { signal })
   if (!r.ok) throw new BronFout('PDOK Locatieserver', `HTTP ${r.status}`)
   const d = await r.json()

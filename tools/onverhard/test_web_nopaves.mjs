@@ -251,5 +251,90 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   stap('stationsmodus via de knoppen: één startpunt, Verder, lengte, plannen')
 }
 
+// ---- UX fase 1: welkom, teller, één betekenis van onverhard, zoeken in de buurt, sneltoetsen ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const nieuw = await browser.newContext({ ...opties, geolocation: { latitude: 52.0116, longitude: 4.3571 }, permissions: ['geolocation'] })
+  const w = await nieuw.newPage()
+  const wf = []
+  w.on('pageerror', (e) => wf.push('PAGEERROR ' + e.message))
+  w.on('dialog', (d) => { wf.push('DIALOOG ' + d.message()); d.dismiss() })
+  await w.goto(basis)
+  assert.equal(await w.locator('#intro').count(), 0, 'geen introslides meer')
+  assert.ok(await w.locator('#welkom').isVisible(), 'welkom op de lege kaart')
+  assert.match(await w.locator('#welkom').textContent(), /Hardlooprondjes over onverhard\. Tik op de kaart waar je wilt starten, of:/)
+  await w.locator('#welkomLocatie').click()
+  await w.waitForFunction(() => document.querySelectorAll('#punten li').length === 1, null, { timeout: 15000 })
+  assert.equal(await w.locator('[data-modus="rondje"]').getAttribute('aria-pressed'), 'true', 'Gebruik mijn locatie start een rondje')
+  assert.ok(await w.locator('#welkom').isHidden(), 'welkom weg zodra er een start is')
+  stap('welkom: één zin en "Gebruik mijn locatie" zet de start van een rondje')
+
+  // zoeken: treffers in de buurt van de start bovenaan
+  if (mobiel) await w.evaluate(() => window.onverhard.sheet.zet('vol'))
+  await w.locator('#zoek').fill('Kerkstraat')
+  await w.waitForSelector('#zoekresultaten:not([hidden]) button', { timeout: 15000 })
+  const eerste = await w.locator('#zoekresultaten button').first().textContent()
+  assert.match(eerste, /Delft/, `eerste treffer bij Delft: ${eerste}`)
+  await w.locator('#zoek').fill('')
+  stap(`zoeken met de start erbij: "Kerkstraat" → ${eerste}`)
+
+  // sneltoetsen in de volgorde van het scherm: 3 = Naar station
+  await w.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {})
+  await w.evaluate(() => document.activeElement && document.activeElement.blur())
+  await w.keyboard.press('3')
+  assert.equal(await w.locator('[data-modus="station"]').getAttribute('aria-pressed'), 'true', 'toets 3 = Naar station')
+  await w.keyboard.press('2')
+  assert.equal(await w.locator('[data-modus="rondje"]').getAttribute('aria-pressed'), 'true', 'toets 2 = Rondje')
+  stap('sneltoetsen 1–6 in de volgorde van het scherm')
+
+  // plannen via de knoppen
+  await w.evaluate(() => document.getElementById('naar3').click())
+  await w.evaluate(() => document.getElementById('plan').click())
+  await w.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  assert.equal(await w.locator('#fout').textContent(), '')
+  await w.waitForTimeout(800)
+  const ondergrond = /\d+% onverhard · \d+% half/
+  assert.match(await w.locator('#kern .ondergrondtegel').textContent(), /\d+%onverhard · \d+% half/, 'tegel: onverhard en half apart')
+  assert.match(await w.locator('#opties .kies small').first().textContent(), ondergrond, 'lijst: onverhard en half apart')
+  assert.match(await w.locator('#kern .waarom').textContent(), /Waarom.*onverhard \+ half samen \d+% \(telt 75%\)/, 'waarom bij de score')
+  if (mobiel) {
+    const piek = await w.locator('#piekbalk .psamen').evaluate((e) => ({ tekst: e.textContent, past: [...e.children].every((c) => c.scrollWidth <= c.clientWidth + 1) }))
+    assert.match(piek.tekst, ondergrond, 'piekbalk: onverhard en half apart')
+    assert.ok(piek.past, `piekbalk zonder afkapping: ${piek.tekst}`)
+  }
+  stap('overal "x% onverhard · y% half", met waarom bij de score')
+
+  // afspelen: de knop heet Afspeelsnelheid
+  if (mobiel) await w.evaluate(() => window.onverhard.sheet.zet('vol'))
+  await w.locator('#afspeel').click()
+  assert.match(await w.locator('#afspeelsnelheid').textContent(), /Afspeelsnelheid/)
+  await w.locator('#afspeel').click()
+  stap('afspelen: "Afspeelsnelheid"')
+
+  // opnieuw: kaartlagen-knoppen leeg
+  assert.ok(await w.locator('.kaartlagen').isVisible(), 'kaartlagen bij het resultaat')
+  await w.locator('#opnieuw').click()
+  assert.ok(await w.locator('.kaartlagen').isHidden(), 'kaartlagen-knoppen weg na opnieuw')
+  stap('opnieuw beginnen haalt de kaartlagen-knoppen weg')
+
+  // mijn gebruik onder [?]
+  await w.locator('#uitleg').click()
+  await w.locator('#gebruik summary').click()
+  const tabel = await w.locator('#gebruiktabel').textContent()
+  for (const t of ['app geopend', 'plannen gestart', 'plannen klaar']) assert.ok(tabel.includes(t), `teller: ${t} in ${tabel}`)
+  const log = await w.evaluate(() => JSON.parse(localStorage.getItem('nopaves.log')))
+  const start = log.find((r) => r.ev === 'plan_start')
+  assert.equal(start.d.start, 'gps', 'plan_start weet dat de start van gps kwam')
+  assert.ok(log.find((r) => r.ev === 'plan_done').d.ms > 0)
+  assert.equal(log.find((r) => r.ev === 'app_open').d.geo, 'granted')
+  await w.locator('#gebruikKopieer').click()
+  await w.locator('#gebruikWis').click()
+  assert.match(await w.locator('#gebruiktabel').textContent(), /Nog niets geteld/)
+  await w.locator('#hulpDicht').click()
+  assert.deepEqual(wf, [], 'geen paginafouten of browservensters')
+  stap(`mijn gebruik: ${log.length} regels geteld, kopiëren en wissen werken`)
+  await nieuw.close()
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)

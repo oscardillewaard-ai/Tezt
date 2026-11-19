@@ -329,16 +329,6 @@ details.blok.stap[open] { padding-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) { .stapnr { transition: none; } }
 
 /* ---------- kennismaking ---------- */
-#intro { width: min(92vw, 440px); max-width: none; padding: 0; border-radius: 20px; overflow: hidden; color: var(--balk-tekst);
-         background: var(--ruis), #4A6428;
-         box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
-#intro::backdrop { background: rgb(10 18 12 / .7); backdrop-filter: blur(2px); }
-#intro[open] { animation: intro-in .35s cubic-bezier(.2, .9, .3, 1.2); }
-.intro-dia { padding: 18px 22px 6px; text-align: center; }
-.intro-dia:not([hidden]) { animation: dia-in .4s ease-out; }
-.intro-dia svg { width: 100%; height: auto; display: block; margin-bottom: 6px; }
-.intro-dia h2 { font: 700 28px/1.1 var(--kop); text-transform: uppercase; letter-spacing: .08em; color: var(--accent-tekst); margin: 6px 0 6px; }
-.intro-dia p { color: #F6F6DA; font-size: 16px; margin: 0 0 6px; min-height: 2.9em; }
 .hoogtelijnen path { fill: none; stroke: rgb(255 255 255 / .14); stroke-width: 1.2; }
 .route { fill: none; stroke: #F1F3D4; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; }
 .teken { stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken 2.2s .4s ease-in-out forwards; }
@@ -354,21 +344,13 @@ details.blok.stap[open] { padding-bottom: 12px; }
 .seg { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken .7s ease-out forwards; }
 .s1 { stroke: #8FA84F; animation-delay: .3s; } .s2 { stroke: #eda100; animation-delay: 1s; }
 .s3 { stroke: #8FA84F; animation-delay: 1.7s; } .s4 { stroke: #C98EAF; animation-delay: 2.4s; }
-.intro-profiel { fill: none; stroke: #e0a35a; stroke-width: 2.5; stroke-linejoin: round; }
 .hm { text-anchor: end; font-size: 18px; opacity: 0; animation: verschijn .4s 2.6s forwards; }
-.intro-voet { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px 18px; }
-.intro-voet .klein { background: transparent; border-color: rgb(255 255 255 / .3); color: #dfe3cf; font-size: 14px; }
-.intro-voet .hoofd { min-width: 120px; min-height: 46px; }
-.intro-stippen { display: flex; gap: 7px; }
-.intro-stippen i { width: 8px; height: 8px; border-radius: 4px; background: rgb(255 255 255 / .3); transition: width .25s, background .25s; }
-.intro-stippen i.aan { width: 22px; background: #F1F3D4; }
 @keyframes teken { to { stroke-dashoffset: 0; } }
 @keyframes verschijn { to { opacity: 1; } }
 @keyframes val { 0% { transform: translateY(-60px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
-@keyframes intro-in { from { transform: translateY(24px) scale(.96); opacity: 0; } }
 @keyframes dia-in { from { transform: translateX(18px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  #intro[open], .intro-dia:not([hidden]), .pin { animation: none; }
+  .pin { animation: none; }
   .teken, .seg { animation: none; stroke-dashoffset: 0; }
   .teller, .binnen, .hm { animation: none; opacity: 1; }
 }
@@ -601,7 +583,7 @@ details.meer > summary { cursor: pointer; margin-top: 12px; color: var(--inkt-2)
    ===================================================================== */
 body { font: 16px/1.45 'Karla', system-ui, -apple-system, 'Segoe UI', sans-serif; }
 h1, h2, h3, .stapkop, .subkop, button.hoofd, .keuze button, .kern b, .optie .kies b, .modi button b, details.blok > summary,
-.hulp-kop h2, #hulp h3, .intro-dia h2, .tekenstatus b, #opnieuw, .ondergrondkop b, .optie .badge, .stapnr {
+.hulp-kop h2, #hulp h3, .tekenstatus b, #opnieuw, .ondergrondkop b, .optie .badge, .stapnr {
   font-family: var(--kop); font-weight: 900; text-transform: none; letter-spacing: -.01em;
 }
 h2 { font-size: 19px; }
@@ -620,7 +602,7 @@ details.blok > summary { font-size: 21px; }
 
 /* vorm: vierkant */
 button, .keuze, .veld select, .veld input, .zoek input, .stap, .stapvlak, .optie, .kern div, .modi button, .fout, .melding,
-.tekenstatus, kbd, #zoekresultaten, .twijfels canvas, .tip, .profieltip, .balkje, .balkje i, .balk i, .legenda i, td i, dialog, #intro, #hulp,
+.tekenstatus, kbd, #zoekresultaten, .twijfels canvas, .tip, .profieltip, .balkje, .balkje i, .balk i, .legenda i, td i, dialog, #hulp,
 .optie .badge, .optie .letter, .stapnr, .hulp-ico, .modi .mico, .leaflet-popup-content-wrapper, .leaflet-bar, .leaflet-bar a,
 .leaflet-bar a:first-child, .leaflet-bar a:last-child, .leaflet-control-layers, .kaartlagen, .waterico, .stationico, .omwegchip,
 .punt.via, .leaflet-control-scale-line, dialog img { border-radius: 0; box-shadow: none; }
@@ -655,13 +637,6 @@ main { border-left: 2px solid var(--inkt); }
 
 /* dialogen */
 dialog { border: 2px solid var(--inkt); }
-#intro { border: 2px solid #F6F6DA; }
-.intro-dia { text-align: left; }
-.intro-dia h2 { font-size: 34px; line-height: .95; letter-spacing: -.02em; }
-.intro-dia .wm { font-size: 68px; color: #F6F6DA; display: block; margin: 6px 0 10px; }
-.intro-dia .wm .pav { background-color: #8c929b; }
-.intro-stippen i { border-radius: 0; }
-.intro-voet .klein { border-width: 2px; }
 #hulp { border: 2px solid var(--inkt); }
 .hulp-ico, .modi .mico { background: var(--balk); color: var(--accent-tekst); }
 .hulp-ico .ico, .modi .mico .ico { width: 22px; height: 22px; }
@@ -736,7 +711,6 @@ button .ico:only-child, .kaartlagen button .ico, #afspeel .ico, .pknoppen .ico, 
 .profielvlak .vlak { opacity: .25; }
 
 /* intro-tekening */
-.intro-dia svg .route { stroke: #F6F6DA; }
 .omweg { stroke: #A8C06A; }
 .gpx rect { fill: var(--zand); }
 
@@ -762,3 +736,24 @@ header > div:first-child { flex: 1 1 auto; }
 .keuze.klein button .ico { margin: 0; width: 1.1em; height: 1.1em; }
 
 .leaflet-control-attribution { font-size: 10px; }
+
+/* ---- UX fase 1 ---- */
+/* welkom op de lege kaart: één zin en één knop, Korrel-vlak met 2px inkt */
+.welkom { position: absolute; z-index: 550; top: 12px; left: 64px; right: 64px; max-width: 420px; margin: 0 auto; padding: 12px 14px;
+  background: var(--vlak); color: var(--inkt); border: 2px solid var(--inkt); border-radius: 0; }
+.welkom[hidden] { display: none; }
+.welkom p { margin: 0 0 10px; font: 600 17px/1.25 'Karla', sans-serif; }
+.welkom button { width: 100%; min-height: 44px; }
+@media (min-width: 701px) { .app { position: relative; } }
+@media (min-width: 861px) { .welkom { left: 64px; right: calc(440px + 64px); } }
+/* waarom bij de score */
+.kern p.waarom { grid-column: 1 / -1; margin: -2px 0 0; font: 500 12px/1.4 var(--mono); color: var(--inkt-2); }
+.kern p.waarom b { font: 700 12px var(--mono); color: var(--inkt); text-transform: uppercase; letter-spacing: .06em; margin-right: .4em; }
+/* piekbalk: geen afkapping meer, regel 2 mag teruglopen */
+@media (max-width: 700px) {
+  .piekbalk .psamen small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+}
+.afspeelsnelheid { align-items: center; }
+.afspeelsnelheid .keuzelabel { font: 500 11px var(--mono); color: var(--inkt-2); padding: 0 8px; border-right: 2px solid var(--inkt); align-self: stretch; display: flex; align-items: center; }
+#gebruik table { width: 100%; }
+#gebruik td:last-child { text-align: right; font-family: var(--mono); }
