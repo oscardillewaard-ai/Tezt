@@ -4,6 +4,7 @@
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
 import * as Teller from './teller.js'
+import * as Meting from './meting.js'
 import { korrelStijl as kaartStijl, koppelKorrels, kanWebgl, KAART_BRON } from './korrelkaart.js'
 import * as Gebieden from './gebieden.js'
 import { haalTegels, bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
@@ -973,6 +974,7 @@ async function planNu() {
   el('bezig').hidden = false
   zetVoortgang(null)
   const t0 = performance.now()
+  Meting.reset()
   Teller.log('plan_start', { soort: staat.modus, km: ['rondje', 'station', 'gebied'].includes(staat.modus) ? staat.km : null, start: startBron, pref: voorkeurKort() })
   let gelukt = 'fout'
   const status = (tekst) => {
@@ -1034,6 +1036,7 @@ async function planNu() {
       console.error(fout)
     }
   } finally {
+    Meting.klaar()
     Teller.log('plan_done', { soort: staat.modus, ms: Math.round(performance.now() - t0), uit: gelukt, n: gelukt === 'ok' ? uitslag.opties.length : 0 })
     stopBezig()
   }
@@ -3218,7 +3221,7 @@ Teller.geoToestemming().then((geo) => Teller.log('app_open', { weergave: Teller.
 telWijzigingen() // beginstand van de voorkeuren, zonder te tellen
 
 // voor de end-to-end-test
-window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag, binnen: () => binnen }
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag, binnen: () => binnen, meting: Meting }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})
