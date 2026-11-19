@@ -294,10 +294,19 @@ export function luchtfotoUrl(bb, pixels) {
 }
 
 // ---------- Plaatsen zoeken ----------
-/** Zoek plekken in Nederland bij PDOK (Locatieserver): [{naam, soort, punt: [lat, lon]}]. */
-export async function zoekPlaats(tekst, signal) {
-  const url = `${LOCATIESERVER}?q=${encodeURIComponent(tekst)}&rows=7&fl=weergavenaam,type,centroide_ll`
-  const r = await fetch(url, { signal })
+/**
+ * De zoekvraag voor de Locatieserver. Met dichtbij ([lat, lon]) zet PDOK treffers in de buurt hoger
+ * (Stationsplein, Kerkstraat). Afgerond op drie decimalen (ongeveer 100 m): genoeg om te sorteren.
+ */
+export function zoekUrl(tekst, dichtbij) {
+  let url = `${LOCATIESERVER}?q=${encodeURIComponent(tekst)}&rows=7&fl=weergavenaam,type,centroide_ll`
+  if (dichtbij && Number.isFinite(dichtbij[0]) && Number.isFinite(dichtbij[1])) url += `&lat=${dichtbij[0].toFixed(3)}&lon=${dichtbij[1].toFixed(3)}`
+  return url
+}
+
+/** Zoek plekken in Nederland bij PDOK (Locatieserver): [{naam, soort, punt: [lat, lon]}]. dichtbij: [lat, lon] of niets. */
+export async function zoekPlaats(tekst, signal, dichtbij) {
+  const r = await fetch(zoekUrl(tekst, dichtbij), { signal })
   if (!r.ok) throw new BronFout('PDOK Locatieserver', `HTTP ${r.status}`)
   const d = await r.json()
   const uit = []

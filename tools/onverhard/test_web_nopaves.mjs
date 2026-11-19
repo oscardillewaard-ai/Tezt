@@ -267,6 +267,37 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   stap('stationsmodus via de knoppen: één startpunt, Verder, lengte, plannen')
 }
 
+// ---- zoeken: treffers bij de start eerst (lat/lon naar PDOK), via het zoekveld ----
+{
+  const schoon = await browser.newContext(
+    mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
+  const zp = await schoon.newPage()
+  const vragen = []
+  zp.on('request', (r) => /locatieserver/.test(r.url()) && vragen.push(r.url()))
+  await zp.goto(basis)
+  await zp.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
+  await zp.goto(basis)
+  await zp.click('[data-modus="station"]') // bij een station is er één punt: een treffer verplaatst de start
+  await zp.evaluate(() => window.onverhard.kaart.setView([52.0116, 4.3571], 14))
+  // eerst een start op de kaart tikken, dan zoeken: de start telt
+  const k = await zp.locator('#kaart').boundingBox()
+  await zp.mouse.click(k.x + k.width / 2, k.y + (mobiel ? k.height * 0.3 : k.height / 2))
+  await zp.waitForTimeout(300)
+  if (mobiel) await zp.evaluate(() => window.onverhard.sheet.zet('vol'))
+  await zp.locator('#zoek').fill('Stationsplein')
+  await zp.waitForSelector('#zoekresultaten:not([hidden]) li', { timeout: 20000 })
+  const eerste = await zp.locator('#zoekresultaten li').first().textContent()
+  assert.match(eerste, /Delft|Den Haag|Rijswijk|Nootdorp/, `eerste treffer bij de start: ${eerste}`)
+  const vraag = vragen.find((u) => /q=Stationsplein/.test(u))
+  assert.match(vraag, /&lat=52\.0\d\d&lon=4\.3\d\d/, 'lat/lon van de start, afgerond op drie decimalen')
+  await zp.locator('#zoekresultaten li').first().click()
+  await zp.waitForTimeout(300)
+  const log = await zp.evaluate(() => JSON.parse(localStorage.getItem('nopaves.log') || '[]'))
+  assert.ok(log.some((r) => r.ev === 'start_moved' && r.d.hoe === 'zoek'), 'start verplaatst via zoeken telt mee')
+  await schoon.close()
+  stap(`zoeken met de start erbij: Stationsplein → ${eerste.trim()}`)
+}
+
 // ---- lokale teller "Mijn gebruik": alles via de knoppen, en er gaat niets het netwerk op ----
 {
   const schoon = await browser.newContext(

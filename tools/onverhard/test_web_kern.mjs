@@ -1023,3 +1023,13 @@ test('weergave: onverhard en half apart, opgeteld gelijk aan wat de score gebrui
   assert.match(W.waaromTekst({ ...an, dubbel: 0.1 }), /min voor 10% heen en terug/)
   assert.equal(W.waaromTekst({ lengte: 0 }), '')
 })
+
+test('zoeken: de start (of het midden van de kaart) gaat als lat/lon mee naar PDOK, afgerond', async () => {
+  const B = await import('../../public/onverhard/bronnen.js')
+  const zonder = B.zoekUrl('Delft Centraal')
+  assert.match(zonder, /\/free\?q=Delft%20Centraal&rows=7&fl=weergavenaam,type,centroide_ll$/)
+  assert.equal(B.zoekUrl('x', null), B.zoekUrl('x'))
+  const met = B.zoekUrl('Stationsplein', [52.01163, 4.35712])
+  assert.match(met, /&lat=52\.012&lon=4\.357$/, met)
+  assert.equal(B.zoekUrl('x', [NaN, 4]), B.zoekUrl('x'), 'een kapot punt gaat niet mee')
+})

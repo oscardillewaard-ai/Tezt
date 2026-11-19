@@ -628,7 +628,10 @@ async function zoek(tekst) {
   zoekStopper = new AbortController()
   const lijst = el('zoekresultaten')
   try {
-    zoekTreffers = (await zoekPlaats(tekst, zoekStopper.signal)).filter((t) => inNederland(t.punt))
+    // treffers bij de start (of anders het midden van de kaart) eerst
+    const midden = kaart.getCenter()
+    const dichtbij = staat.punten[0] || [midden.lat, midden.lng]
+    zoekTreffers = (await zoekPlaats(tekst, zoekStopper.signal, dichtbij)).filter((t) => inNederland(t.punt))
   } catch (fout) {
     if (fout.name === 'AbortError') return
     lijst.innerHTML = '<li class="leeg">Zoeken lukt nu niet; tik de plek op de kaart.</li>'
