@@ -1155,6 +1155,41 @@ export function lawAandeel(analyse) {
   return som / analyse.lengte
 }
 
+/** Lengte (m) van het langste aaneengesloten verharde stuk (eindoordeel). */
+export function langsteVerhardeStuk(analyse) {
+  let beste = 0
+  let nu = 0
+  for (const s of analyse.stukken) {
+    if (groep(s.eind) === 'hard') {
+      nu += s.tot - s.van
+      if (nu > beste) beste = nu
+    } else nu = 0
+  }
+  return beste
+}
+
+/** Label bij een Nopav.es-score. */
+export function nopavesLabel(score) {
+  if (score >= 90) return 'Puur onverhard'
+  if (score >= 75) return 'Lekker ruig'
+  if (score >= 55) return 'Gemengd'
+  return 'Veel asfalt'
+}
+
+/**
+ * Nopav.es-score (0-100) in één getal: 75% onverhard + half verhard (eindoordeel),
+ * 15% smalle paadjes, 10% het langste verharde stuk (0 bij 2 km of meer), min
+ * 100 × (heen en terug + 2 × strand). Geeft {score, label}.
+ */
+export function nopavesScore(analyse) {
+  if (!analyse.lengte) return { score: 0, label: nopavesLabel(0) }
+  const stuk = Math.min(1, langsteVerhardeStuk(analyse) / 2000)
+  const mix = 0.75 * zachtAandeel(analyse, 'eind') + 0.15 * paadjesAandeel(analyse) + 0.1 * (1 - stuk)
+  const straf = (analyse.dubbel || 0) + 2 * (strandMeter(analyse) / analyse.lengte)
+  const score = Math.round(Math.max(0, Math.min(100, 100 * (mix - straf))))
+  return { score, label: nopavesLabel(score) }
+}
+
 /** Routekosten in 'gewogen km' met de ondergrond van het eindoordeel. */
 export function routeKosten(analyse, lawFactor = 1, trail = false, strandStraf = 0) {
   let totaal = 0
@@ -1325,11 +1360,11 @@ export const rondjeOmtrek = (straal, rek = 1) => straal * vormOmtrek(rek)
 // ---------- GPX ----------
 const xmlVeilig = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
 
-export function maakGpx(traject, naam, tijd = new Date()) {
+export function maakGpx(traject, naam, tijd = new Date(), beschrijving = '') {
   const regels = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<gpx version="1.1" creator="onverhard-planner" xmlns="http://www.topografix.com/GPX/1/1">',
-    `  <metadata><name>${xmlVeilig(naam)}</name><time>${tijd.toISOString().slice(0, 19)}Z</time></metadata>`,
+    `  <metadata><name>${xmlVeilig(naam)}</name>${beschrijving ? `<desc>${xmlVeilig(beschrijving)}</desc>` : ''}<time>${tijd.toISOString().slice(0, 19)}Z</time></metadata>`,
   ]
   traject.punten.forEach(([lat, lon], i) => {
     const label = i === 0 ? 'Start' : i === traject.punten.length - 1 ? 'Finish' : `Via ${i}`

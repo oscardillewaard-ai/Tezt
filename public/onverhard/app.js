@@ -880,7 +880,7 @@ function tekenAlternatieven() {
   for (const i of opKaart) {
     if (i === gekozen) continue
     const o = uitslag.opties[i]
-    const tip = `Route ${o.naam}: ${nl(o.km)} km, ${pct(o.zacht)} onverhard. Tik om te kiezen.`
+    const tip = `Route ${o.naam}: ${nl(o.km)} km, score ${o.score}, ${pct(o.zacht)} onverhard. Tik om te kiezen.`
     const kies = () => kiesRoute(i)
     L.polyline(naarLatLon(o.analyse.xy), { pane: 'alternatieven', color: KLEUR.rouw, weight: 7, opacity: 0.7, bubblingMouseEvents: false })
       .bindTooltip(tip, { sticky: true })
@@ -1294,7 +1294,7 @@ function tekenOpties() {
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
     const titel = o.ingelezen ? veilig(o.ingelezen) : `Route ${o.naam}${i === 0 ? '</b> · aanbevolen<b>' : ''}`
-    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span>`
+    kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span><span class="badge ${scoreKlasse(o.score)}" title="Nopav.es-score: ${veilig(o.label)}">${o.score}</span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
     toon.className = 'toon'
@@ -1506,11 +1506,14 @@ function tekenTwijfels() {
   el('twijfelnoot').textContent = plan.twijfels.length ? 'Bronnen oneens. Tik om te zoomen.' : 'Geen twijfelstukken.'
 }
 
+/** Kleurklasse bij een score, voor de tegel en de badge. */
+const scoreKlasse = (s) => (s >= 90 ? 's-top' : s >= 75 ? 's-goed' : s >= 55 ? 's-mid' : 's-laag')
+
 function tekenKern() {
   el('kern').innerHTML =
+    `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span></div>` +
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
     `<div><b>${pct(plan.zacht.eind)}</b><span>onverhard + half verhard</span></div>` +
-    `<div><b>${pct(K.paadjesAandeel(plan.analyse))}</b><span>smalle paadjes</span></div>` +
     (keuze().hoogte
       ? `<div><b>↗ ${Math.round(keuze().hoogte.stijgen)} m</b><span>hoogte&shy;meters</span></div>`
       : `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`)
@@ -1670,7 +1673,7 @@ el('gpx').addEventListener('click', () => {
   const nu = new Date()
   const stempel = nu.toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-')
   const naam = `onverhard-${stempel}-route-${plan.naam}`
-  const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu)], { type: 'application/gpx+xml' }))
+  const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu, `Nopav.es-score ${plan.score} (${plan.label}), ${pct(plan.zacht.eind)} onverhard`)], { type: 'application/gpx+xml' }))
   const a = document.createElement('a')
   a.href = url
   a.download = naam + '.gpx'
@@ -1810,7 +1813,7 @@ function tekenBewaard() {
   ul.innerHTML = ''
   for (const r of lijst) {
     const li = document.createElement('li')
-    li.innerHTML = `<span><b>${veilig(r.naam)}</b><small>${nl(r.km, 1)} km · ${pct(r.zacht)} onverhard${r.stijgen ? ` · ↗ ${Math.round(r.stijgen)} m` : ''} · ${veilig(r.datum)}</small></span>`
+    li.innerHTML = `<span><b>${veilig(r.naam)}</b><small>${nl(r.km, 1)} km${typeof r.score === 'number' ? ` · score ${r.score}` : ''} · ${pct(r.zacht)} onverhard${r.stijgen ? ` · ↗ ${Math.round(r.stijgen)} m` : ''} · ${veilig(r.datum)}</small></span>`
     const open = document.createElement('button')
     open.type = 'button'
     open.textContent = 'Open'
@@ -1842,6 +1845,7 @@ el('bewaar').addEventListener('click', () => {
     datum,
     km: o.km,
     zacht: o.zacht,
+    score: o.score,
     stijgen: o.stijgen || null,
     traject: { coords: o.traject.coords.map((c) => [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6]), segs: o.traject.segs, punten: o.traject.punten || [] },
     staat: JSON.parse(momentopname().json),

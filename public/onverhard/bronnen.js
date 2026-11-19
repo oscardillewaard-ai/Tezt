@@ -1437,8 +1437,11 @@ const LETTERS = 'ABCDEFGH'
 
 /** Eén route zoals de app hem toont. */
 function optieVan(o, naam) {
+  const nopaves = K.nopavesScore(o.an)
   return {
     naam,
+    score: nopaves.score,
+    label: nopaves.label,
     traject: o.traject,
     analyse: o.an,
     km: o.an.lengte / 1000,
@@ -1568,6 +1571,8 @@ export function details(optie, minTwijfel = 30) {
   const kort = analyse.samengevoegd.filter((s) => s.twijfel && !s.nr)
   return {
     naam: optie.naam,
+    score: optie.score,
+    label: optie.label,
     traject: optie.traject,
     analyse,
     twijfels,
@@ -1637,6 +1642,12 @@ export async function maakPlan(opties) {
       optie.vast = [0, o.knopen.length - 1]
     }
     lijst.push(optie)
+  }
+  // Bij een rondje van een bepaalde lengte: de hoogste Nopav.es-score eerst, met een strafpunt per
+  // procent afwijking van de gevraagde lengte (boven de 10%), zodat "aanbevolen" ook echt past.
+  if (opties.rondjeKm && !opties.modus && plan.doel && lijst.length > 1) {
+    const rang = (o) => o.score - 100 * 0.3 * Math.max(0, Math.abs(o.km * 1000 - plan.doel) / plan.doel - 0.1)
+    lijst.sort((a, b) => rang(b) - rang(a))
   }
   // Een andere route die veel minder onverhard is dan de beste helpt niemand (zoals een rondje
   // door de polder naast een rondje door de duinen): laat die weg en zeg dat erbij.

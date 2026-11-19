@@ -727,3 +727,42 @@ test('lusjes weghalen: een rondje om een blok onderweg verdwijnt', () => {
   const vast = [0, r.knopen.indexOf(k(4, 3)), r.knopen.length - 1]
   assert.ok(G.zonderLusjes(g, r.knopen, r.segs, vast, { maxLus: 600 }).knopen.includes(k(4, 3)))
 })
+
+// ---------- Nopav.es-score ----------
+/** Een nepanalyse met stukken van 100 m: [klasse, highway?, strand?] per stuk. */
+const nepAnalyse = (stukken, dubbel = 0) => {
+  let m = 0
+  const lijst = stukken.map(([eind, highway = 'track', strand = false]) => {
+    const s = { van: m, tot: m + 100, eind, tags: [`highway=${highway}`], strand }
+    m += 100
+    return s
+  })
+  return { stukken: lijst, lengte: m, dubbel }
+}
+
+test('nopavesScore: grenzen en labels', () => {
+  const alleOnverhard = nepAnalyse(Array(20).fill([K.ONVERHARD, 'track']))
+  assert.deepEqual(K.nopavesScore(alleOnverhard), { score: 85, label: 'Lekker ruig' }) // 75 + 0 paadjes + 10
+  const alleenPaden = nepAnalyse(Array(20).fill([K.ONVERHARD, 'path']))
+  assert.deepEqual(K.nopavesScore(alleenPaden), { score: 100, label: 'Puur onverhard' })
+  const asfalt = nepAnalyse(Array(30).fill([K.GESLOTEN, 'residential']))
+  assert.deepEqual(K.nopavesScore(asfalt), { score: 0, label: 'Veel asfalt' })
+  assert.equal(K.nopavesScore({ stukken: [], lengte: 0, dubbel: 0 }).score, 0)
+  for (const [s, l] of [[90, 'Puur onverhard'], [89, 'Lekker ruig'], [75, 'Lekker ruig'], [74, 'Gemengd'], [55, 'Gemengd'], [54, 'Veel asfalt']]) {
+    assert.equal(K.nopavesLabel(s), l)
+  }
+})
+
+test('nopavesScore: dubbel lopen, strand en een lang verhard stuk kosten punten', () => {
+  const basis = nepAnalyse(Array(20).fill([K.ONVERHARD, 'path']))
+  const dubbel = K.nopavesScore({ ...basis, dubbel: 0.2 }).score
+  assert.equal(dubbel, 80)
+  const strand = nepAnalyse(Array(20).fill([K.ONVERHARD, 'path']).map((s, i) => (i < 4 ? [s[0], s[1], true] : s)))
+  assert.equal(K.nopavesScore(strand).score, 60) // 20% strand telt dubbel
+  // één aaneengesloten verhard stuk van 2 km telt zwaarder dan dezelfde meters verspreid
+  const aaneen = nepAnalyse([...Array(20).fill([K.GESLOTEN, 'residential']), ...Array(20).fill([K.ONVERHARD, 'path'])])
+  const verspreid = nepAnalyse(Array.from({ length: 40 }, (_, i) => (i % 2 ? [K.GESLOTEN, 'residential'] : [K.ONVERHARD, 'path'])))
+  assert.ok(K.nopavesScore(verspreid).score > K.nopavesScore(aaneen).score)
+  assert.equal(K.langsteVerhardeStuk(aaneen), 2000)
+  assert.equal(K.langsteVerhardeStuk(verspreid), 100)
+})

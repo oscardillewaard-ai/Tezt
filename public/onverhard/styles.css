@@ -162,16 +162,22 @@ button.hoofd:hover { filter: brightness(1.05); background: var(--route); }
 .melding { background: var(--let-op-vlak); border: 1px solid var(--let-op-rand); border-radius: 8px; padding: 8px 12px;
            margin-top: 8px; font-size: 13px; }
 
-.kern { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kern { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .kern div { background: var(--vlak); border: 1.5px solid var(--rand); border-radius: 12px; padding: 8px 10px; }
 .kern b { display: block; font: 700 26px/1.1 var(--kop); font-variant-numeric: tabular-nums; }
+.kern .score { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; background: var(--balk); border-color: var(--balk); color: var(--balk-tekst); }
+.kern .score b { font-size: 44px; color: var(--accent-tekst); }
+.kern .score span { color: var(--balk-tekst); font-size: 12px; }
+.kern .score.s-laag b { color: #ffb4a8; }
+.optie .badge { margin-left: auto; align-self: center; flex: none; min-width: 34px; text-align: center; padding: 3px 7px; border-radius: 999px; font: 700 15px/1.2 var(--kop); background: var(--balk); color: var(--accent-tekst); font-variant-numeric: tabular-nums; }
+.optie .badge.s-laag { background: #7a2a22; color: #fff; }
 .kern span { color: var(--inkt-2); font: 500 11px/1.3 var(--mono); display: block; }
 
 .opties { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .optie { display: grid; grid-template-columns: 1fr auto; align-items: stretch; border: 1.5px solid var(--rand);
          border-radius: 12px; overflow: hidden; background: var(--vlak); }
 .optie.gekozen { border-color: var(--inkt); box-shadow: 0 0 0 1.5px var(--inkt); border-left: 6px solid var(--route); }
-.optie .kies { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; text-align: left;
+.optie .kies { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; text-align: left;
                border: 0; border-radius: 0; background: none; padding: 10px 12px; }
 .optie .kies:hover { background: var(--vlak-2); }
 .optie .letter { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
@@ -258,7 +264,8 @@ dialog form { text-align: right; }
   main { border-left: 0; border-top: 0; overflow: visible; padding: 0 16px 28px; }
   header { margin: 0 -16px; padding: 12px 16px 10px; }
   #resultaat { scroll-margin-top: calc(52vh + 8px); } /* niet achter de vastgezette kaart */
-  .kern { grid-template-columns: repeat(2, 1fr); }
+  .kern { grid-template-columns: repeat(3, 1fr); }
+  .kern b { font-size: 22px; }
   .twijfels li { grid-template-columns: 26px 1fr 64px; }
   .twijfels canvas { width: 64px; height: 64px; }
   th, td { padding-left: 6px; }
