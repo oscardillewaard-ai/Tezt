@@ -9,6 +9,7 @@ const SHELL = [
   'app.js',
   'sheet.js',
   'gebruik.js',
+  'weergave.js',
   'korrelkaart.js',
   'bronnen.js',
   'kern.js',

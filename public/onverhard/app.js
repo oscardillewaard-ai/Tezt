@@ -4,6 +4,7 @@
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
 import * as Gebruik from './gebruik.js'
+import { aandelen, ondergrondTekst, totaalTekst, waaromTekst } from './weergave.js'
 import { korrelStijl as kaartStijl, koppelKorrels, kanWebgl, KAART_BRON } from './korrelkaart.js'
 import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
@@ -715,7 +716,7 @@ function werkPiekbalk() {
   else if (stap === 4 && plan) {
     h =
       `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
-      `<span class="psamen"><b>${nl(plan.analyse.lengte / 1000)} km</b><small>${pct(plan.zacht.eind)} onverhard · ${veilig(plan.label)}</small></span>` +
+      `<span class="psamen"><b>${nl(plan.analyse.lengte / 1000)} km</b><small>${ondergrondTekst(aandelen(plan.analyse))} · ${veilig(plan.label)}</small></span>` +
       '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>'
   } else if (stap === 2) {
     h = `<span class="psamen"><b>${veilig(el('stap2kop').textContent)}</b></span><button type="button" class="hoofd" data-proxy="naar3" ${plaatsKlaar ? '' : 'disabled'}>Verder →</button>`
@@ -1039,7 +1040,7 @@ function tekenAlternatieven() {
   for (const i of opKaart) {
     if (i === gekozen) continue
     const o = uitslag.opties[i]
-    const tip = `Route ${o.naam}: ${nl(o.km)} km, score ${o.score}, ${pct(o.zacht)} onverhard. Tik om te kiezen.`
+    const tip = `Route ${o.naam}: ${nl(o.km)} km, score ${o.score}, ${o.analyse ? ondergrondTekst(aandelen(o.analyse)) : totaalTekst(o.zacht)}. Tik om te kiezen.`
     const kies = () => kiesRoute(i)
     L.polyline(naarLatLon(o.analyse.xy), { pane: 'alternatieven', color: KLEUR.rouw, weight: 7, opacity: 0.7, bubblingMouseEvents: false })
       .bindTooltip(tip, { sticky: true })
@@ -1586,7 +1587,7 @@ function tekenOpties() {
     kies.type = 'button'
     kies.className = 'kies'
     kies.setAttribute('aria-pressed', String(i === gekozen))
-    let regel = `${pct(o.zacht)} onverhard · ${pct(o.paadjes)} paadjes`
+    let regel = `${o.analyse ? ondergrondTekst(aandelen(o.analyse)) : totaalTekst(o.zacht)} · ${pct(o.paadjes)} paadjes`
     if (o.law > 0.05) regel += ` · ${pct(o.law)} LAW`
     if (o.stijgen !== null && o.stijgen !== undefined) regel += ` · ↗ ${Math.round(o.stijgen)} m`
     if (o.ronden > 1) regel += ` · ${o.ronden} rondjes`
@@ -1613,8 +1614,7 @@ function tekenOpties() {
 /** Overzicht van de ondergrond voor de gekozen bron: per soort een balk met km en procent. */
 function tekenBalken() {
   const doos = el('balken')
-  const zacht = plan.zacht[bron]
-  let h = `<p class="ondergrondkop"><b>${pct(zacht)}</b> onverhard of half verhard <small>volgens ${BRONNAAM[bron].toLowerCase()}</small></p><ul class="ondergrondlijst">`
+  let h = `<p class="ondergrondkop"><b>${ondergrondTekst(aandelen(plan.analyse, bron))}</b> <small>volgens ${BRONNAAM[bron].toLowerCase()}</small></p><ul class="ondergrondlijst">`
   for (const r of plan.tabel) {
     const c = r[bron]
     if (c.km <= 0.005) continue
@@ -1669,7 +1669,7 @@ function tekenZachteStukken() {
   const t = el('zacht')
   t.innerHTML = '<tr><th>Waar</th><th>Lengte</th><th>Ondergrond</th></tr>'
   if (!plan.zachteStukken.length) {
-    t.innerHTML = '<tr><td>Geen onverharde stukken gevonden.</td></tr>'
+    t.innerHTML = '<tr><td>Geen stukken onverhard of half gevonden.</td></tr>'
     return
   }
   for (const z of plan.zachteStukken) {
@@ -1823,17 +1823,17 @@ function strookHtml() {
     .slice()
     .sort((x, y) => y.eind.pct - x.eind.pct)
     .slice(0, 4)
-    .map((r) => `<span><i class="${korrelKlasse(r.klasse)}" style="background-color:${KLEUR[r.klasse]}"></i>${r.klasse} ${nl(r.eind.pct, 0)}%</span>`)
+    .map((r) => `<span><i class="${korrelKlasse(r.klasse)}" style="background-color:${KLEUR[r.klasse]}"></i>${nl(r.eind.pct, 0)}% ${r.klasse === 'half verhard' ? 'half' : r.klasse}</span>`)
     .join('')
   return `<div class="strook" role="img" aria-label="Ondergrond: ${beschrijving}">${delen}</div><p class="strookleg">${leg}</p>`
 }
 
 function tekenKern() {
   el('kern').innerHTML =
-    `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span></div>` +
+    `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span><small class="waarom">${waaromTekst(plan.analyse)}</small></div>` +
     strookHtml() +
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
-    `<div><b>${pct(plan.zacht.eind)}</b><span>onverhard + half verhard</span></div>` +
+    `<div class="ondergrondtegel"><b>${pct(aandelen(plan.analyse).onverhard)}</b><span>${ondergrondTekst(aandelen(plan.analyse)).replace(/^\d+% /, '')}</span></div>` +
     (keuze().hoogte
       ? `<div><b>↗ ${Math.round(keuze().hoogte.stijgen)} m</b><span>hoogte&shy;meters</span></div>`
       : `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`)
@@ -2002,7 +2002,7 @@ el('gpx').addEventListener('click', () => {
   const stempel = nu.toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-')
   const station = keuze().station
   const naam = station ? `Nopav.es → ${station}` : `onverhard-${stempel}-route-${plan.naam}`
-  const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu, `Nopav.es-score ${plan.score} (${plan.label}), ${pct(plan.zacht.eind)} onverhard`)], { type: 'application/gpx+xml' }))
+  const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu, `Nopav.es-score ${plan.score} (${plan.label}), ${ondergrondTekst(aandelen(plan.analyse))}`)], { type: 'application/gpx+xml' }))
   const a = document.createElement('a')
   a.href = url
   a.download = naam.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') + '.gpx'
@@ -2143,7 +2143,7 @@ function tekenBewaard() {
   ul.innerHTML = ''
   for (const r of lijst) {
     const li = document.createElement('li')
-    li.innerHTML = `<span><b>${veilig(r.naam)}</b><small>${nl(r.km, 1)} km${typeof r.score === 'number' ? ` · score ${r.score}` : ''} · ${pct(r.zacht)} onverhard${r.stijgen ? ` · ↗ ${Math.round(r.stijgen)} m` : ''} · ${veilig(r.datum)}</small></span>`
+    li.innerHTML = `<span><b>${veilig(r.naam)}</b><small>${nl(r.km, 1)} km${typeof r.score === 'number' ? ` · score ${r.score}` : ''} · ${typeof r.onverhard === 'number' ? ondergrondTekst({ onverhard: r.onverhard, half: r.half || 0 }) : totaalTekst(r.zacht)}${r.stijgen ? ` · ↗ ${Math.round(r.stijgen)} m` : ''} · ${veilig(r.datum)}</small></span>`
     const open = document.createElement('button')
     open.type = 'button'
     open.textContent = 'Open'
@@ -2175,6 +2175,7 @@ el('bewaar').addEventListener('click', () => {
     datum,
     km: o.km,
     zacht: o.zacht,
+    ...(o.analyse ? aandelen(o.analyse) : {}),
     score: o.score,
     stijgen: o.stijgen || null,
     traject: { coords: o.traject.coords.map((c) => [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6]), segs: o.traject.segs, punten: o.traject.punten || [] },

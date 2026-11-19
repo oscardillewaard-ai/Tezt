@@ -769,3 +769,7 @@ header > div:first-child { flex: 1 1 auto; }
 #hulp .gebruikknoppen { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 18px 0; }
 #hulp .gebruikknoppen button { font-size: 15px; padding: 6px 12px; }
 #hulp .gebruikjson { display: block; box-sizing: border-box; width: calc(100% - 36px); margin: 8px 18px 0; font: 500 11px/1.4 var(--mono, monospace); border: 2px solid var(--inkt); background: var(--vlak, #fff); color: var(--inkt); }
+
+/* waarom-regel bij de score: waar het getal vandaan komt */
+.kern .score { flex-wrap: wrap; }
+.kern .score small.waarom { flex-basis: 100%; margin-top: 2px; font: 500 11px/1.35 var(--mono); color: var(--balk-tekst); opacity: .9; }

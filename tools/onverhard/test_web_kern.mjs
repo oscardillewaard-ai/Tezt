@@ -1003,3 +1003,23 @@ test('teller: samenvatting telt per soort, start, voorkeur, onderdeel en planduu
   assert.equal(s.planDuurMediaanMs, 6000, 'alleen geslaagde plannen tellen voor de wachttijd')
   assert.equal(Gebruik.samenvatting([]).regels, 0)
 })
+
+test('weergave: onverhard en half apart, opgeteld gelijk aan wat de score gebruikt', async () => {
+  const W = await import('../../public/onverhard/weergave.js')
+  // 1000 m: 255 onverhard, 285 half, 460 asfalt
+  const stuk = (van, tot, eind) => ({ van, tot, eind, osm: eind, bgt: eind, tags: ['path'] })
+  const an = { lengte: 1000, dubbel: 0, stukken: [stuk(0, 255, K.ONVERHARD), stuk(255, 540, K.HALF), stuk(540, 1000, 'gesloten verharding')], samengevoegd: [] }
+  const a = W.aandelen(an)
+  assert.ok(Math.abs(a.onverhard - 0.255) < 1e-9 && Math.abs(a.half - 0.285) < 1e-9)
+  assert.ok(Math.abs(a.onverhard + a.half - K.zachtAandeel(an, 'eind')) < 1e-9, 'samen is het aandeel dat de score telt')
+  // 25,5 en 28,5 afgerond los zou 26 + 29 = 55 geven; het totaal is 54
+  assert.equal(W.ondergrondTekst(a), '26% onverhard · 28% half')
+  assert.equal(W.ondergrondTekst({ onverhard: 0, half: 0 }), '0% onverhard · 0% half')
+  assert.equal(W.totaalTekst(0.54), '54% onverhard + half')
+  const waarom = W.waaromTekst(an)
+  assert.match(waarom, /onverhard \+ half samen \(54%\)/)
+  assert.match(waarom, /langste verharde stuk 0,5 km/)
+  assert.doesNotMatch(waarom, /min voor/)
+  assert.match(W.waaromTekst({ ...an, dubbel: 0.1 }), /min voor 10% heen en terug/)
+  assert.equal(W.waaromTekst({ lengte: 0 }), '')
+})

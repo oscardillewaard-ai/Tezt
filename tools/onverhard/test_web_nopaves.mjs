@@ -61,6 +61,22 @@ const scores = badges.map(Number)
 assert.ok(scores.every((s, i) => i === 0 || s <= scores[0] + 8), 'aanbevolen route heeft (ongeveer) de hoogste score')
 stap(`score ${score} in de tegel en op de routekaart (${badges.join(', ')})`)
 
+// ---- één betekenis van 'onverhard': overal '26% onverhard · 28% half', en een waarom-regel bij de score ----
+{
+  const vorm = /\d+% onverhard · \d+% half/
+  const regels = await page.locator('#opties .kies small').allTextContents()
+  assert.ok(regels.length && regels.every((r) => vorm.test(r)), `routelijst: ${regels[0]}`)
+  assert.match(await page.locator('#kern .ondergrondtegel').textContent(), /^\d+%onverhard · \d+% half$/)
+  assert.match(await page.locator('#piekbalk').textContent(), vorm)
+  assert.match(await page.locator('#kern .waarom').textContent(), /onverhard \+ half samen \(\d+%\)/)
+  const { o, h, zacht } = await page.evaluate(() => {
+    const t = document.querySelector('#kern .ondergrondtegel').textContent.match(/(\d+)%onverhard · (\d+)% half/)
+    return { o: Number(t[1]), h: Number(t[2]), zacht: window.onverhard.krijgPlan().zacht.eind }
+  })
+  assert.equal(o + h, Math.round(100 * zacht), 'onverhard + half is het aandeel dat de score gebruikt')
+  stap(`één betekenis: ${o}% onverhard · ${h}% half (samen ${Math.round(100 * zacht)}%, zoals de score)`)
+}
+
 // ---- kaartlagen op de kaart, geen Water-tab meer ----
 assert.equal(await page.locator('#tabs button').count(), 2, 'tabs: Hoogte en Ondergrond')
 assert.equal(await page.locator('#waterlijst').count(), 0, 'geen waterlijst meer in het paneel')
@@ -98,7 +114,7 @@ await page.screenshot({ path: path.join(map, `nopaves_resultaat_${soort}.png`) }
   await klik('omwegen')
   await og.waitForTimeout(500)
   const chips = await og.locator('.omwegchip').allTextContents()
-  console.log(`  omwegen op ${voor.km.toFixed(1)} km, score ${voor.score}, ${(100 * voor.zacht).toFixed(0)}% onverhard: ${chips.length ? chips.join(' | ') : 'geen'}`)
+  console.log(`  omwegen op ${voor.km.toFixed(1)} km, score ${voor.score}, ${(100 * voor.zacht).toFixed(0)}% onverhard + half: ${chips.length ? chips.join(' | ') : 'geen'}`)
   await og.screenshot({ path: path.join(map, `nopaves_omwegen_${soort}.png`) })
   assert.ok(chips.length >= 1, 'bij Rijswijk Buiten is een groene omweg te vinden')
   {
