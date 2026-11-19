@@ -5,7 +5,8 @@ import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
 import * as Teller from './teller.js'
 import { korrelStijl as kaartStijl, koppelKorrels, kanWebgl, KAART_BRON } from './korrelkaart.js'
-import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import * as Gebieden from './gebieden.js'
+import { haalTegels, bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -86,7 +87,7 @@ function korrelStijl(klasse) {
 }
 
 // ---------- Toestand ----------
-const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false }
+const staat = { modus: 'route', punten: [], km: 10, law: 1, grondig: 2, trail: true, strand: true, kaartje: false, vorm: 'lus', luchtfoto: false, vlak: null, lijn: null, wegen: 'straten', dood: true, heuvels: false, tempo: null, eenheid: 'km', minuten: 60 }
 const TEKENMODI = new Set(['gebied', 'straten', 'tekenen'])
 const tekenModus = () => TEKENMODI.has(staat.modus)
 /** de tekening die bij deze modus hoort: een gebied (vlak) of een lijn */
@@ -890,6 +891,7 @@ el('opnieuw').addEventListener('click', () => {
   staat.vlak = null
   staat.lijn = null
   startNaam = ''
+  binnen = null
   sluitToast()
   uitslag = null
   plan = null
@@ -980,14 +982,21 @@ async function planNu() {
   try {
     const rondje = staat.modus === 'rondje'
     const station = staat.modus === 'station'
+    // Rondjes in een benoemd gebied: het gebied afgesneden met een cirkel van L/2 rond de start
+    let binnenVlak = null
+    if (rondje && binnen && UI_NIEUW) {
+      binnenVlak = Gebieden.gebiedRondStart(binnen.ring, staat.punten[0], (staat.km * 1000) / 2)
+      if (!binnenVlak) throw Object.assign(new Error(`binnen ${binnen.naam} is rond deze start te weinig ruimte`), { bron: binnen.naam, melding: 'te weinig gebied rond de start' })
+    }
     const resultaat = await maakPlan({
-      modus: tekenModus() || station ? staat.modus : undefined,
-      tekening: tekenModus() ? tekening() : undefined,
+      modus: binnenVlak ? 'gebied' : tekenModus() || station ? staat.modus : undefined,
+      tekening: binnenVlak || (tekenModus() ? tekening() : undefined),
       wegen: staat.wegen,
       zonderDoodlopend: staat.dood !== false,
       heuvels: !!staat.heuvels,
       punten: rondje ? staat.punten.slice(0, 2) : station ? staat.punten.slice(0, 1) : staat.punten,
       rondjeKm: rondje || station || staat.modus === 'gebied' ? staat.km : null,
+      binnen: binnenVlak ? binnen.naam : undefined,
       law: staat.law,
       trail: staat.trail,
       alles: !!staat.alles,
@@ -2458,7 +2467,71 @@ kaart.on('contextmenu', (e) => {
   menu.style.top = `${Math.min(y, window.innerHeight - menu.offsetHeight - 8)}px`
   netGetekend = Date.now() // de tik die het menu sluit is geen nieuw punt
   menu.querySelector('button')?.focus()
+  if (UI_NIEUW && inNederland(p)) gebiedInMenu(menu, p)
 })
+
+// ---------- Rondjes in dit gebied (UX fase 3) ----------
+const gevondenGebieden = [] // eerder gevonden gebieden: een tweede keer lang drukken is meteen klaar
+let gebiedStopper = null
+async function zoekGebied(p, signal) {
+  const lonlat = [p[1], p[0]]
+  const bekend = gevondenGebieden.find((g) => Gebieden.puntInRing(lonlat, g.lonlat))
+  if (bekend) return bekend
+  let g
+  try {
+    g = await Gebieden.zoekNatura2000(p[0], p[1], signal)
+  } catch (fout) {
+    if (fout.name === 'AbortError') throw fout
+    // Natura 2000 niet bereikbaar: terugval op de natuurgebieden in de kaarttegels
+    g = await Gebieden.zoekParkInTegels(p[0], p[1], signal, haalTegels)
+  }
+  if (g) {
+    g.lonlat = g.ring.map(([a, b]) => [b, a])
+    gevondenGebieden.push(g)
+    if (gevondenGebieden.length > 6) gevondenGebieden.shift()
+  }
+  return g
+}
+/** Zet "Rondjes in <naam>" in het open kaartmenu zodra het gebied onder de tik bekend is. */
+function gebiedInMenu(menu, p) {
+  if (gebiedStopper) gebiedStopper.abort()
+  gebiedStopper = new AbortController()
+  const plek = document.createElement('button')
+  plek.type = 'button'
+  plek.setAttribute('role', 'menuitem')
+  plek.disabled = true
+  plek.className = 'gebiedzoek'
+  plek.innerHTML = ico('gebied') + 'Gebied zoeken…'
+  menu.prepend(plek)
+  const t0 = performance.now()
+  zoekGebied(p, gebiedStopper.signal)
+    .then((g) => {
+      if (!plek.isConnected) return
+      if (!g) return plek.remove()
+      plek.disabled = false
+      plek.innerHTML = ico('gebied')
+      plek.append(document.createTextNode(`Rondjes in ${g.naam}`))
+      plek.dataset.ms = String(Math.round(performance.now() - t0))
+      plek.addEventListener('click', () => {
+        sluitMenu()
+        onthoud()
+        if (staat.modus !== 'rondje') zetModus('rondje')
+        bewaarSoort('rondje')
+        staat.punten = [p]
+        startBron = 'tik'
+        startNaam = `in ${g.naam}`
+        binnen = g
+        if (uitslag) el('opnieuw').click() // een nieuw plan: het oude resultaat weg, maar de start en het gebied blijven
+        staat.punten = [p]
+        binnen = g
+        startNaam = `in ${g.naam}`
+        puntenGewijzigd()
+        toonOpKaart(p, Math.min(kaart.getZoom(), 13))
+        Teller.log('gebied_kies', { naam: g.naam, bron: g.bron, ms: Number(plek.dataset.ms) })
+      })
+    })
+    .catch(() => plek.isConnected && plek.remove())
+}
 document.addEventListener('pointerdown', (e) => {
   if (!el('kaartmenu').hidden && !el('kaartmenu').contains(e.target)) sluitMenu()
 })
@@ -2498,7 +2571,7 @@ el('welkomLocatie').addEventListener('click', () => {
 })
 
 // ---------- Mijn gebruik (lokale teller) ----------
-const GEBRUIK_NAAM = { app_open: 'app geopend', plan_start: 'plannen gestart', plan_done: 'plannen klaar', start_moved: 'start versleept', pref_change: 'voorkeur gewijzigd', km_change: 'afstand gewijzigd', gpx: 'GPX', bewaar: 'bewaard', andere_route: 'andere route', details_open: 'details geopend', sheet_state: 'paneel verschoven' }
+const GEBRUIK_NAAM = { app_open: 'app geopend', plan_start: 'plannen gestart', plan_done: 'plannen klaar', start_moved: 'start versleept', pref_change: 'voorkeur gewijzigd', km_change: 'afstand gewijzigd', gpx: 'GPX', bewaar: 'bewaard', andere_route: 'andere route', details_open: 'details geopend', sheet_state: 'paneel verschoven', gebied_kies: 'rondjes in een gebied' }
 function tekenGebruik() {
   const regels = Teller.lees()
   const rijen = Teller.tellingen(regels)
@@ -2554,6 +2627,7 @@ el('hulp').addEventListener('click', (e) => {
 const VAST = new Set(['rondje', 'station', 'route'])
 const SOORT_SLEUTEL = 'nopaves.soort'
 const PLANTEKST = { rondje: 'Plan rondje', station: 'Zoek routes naar stations', route: 'Plan route' }
+let binnen = null // {naam, ring: [[lat, lon], ...], bron}: Rondjes in dit gebied (UX fase 3)
 let startNaam = '' // hoe de start heet in de startregel: Mijn locatie, een zoektreffer, of op de kaart
 
 const vasteSoort = () => UI_NIEUW && VAST.has(staat.modus)
@@ -2613,11 +2687,55 @@ function tekenStartregel() {
   r.innerHTML = `<span class="startico">${ico('start')}</span><span class="starttekst">${tekst}</span>${knoppen}`
 }
 
+// afstand in km, of (met een tempo) in minuten: de planner krijgt dan km = minuten ÷ tempo
+const SNEL = { km: [5, 10, 15, 20], min: [30, 45, 60, 90] }
+const inMinuten = () => staat.eenheid === 'min' && !!staat.tempo
+const kmUitMinuten = (min) => Math.max(2, Math.min(60, Math.round(((min * 60) / staat.tempo / 1000) * 1000 * 10) / 10))
 function tekenAfstand() {
-  el('kmGetal').textContent = staat.km
-  el('kmMin').disabled = staat.km <= 2
-  el('kmPlus').disabled = staat.km >= 60
-  for (const b of el('snelkeuzes').children) b.setAttribute('aria-pressed', String(Number(b.dataset.km) === staat.km))
+  const min = inMinuten()
+  const waarde = min ? staat.minuten : staat.km
+  el('kmGetal').textContent = min ? waarde : nl(waarde, Number.isInteger(waarde) ? 0 : 1)
+  el('kmEenheid').textContent = min ? 'min' : 'km'
+  el('kmEenheid').disabled = !staat.tempo
+  el('kmEenheid').setAttribute('aria-label', staat.tempo ? `Eenheid: ${min ? 'minuten (tik voor km)' : 'km (tik voor minuten)'}` : 'Eenheid: km (stel een tempo in voor minuten)')
+  el('kmMin').disabled = min ? staat.minuten <= 10 : staat.km <= 2
+  el('kmPlus').disabled = min ? staat.minuten >= 360 : staat.km >= 60
+  el('kmMin').setAttribute('aria-label', min ? '5 minuten korter' : '1 km korter')
+  el('kmPlus').setAttribute('aria-label', min ? '5 minuten langer' : '1 km langer')
+  const snel = SNEL[min ? 'min' : 'km']
+  el('snelkeuzes').innerHTML = snel.map((v) => `<button type="button" data-waarde="${v}" aria-pressed="${v === waarde}">${v}</button>`).join('')
+  const noot = el('afstandnoot')
+  if (staat.tempo && staat.modus !== 'route') {
+    const minuten = Math.round((staat.km * staat.tempo) / 60)
+    noot.textContent = min ? `${staat.minuten} min ≈ ${nl(staat.km, 1)} km` : `${nl(staat.km, Number.isInteger(staat.km) ? 0 : 1)} km ≈ ${minuten} min`
+  } else noot.textContent = ''
+  noot.hidden = !noot.textContent
+}
+/** Eén stap groter of kleiner: 1 km, of 5 minuten. */
+function stapAfstand(richting) {
+  if (inMinuten()) zetMinuten(staat.minuten + 5 * richting)
+  else zetKm(Math.round(staat.km) + richting)
+}
+function zetMinuten(min) {
+  const nieuw = Math.max(10, Math.min(360, Math.round(Number(min) || staat.minuten)))
+  onthoud()
+  staat.minuten = nieuw
+  staat.km = kmUitMinuten(nieuw)
+  el('km').value = staat.km
+  bewaar()
+  tekenAfstand()
+}
+function wisselEenheid() {
+  if (!staat.tempo) return
+  staat.eenheid = inMinuten() ? 'km' : 'min'
+  if (staat.eenheid === 'min') {
+    // de minuten die bij de huidige afstand horen, afgerond op 5
+    staat.minuten = Math.max(10, Math.min(360, Math.round((staat.km * staat.tempo) / 60 / 5) * 5))
+    staat.km = kmUitMinuten(staat.minuten)
+  } else staat.km = Math.max(2, Math.min(60, Math.round(staat.km)))
+  el('km').value = staat.km
+  bewaar()
+  tekenAfstand()
 }
 
 /** Alles van de plankaart bijwerken: zichtbaarheid, soort, start, afstand, voorkeuren, knop. */
@@ -2638,6 +2756,9 @@ function werkPlankaart() {
   el('planKnop').hidden = !vast
   if (vast) {
     tekenStartregel()
+    if (binnen && (staat.modus !== 'rondje' || !staat.punten.length || !Gebieden.puntInRing([staat.punten[0][1], staat.punten[0][0]], binnen.ring.map(([a, b]) => [b, a])))) binnen = null
+    el('binnenchip').hidden = !binnen
+    if (binnen) el('binnenNaam').textContent = binnen.naam
     el('afstandregel').hidden = staat.modus === 'route'
     el('afstandnoot').hidden = staat.modus === 'route' || !el('afstandnoot').textContent
     tekenAfstand()
@@ -2794,6 +2915,10 @@ function tekenTempo() {
 }
 function zetTempo(sec) {
   staat.tempo = sec === null ? null : Math.max(150, Math.min(900, sec))
+  if (!staat.tempo && staat.eenheid === 'min') {
+    staat.eenheid = 'km'
+    staat.km = Math.max(2, Math.min(60, Math.round(staat.km)))
+  } else if (staat.tempo && staat.eenheid === 'min') staat.km = kmUitMinuten(staat.minuten)
   bewaar()
   tekenTempo()
 }
@@ -2924,22 +3049,34 @@ function startNieuweUi() {
       }
     }
   })
-  houdVast(el('kmMin'), () => zetKm(staat.km - 1))
-  houdVast(el('kmPlus'), () => zetKm(staat.km + 1))
+  houdVast(el('kmMin'), () => stapAfstand(-1))
+  houdVast(el('kmPlus'), () => stapAfstand(1))
   el('snelkeuzes').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-km]')
-    if (b) zetKm(Number(b.dataset.km))
+    const b = e.target.closest('[data-waarde]')
+    if (!b) return
+    if (inMinuten()) zetMinuten(Number(b.dataset.waarde))
+    else zetKm(Number(b.dataset.waarde))
+  })
+  el('kmEenheid').addEventListener('click', wisselEenheid)
+  el('binnenWeg').addEventListener('click', () => {
+    binnen = null
+    werkPlankaart()
   })
   el('kmWaarde').addEventListener('click', () => {
     el('kmWaarde').hidden = true
     el('kmInvoer').hidden = false
-    el('kmInvoer').value = staat.km
+    const min = inMinuten()
+    el('kmInvoer').min = min ? 10 : 2
+    el('kmInvoer').max = min ? 360 : 60
+    el('kmInvoer').setAttribute('aria-label', min ? 'Duur in minuten (10 tot 360)' : 'Afstand in km (2 tot 60)')
+    el('kmInvoer').value = min ? staat.minuten : staat.km
     el('kmInvoer').focus()
     el('kmInvoer').select()
   })
   const kmKlaar = () => {
     if (el('kmInvoer').hidden) return
-    zetKm(el('kmInvoer').value)
+    if (inMinuten()) zetMinuten(el('kmInvoer').value)
+    else zetKm(el('kmInvoer').value)
     el('kmInvoer').hidden = true
     el('kmWaarde').hidden = false
   }
@@ -3081,7 +3218,7 @@ Teller.geoToestemming().then((geo) => Teller.log('app_open', { weergave: Teller.
 telWijzigingen() // beginstand van de voorkeuren, zonder te tellen
 
 // voor de end-to-end-test
-window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag }
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag, binnen: () => binnen }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})

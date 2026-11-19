@@ -839,3 +839,17 @@ details.details { margin-top: 10px; }
   [data-ui="nieuw"] header .sub { display: none; }
   [data-ui="nieuw"] header .wm { font-size: 34px; }
 }
+
+/* ---- UX fase 3: minuten en gebieden ---- */
+.afstandvak { display: inline-flex; align-items: stretch; border: 2px solid var(--inkt); }
+.afstandvak .afstandwaarde, .afstandvak .afstandinvoer { border: 0; min-width: 64px; width: auto; }
+.afstandvak .afstandinvoer { width: 72px; }
+.eenheid { border: 0; border-left: 2px solid var(--inkt); border-radius: 0; min-height: 40px; min-width: 44px; padding: 0 8px; font: 700 14px var(--mono); background: var(--vlak-2); color: var(--inkt); }
+.eenheid:disabled { background: var(--vlak); color: var(--inkt); opacity: 1; cursor: default; }
+.eenheid:not(:disabled) { text-decoration: underline dotted; text-underline-offset: 3px; }
+.binnenchip { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 2px 10px; border: 2px solid var(--heide); background: var(--vlak); font: 600 15px 'Karla', sans-serif; }
+.binnenchip[hidden] { display: none; }
+.binnenchip b { font: 800 17px var(--kop); }
+.binnenchip button { border-radius: 0; min-height: 34px; min-width: 36px; padding: 0; border-color: var(--heide); }
+.binnenchip .ico { margin: 0; }
+.kaartmenu .gebiedzoek:disabled { opacity: .6; }

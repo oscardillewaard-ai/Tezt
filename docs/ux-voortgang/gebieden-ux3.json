@@ -1,0 +1,68 @@
+[
+ {
+  "gebied": "Meijendel & Berkheide",
+  "gevonden": "Meijendel & Berkheide",
+  "zoekMs": 611,
+  "chip": "Meijendel & Berkheide",
+  "planMs": 15705,
+  "fout": "",
+  "km": 12.738843207011413,
+  "score": 85,
+  "binnen": 2,
+  "paginafouten": []
+ },
+ {
+  "gebied": "Veluwe (Veluwezoom)",
+  "gevonden": "Veluwe",
+  "zoekMs": 1704,
+  "chip": "Veluwe",
+  "planMs": 45347,
+  "fout": "",
+  "km": 12.701061689578331,
+  "score": 91,
+  "binnen": 2,
+  "paginafouten": []
+ },
+ {
+  "gebied": "Schoorlse Duinen",
+  "gevonden": "Schoorlse Duinen",
+  "zoekMs": 568,
+  "chip": "Schoorlse Duinen",
+  "planMs": 15747,
+  "fout": "",
+  "km": 10.339601903069612,
+  "score": 99,
+  "binnen": 2,
+  "paginafouten": []
+ },
+ {
+  "gebied": "Kennemerland-Zuid",
+  "gevonden": "Kennemerland-Zuid",
+  "zoekMs": 739,
+  "chip": "Kennemerland-Zuid",
+  "planMs": 28683,
+  "fout": "",
+  "km": 14.18854204407745,
+  "score": 75,
+  "binnen": 2,
+  "paginafouten": []
+ },
+ {
+  "gebied": "Loonse en Drunense Duinen",
+  "gevonden": "Loonse en Drunense Duinen & Leemkuilen",
+  "zoekMs": 696,
+  "chip": "Loonse en Drunense Duinen & Leemkuilen",
+  "planMs": 26383,
+  "fout": "",
+  "km": 10.474479412917777,
+  "score": 97,
+  "binnen": 2,
+  "paginafouten": []
+ },
+ {
+  "gebied": "Delftse Hout (geen beschermd gebied)",
+  "gevonden": null,
+  "zoekMs": 647,
+  "paginafouten": []
+ }
+]
