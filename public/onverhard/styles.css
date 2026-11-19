@@ -11,24 +11,24 @@
   --mono: 'Overpass Mono', ui-monospace, Menlo, monospace;
   /* de kleuren van de grond */
   --zand: #E3C98C; --veen: #2B211B; --heide: #9B4A7A; --mos: #5F7A2F; --klei: #A8714A; --asfalt: #565B63;
-  --pagina: #E6D095;
-  --vlak: #F2E4B8;
-  --vlak-2: #E9D8A3;
-  --rand: #A38E62;
-  --inkt: #2B211B;
-  --inkt-2: #4B3E31;
-  --inkt-3: #6A5A47;
-  --balk: #2B211B; /* veen */
-  --balk-tekst: #F2E4B8;
-  --route: #9B4A7A; /* heide: hoofdknop, gekozen keuze */
-  --route-inkt: #FBF0D0;
-  --accent: #2B211B;
-  --accent-tekst: #F2E4B8;
-  --rouw: #F8EFD0; /* rand om de route op de kaart */
+  --pagina: #DDE5B3;
+  --vlak: #F1F3D4;
+  --vlak-2: #E3E9BD;
+  --rand: #A3AE75;
+  --inkt: #2E3320;
+  --inkt-2: #4A5235;
+  --inkt-3: #656E4B;
+  --balk: #4F6B2A; /* mos */
+  --balk-tekst: #F6F6DA;
+  --route: #9BC046; /* jong gras: hoofdknop, gekozen keuze */
+  --route-inkt: #1F2A12;
+  --accent: #4F6B2A;
+  --accent-tekst: #F6F6DA;
+  --rouw: #F6F7DD; /* rand om de route op de kaart */
   --fout-vlak: #F6D8CC;
   --fout-rand: #B5533F;
   --fout-inkt: #5E1A10;
-  --let-op-vlak: #F4DF94;
+  --let-op-vlak: #F3E8A0;
   --let-op-rand: #A8841F;
   --hoogtelijn: #8A5530;
   --onverhard: #008300;
@@ -49,27 +49,27 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --pagina: #1C1612; --vlak: #271E18; --vlak-2: #33281F; --rand: #5E4D3A;
-    --inkt: #F2E4B8; --inkt-2: #D8C79A; --inkt-3: #AC9B72;
-    --balk: #120D0A; --balk-tekst: #F2E4B8;
-    --route: #C77BA7; --route-inkt: #1C1612; --accent: #C77BA7; --accent-tekst: #F2E4B8;
-    --rouw: #0B0806;
+    --pagina: #1E2517; --vlak: #28301F; --vlak-2: #333D28; --rand: #566240;
+    --inkt: #EEF1CC; --inkt-2: #CCD4A2; --inkt-3: #A1AC77;
+    --balk: #45602A; --balk-tekst: #F4F6D8;
+    --route: #A9CF52; --route-inkt: #1B2410; --accent: #A9CF52; --accent-tekst: #F4F6D8;
+    --rouw: #10150B;
     --fout-vlak: #3B1714; --fout-rand: #9A3A31; --fout-inkt: #FFC4BC;
-    --let-op-vlak: #362C08; --let-op-rand: #8A7120;
-    --hoogtelijn: #C98B52;
+    --let-op-vlak: #3A3410; --let-op-rand: #8A8A2A;
+    --hoogtelijn: #C9A15E;
     --half: #c98500; --open: #d55181; --gesloten: #9085e9; --twijfel: #ff8a80;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --pagina: #1C1612; --vlak: #271E18; --vlak-2: #33281F; --rand: #5E4D3A;
-  --inkt: #F2E4B8; --inkt-2: #D8C79A; --inkt-3: #AC9B72;
-  --balk: #120D0A; --balk-tekst: #F2E4B8;
-  --route: #C77BA7; --route-inkt: #1C1612; --accent: #C77BA7; --accent-tekst: #F2E4B8;
-  --rouw: #0B0806;
+  --pagina: #1E2517; --vlak: #28301F; --vlak-2: #333D28; --rand: #566240;
+  --inkt: #EEF1CC; --inkt-2: #CCD4A2; --inkt-3: #A1AC77;
+  --balk: #45602A; --balk-tekst: #F4F6D8;
+  --route: #A9CF52; --route-inkt: #1B2410; --accent: #A9CF52; --accent-tekst: #F4F6D8;
+  --rouw: #10150B;
   --fout-vlak: #3B1714; --fout-rand: #9A3A31; --fout-inkt: #FFC4BC;
-  --let-op-vlak: #362C08; --let-op-rand: #8A7120;
-  --hoogtelijn: #C98B52;
+  --let-op-vlak: #3A3410; --let-op-rand: #8A8A2A;
+  --hoogtelijn: #C9A15E;
   --half: #c98500; --open: #d55181; --gesloten: #9085e9; --twijfel: #ff8a80;
 }
 
@@ -330,7 +330,7 @@ details.blok.stap[open] { padding-bottom: 12px; }
 
 /* ---------- kennismaking ---------- */
 #intro { width: min(92vw, 440px); max-width: none; padding: 0; border-radius: 20px; overflow: hidden; color: var(--balk-tekst);
-         background: var(--ruis), #2B211B;
+         background: var(--ruis), #4A6428;
          box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
 #intro::backdrop { background: rgb(10 18 12 / .7); backdrop-filter: blur(2px); }
 #intro[open] { animation: intro-in .35s cubic-bezier(.2, .9, .3, 1.2); }
@@ -338,19 +338,19 @@ details.blok.stap[open] { padding-bottom: 12px; }
 .intro-dia:not([hidden]) { animation: dia-in .4s ease-out; }
 .intro-dia svg { width: 100%; height: auto; display: block; margin-bottom: 6px; }
 .intro-dia h2 { font: 700 28px/1.1 var(--kop); text-transform: uppercase; letter-spacing: .08em; color: var(--accent-tekst); margin: 6px 0 6px; }
-.intro-dia p { color: #F2E4B8; font-size: 16px; margin: 0 0 6px; min-height: 2.9em; }
+.intro-dia p { color: #F6F6DA; font-size: 16px; margin: 0 0 6px; min-height: 2.9em; }
 .hoogtelijnen path { fill: none; stroke: rgb(255 255 255 / .14); stroke-width: 1.2; }
-.route { fill: none; stroke: #E3C98C; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; }
+.route { fill: none; stroke: #F1F3D4; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; }
 .teken { stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken 2.2s .4s ease-in-out forwards; }
 .teken.laat { animation-delay: 1s; }
-.loper { fill: #fff; stroke: #2B211B; stroke-width: 3; }
-.pin circle { fill: #2B211B; stroke: #fff; stroke-width: 3; }
-.pin text, .teller, .hm { fill: #E3C98C; font: 700 15px var(--kop); text-anchor: middle; }
+.loper { fill: #fff; stroke: #2E3320; stroke-width: 3; }
+.pin circle { fill: #2E3320; stroke: #fff; stroke-width: 3; }
+.pin text, .teller, .hm { fill: #F1F3D4; font: 700 15px var(--kop); text-anchor: middle; }
 .teller { font-size: 30px; fill: #fff; opacity: 0; animation: verschijn .4s 1s forwards; }
 .pin { animation: val .6s cubic-bezier(.3, 1.6, .5, 1) both; transform-origin: 160px 150px; }
-.gebied { fill: rgb(227 201 140 / .1); stroke: #E3C98C; stroke-width: 3.5; stroke-dasharray: 1; stroke-linejoin: round; }
+.gebied { fill: rgb(241 243 212 / .1); stroke: #F1F3D4; stroke-width: 3.5; stroke-dasharray: 1; stroke-linejoin: round; }
 .binnen { fill: none; stroke: #8FA84F; stroke-width: 4.5; stroke-linecap: round; opacity: 0; animation: verschijn .6s 2.4s forwards; }
-.pen path { fill: #fff; stroke: #2B211B; stroke-width: 1.5; }
+.pen path { fill: #fff; stroke: #2E3320; stroke-width: 1.5; }
 .seg { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: teken .7s ease-out forwards; }
 .s1 { stroke: #8FA84F; animation-delay: .3s; } .s2 { stroke: #eda100; animation-delay: 1s; }
 .s3 { stroke: #8FA84F; animation-delay: 1.7s; } .s4 { stroke: #C98EAF; animation-delay: 2.4s; }
@@ -361,7 +361,7 @@ details.blok.stap[open] { padding-bottom: 12px; }
 .intro-voet .hoofd { min-width: 120px; min-height: 46px; }
 .intro-stippen { display: flex; gap: 7px; }
 .intro-stippen i { width: 8px; height: 8px; border-radius: 4px; background: rgb(255 255 255 / .3); transition: width .25s, background .25s; }
-.intro-stippen i.aan { width: 22px; background: #E3C98C; }
+.intro-stippen i.aan { width: 22px; background: #F1F3D4; }
 @keyframes teken { to { stroke-dashoffset: 0; } }
 @keyframes verschijn { to { opacity: 1; } }
 @keyframes val { 0% { transform: translateY(-60px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
@@ -441,17 +441,17 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 
 /* intro: soorten, tikken, aanpassen */
 .chip rect { fill: rgb(255 255 255 / .08); stroke: rgb(255 255 255 / .35); stroke-width: 1.5; }
-.chip text { fill: #F2E4B8; font: 700 15px var(--kop); text-anchor: middle; letter-spacing: .04em; }
+.chip text { fill: #F6F6DA; font: 700 15px var(--kop); text-anchor: middle; letter-spacing: .04em; }
 .chip { opacity: 0; animation: verschijn .35s forwards; }
 .c1 { animation-delay: .2s; } .c2 { animation-delay: .4s; } .c3 { animation-delay: .6s; } .c4 { animation-delay: .8s; } .c5 { animation-delay: 1s; }
 .c2 rect { animation: kies .4s 1.8s forwards; }
 .c2 text { animation: kiesTekst .4s 1.8s forwards; }
 .tik { fill: rgb(255 255 255 / .5); opacity: 0; transform-origin: 160px 57px; animation: tik .7s 1.5s ease-out forwards; }
-.omweg { fill: none; stroke: #E3C98C; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; opacity: 0; animation: verschijn .5s 2.8s forwards; }
-.handvat { fill: #E3C98C; stroke: #2B211B; stroke-width: 3; opacity: 0; animation: sleep 1.2s 2.2s ease-in-out forwards; }
-.gpx rect { fill: #E3C98C; } .gpx text { fill: #141a12; font: 700 13px var(--kop); text-anchor: middle; }
+.omweg { fill: none; stroke: #F1F3D4; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 10 8; opacity: 0; animation: verschijn .5s 2.8s forwards; }
+.handvat { fill: #F1F3D4; stroke: #2E3320; stroke-width: 3; opacity: 0; animation: sleep 1.2s 2.2s ease-in-out forwards; }
+.gpx rect { fill: #F1F3D4; } .gpx text { fill: #141a12; font: 700 13px var(--kop); text-anchor: middle; }
 .gpx { opacity: 0; animation: verschijn .4s 3.4s forwards; }
-@keyframes kies { to { fill: #E3C98C; stroke: #E3C98C; } }
+@keyframes kies { to { fill: #F1F3D4; stroke: #F1F3D4; } }
 @keyframes kiesTekst { to { fill: #141a12; } }
 @keyframes tik { 0% { opacity: .8; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.6); } }
 @keyframes sleep { 0% { opacity: 1; transform: translate(-44px, 28px); } 100% { opacity: 1; transform: none; } }
@@ -655,10 +655,10 @@ main { border-left: 2px solid var(--inkt); }
 
 /* dialogen */
 dialog { border: 2px solid var(--inkt); }
-#intro { border: 2px solid var(--zand); }
+#intro { border: 2px solid #F6F6DA; }
 .intro-dia { text-align: left; }
 .intro-dia h2 { font-size: 34px; line-height: .95; letter-spacing: -.02em; }
-.intro-dia .wm { font-size: 68px; color: var(--zand); display: block; margin: 6px 0 10px; }
+.intro-dia .wm { font-size: 68px; color: #F6F6DA; display: block; margin: 6px 0 10px; }
 .intro-dia .wm .pav { background-color: #8c929b; }
 .intro-stippen i { border-radius: 0; }
 .intro-voet .klein { border-width: 2px; }
@@ -722,7 +722,7 @@ button .ico:only-child, .kaartlagen button .ico, #afspeel .ico, .pknoppen .ico, 
 .loper .ico { width: 18px; height: 18px; margin: 0; }
 .omwegknop { font-family: var(--kop); font-weight: 900; font-size: 20px; }
 .omwegknop[aria-pressed="true"] { background: var(--mos); border-color: var(--inkt); color: var(--accent-tekst); }
-.omwegchip { background: var(--mos); color: #F2E4B8; border: 2px solid var(--inkt); font-family: var(--kop); font-weight: 900; font-size: 15px; letter-spacing: 0; }
+.omwegchip { background: var(--mos); color: #F6F6DA; border: 2px solid var(--inkt); font-family: var(--kop); font-weight: 900; font-size: 15px; letter-spacing: 0; }
 
 /* laden: het poppetje loopt naar rechts */
 .balkje { height: 10px; border: 2px solid var(--inkt); background: var(--vlak); }
@@ -736,7 +736,7 @@ button .ico:only-child, .kaartlagen button .ico, #afspeel .ico, .pknoppen .ico, 
 .profielvlak .vlak { opacity: .25; }
 
 /* intro-tekening */
-.intro-dia svg .route { stroke: var(--zand); }
+.intro-dia svg .route { stroke: #F6F6DA; }
 .omweg { stroke: #A8C06A; }
 .gpx rect { fill: var(--zand); }
 
@@ -760,3 +760,5 @@ h1 { font-size: 44px; }
 header > div:first-child { flex: 1 1 auto; }
 .keuze.klein button { display: flex; align-items: center; justify-content: center; gap: .3em; font-size: 17px; line-height: 1.05; padding: 6px 6px; }
 .keuze.klein button .ico { margin: 0; width: 1.1em; height: 1.1em; }
+
+.leaflet-control-attribution { font-size: 10px; }

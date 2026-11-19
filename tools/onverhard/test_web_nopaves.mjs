@@ -230,5 +230,26 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await sp.screenshot({ path: path.join(map, `nopaves_station_${soort}.png`) })
 }
 
+// ---- stationsmodus via de knoppen (zoals je hem zelf gebruikt, niet via een link) ----
+{
+  // een schone browser zonder bewaarde keuzes, zoals bij een nieuwe gebruiker
+  const schoon = await browser.newContext(
+    mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
+  const sk = await schoon.newPage()
+  await sk.goto(basis)
+  await sk.evaluate(() => localStorage.setItem('onverhard.intro', '1'))
+  await sk.goto(basis)
+  await sk.click('[data-modus="station"]')
+  assert.equal(await sk.locator('#naar3').isDisabled(), true, 'zonder startpunt kun je nog niet verder')
+  await sk.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  assert.equal(await sk.locator('#naar3').isDisabled(), false, 'met één startpunt kun je verder (geen eindpunt nodig)')
+  await sk.evaluate(() => document.getElementById('naar3').click())
+  assert.equal(await sk.locator('#kmveld').isVisible(), true, 'de lengte kies je in stap 3')
+  assert.equal(await sk.locator('#plan').isDisabled(), false)
+  assert.match(await sk.locator('#plan').textContent(), /stations/)
+  await schoon.close()
+  stap('stationsmodus via de knoppen: één startpunt, Verder, lengte, plannen')
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)

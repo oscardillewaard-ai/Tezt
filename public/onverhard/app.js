@@ -333,7 +333,7 @@ function tekenPuntenlijst() {
   const tm = tekenModus()
   // stap 2: kop per soort, en pas verder als de plek bekend is
   el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', station: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken de wijk', tekenen: 'Teken je route' }[staat.modus]
-  plaatsKlaar = tm ? !!tekening() : rondje ? n >= 1 : n >= 2
+  plaatsKlaar = tm ? !!tekening() : rondje || station ? n >= 1 : n >= 2
   el('naar3').disabled = !plaatsKlaar
   werkStapperBij()
   el('tekenpaneel').hidden = !tm
@@ -386,9 +386,9 @@ function tekenPuntenlijst() {
   let hint
   if (rondje) {
     if (n === 0) hint = 'Zoek of tik het startpunt.'
-    else if (n === 1) hint = 'Kies de lengte, of tik een keerpunt.'
+    else if (n === 1) hint = 'Tik op Verder om de lengte te kiezen, of tik een keerpunt.'
     else hint = ''
-  } else if (station) hint = n === 0 ? 'Zoek of tik waar je begint.' : 'Kies de lengte: de app zoekt de stations.'
+  } else if (station) hint = n === 0 ? 'Zoek of tik waar je begint.' : 'Tik op Verder: daar kies je de lengte.'
   else if (n === 0) hint = 'Zoek of tik het startpunt.'
   else if (n === 1) hint = 'Zoek of tik het eindpunt.'
   else hint = ''

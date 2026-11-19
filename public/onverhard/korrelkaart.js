@@ -9,18 +9,18 @@ const TILEJSON = 'https://tiles.openfreemap.org/planet'
 /** De kleuren per thema. 'ink' is de kleur van de korrel zelf. */
 export const THEMA = {
   licht: {
-    bg: '#EBDDAE', wood: '#A8BC72', grass: '#D9DA9B', scrub: '#C9C788', heath: '#D3A7C2', farm: '#E9DDA8', sand: '#EAD59C',
-    wetland: '#B9CCA3', water: '#8FB4BF', res: '#E3CF99', comm: '#DDC58D', ind: '#D6BD88', campus: '#E7D7A1', pitch: '#C9D28F',
-    rail: '#E0D0A0', building: '#DAC28C', buildingLijn: '#C4AA72', ink: '#2B211B', ink2: '#4B3E31', halo: '#F2E4B8',
-    snel: '#4F535A', hoofd: '#5E636A', klein: '#80848B', fiets: '#8C9096', onverhard: '#6B4A2E', pad: '#2B211B',
-    waterLabel: '#2F6070', park: '#5F7A2F', grens: '#9B4A7A', korrelInkt: [43, 33, 27],
+    bg: '#DDE6B0', wood: '#8FB05A', grass: '#C9DA8E', scrub: '#B8C77C', heath: '#D3A7C2', farm: '#E4E9B5', sand: '#EAD59C',
+    wetland: '#B3CE9C', water: '#8FB8C2', res: '#E4DFAB', comm: '#DDD49C', ind: '#D3CB98', campus: '#E3E5B0', pitch: '#B9D47E',
+    rail: '#D5D8A8', building: '#D8D09A', buildingLijn: '#BDB67E', ink: '#2E3320', ink2: '#4A5235', halo: '#F1F3D4',
+    snel: '#4F535A', hoofd: '#5E636A', klein: '#80848B', fiets: '#8C9096', onverhard: '#6B4A2E', pad: '#2E3320',
+    waterLabel: '#2F6070', park: '#4F6B2A', grens: '#9B4A7A', korrelInkt: [46, 51, 32],
   },
   donker: {
-    bg: '#241B16', wood: '#3E4824', grass: '#444728', scrub: '#3A3E26', heath: '#5B3B4D', farm: '#2B2318', sand: '#5A4A2C',
-    wetland: '#364434', water: '#2E4853', res: '#2D231B', comm: '#33271E', ind: '#38291F', campus: '#2F261C', pitch: '#3A4424',
-    rail: '#2E251C', building: '#3B2E22', buildingLijn: '#52402F', ink: '#F2E4B8', ink2: '#D8C79A', halo: '#241B16',
-    snel: '#B8BCC2', hoofd: '#9FA3A9', klein: '#82868C', fiets: '#6F7378', onverhard: '#D9B77A', pad: '#F2E4B8',
-    waterLabel: '#9FC4CF', park: '#9DB36A', grens: '#C77BA7', korrelInkt: [242, 228, 184],
+    bg: '#222B1A', wood: '#3A5428', grass: '#43572A', scrub: '#394A26', heath: '#5B3F52', farm: '#2A3320', sand: '#5A4F2E',
+    wetland: '#34503A', water: '#2E4F5A', res: '#2A3220', comm: '#30382A', ind: '#363B2A', campus: '#2C3523', pitch: '#3C5726',
+    rail: '#2C3324', building: '#363C2A', buildingLijn: '#4C5538', ink: '#EEF1CC', ink2: '#CCD4A2', halo: '#222B1A',
+    snel: '#B8BCC2', hoofd: '#9FA3A9', klein: '#82868C', fiets: '#6F7378', onverhard: '#D9B77A', pad: '#EEF1CC',
+    waterLabel: '#9FC9CF', park: '#A9CF52', grens: '#C77BA7', korrelInkt: [238, 241, 204],
   },
 }
 
@@ -232,4 +232,4 @@ export function kanWebgl() {
 }
 
 /** De bronvermelding die bij deze kaart hoort (OpenFreeMap vraagt erom). */
-export const KAART_BRON = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> · Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-bijdragers</a>'
+export const KAART_BRON = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a>'

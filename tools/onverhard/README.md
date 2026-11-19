@@ -341,9 +341,11 @@ van 42% naar 53% onverhard, met 5% dubbel lopen. Een rondje door Delft zelf had
 geen omweg: de grote verharde stukken hebben daar geen onverhard alternatief.
 
 **Huisstijl Korrel**: de ondergrond is het merk. Zand, gras, heide, klei en
-asfalt hebben elk een eigen korrel en kleur (zand `#E3C98C`, veen `#2B211B`,
-heide `#9B4A7A`, mos `#5F7A2F`, klei `#A8714A`, asfalt `#565B63`); 's nachts is
-het dezelfde grond in donker. Het woordteken is `no` + `pav` (doorgestreept,
+asfalt hebben elk een eigen korrel en kleur. De app zelf is groen en licht:
+papier `#F1F3D4`, achtergrond `#DDE5B3`, inkt donkerolijf `#2E3320`, mos
+`#4F6B2A` voor de donkere vlakken (de scorestrook, gekozen knoppen) en jong gras
+`#9BC046` voor de hoofdknop; 's nachts dezelfde kleuren in donker. Heide
+`#9B4A7A` blijft over voor de doorhaling in het logo. Het woordteken is `no` + `pav` (doorgestreept,
 gevuld met asfalt) + `.es`. Letters: Darker Grotesque (titels), Karla (tekst) en
 Overpass Mono (cijfers), lokaal meegeleverd in `fonts/`. Alles is vierkant met
 een rand van 2 px in inkt, zonder schaduw; de pictogrammen zijn lijntekeningen
