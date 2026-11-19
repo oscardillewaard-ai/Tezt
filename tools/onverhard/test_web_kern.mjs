@@ -934,3 +934,20 @@ test('groene omwegen: een route die al onverhard is krijgt er geen, en toepassen
   const dubbel = G.groeneOmwegen(g, terug, terugSegs, [])
   assert.deepEqual(dubbel, [], 'de boog is al gebruikt: dubbel lopen telt niet als omweg')
 })
+
+import * as Teller from '../../public/onverhard/teller.js'
+test('teller: ringbuffer van hooguit 500 regels, tellingen en wissen', () => {
+  const opslag = { d: {}, getItem(k) { return this.d[k] ?? null }, setItem(k, v) { this.d[k] = v }, removeItem(k) { delete this.d[k] } }
+  for (let i = 0; i < 520; i++) Teller.log(i % 2 ? 'gpx' : 'plan_start', { i }, opslag, 1000 + i)
+  const r = Teller.lees(opslag)
+  assert.equal(r.length, Teller.MAX)
+  assert.equal(r[0].d.i, 20, 'de oudste vallen eraf')
+  assert.deepEqual(Object.keys(r[0]), ['t', 'ev', 'd'])
+  assert.deepEqual(Teller.tellingen(r), [['gpx', 250], ['plan_start', 250]])
+  Teller.wis(opslag)
+  assert.deepEqual(Teller.lees(opslag), [])
+  // kapotte of geblokkeerde opslag: geen fout
+  const stuk = { getItem() { throw new Error('nee') }, setItem() { throw new Error('nee') }, removeItem() { throw new Error('nee') } }
+  assert.doesNotThrow(() => Teller.log('x', {}, stuk))
+  assert.deepEqual(Teller.lees(stuk), [])
+})
