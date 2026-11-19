@@ -265,9 +265,28 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   assert.match(download.suggestedFilename(), /^Nopav\.es-.*\.gpx$/)
   const gpx = (await import('node:fs')).readFileSync(await download.path(), 'utf8')
   assert.match(gpx, /<name>Nopav\.es → /)
+  await sp.screenshot({ path: path.join(map, `nopaves_station_${soort}.png`) })
+  // Nieuwe route (de knop ↻ bovenin): ook de kaartlagen-knoppen van de oude route verdwijnen
+  assert.equal(await sp.locator('.kaartlagen').isVisible(), true, 'kaartlagen staan er bij het resultaat')
+  await sp.locator('#opnieuw').click()
+  await sp.waitForTimeout(300)
+  assert.equal(await sp.locator('.kaartlagen').isVisible(), false, 'na opnieuw: geen kaartlagen-knoppen meer')
+  assert.equal(await sp.locator('.kaartlagen button').count(), 0)
+  assert.equal(await sp.locator('.stationico').count(), 0, 'na opnieuw: geen stations meer op de kaart')
+  await sp.screenshot({ path: path.join(map, `nopaves_opnieuw_${soort}.png`) })
+  // sneltoetsen 1-6 in de volgorde van de knoppen op het scherm
+  const opScherm = await sp.evaluate(() => [...document.querySelectorAll('#modus [data-modus]')].map((b) => b.dataset.modus))
+  assert.equal(opScherm.length, 6)
+  for (let n = 1; n <= 6; n++) {
+    await sp.locator('#kaart').focus().catch(() => {})
+    await sp.evaluate(() => document.activeElement && document.activeElement.blur())
+    await sp.keyboard.press(String(n))
+    assert.equal(await sp.locator(`#modus [data-modus="${opScherm[n - 1]}"]`).getAttribute('aria-pressed'), 'true', `toets ${n} → ${opScherm[n - 1]}`)
+  }
+  assert.match(await sp.locator('#hulp .toetsen').textContent(), /1–6/)
+  stap(`Nieuwe route wist de kaartlagen; toetsen 1-6 = ${opScherm.join(', ')}`)
   assert.deepEqual(sf, [], 'geen paginafouten')
   stap(`stationsmodus: ${titels.length} routes (${namen.join(', ')}) in ${sec} s, ${tegels12} tegels z12, ${tegels14} tegels z14, stations: ${stationsInfo.map((s) => s.naam).join(', ')}`)
-  await sp.screenshot({ path: path.join(map, `nopaves_station_${soort}.png`) })
 }
 
 // ---- stationsmodus via de knoppen (zoals je hem zelf gebruikt, niet via een link) ----

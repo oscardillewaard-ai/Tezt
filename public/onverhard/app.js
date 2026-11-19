@@ -877,6 +877,7 @@ el('opnieuw').addEventListener('click', () => {
   opKaart.clear()
   stopAfspelen()
   for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag, stationLaag, omwegLaag]) laag.clearLayers()
+  tekenKaartlagen(null) // de knoppen voor stations en water horen bij de oude route
   el('resultaat').hidden = true
   toonFout('')
   bewaar()
@@ -2044,6 +2045,7 @@ function herstel(opname) {
   } else {
     plan = null
     for (const laag of [routeLaag, altLaag, profielLaag, waterLaag, stationLaag, omwegLaag]) laag.clearLayers()
+    tekenKaartlagen(null)
     el('resultaat').hidden = true
     if (stap === 4) toonStap(2)
   }
@@ -2069,7 +2071,8 @@ function opnieuwDoen() {
 el('terug').addEventListener('click', ongedaanMaken)
 
 // ---------- Sneltoetsen ----------
-const MODI = ['route', 'rondje', 'gebied', 'straten', 'tekenen']
+// sneltoetsen 1-6 in de volgorde op het scherm (A naar B, Rondje, Naar station, In gebied, Elke straat, Tekenen)
+const MODI = [...document.querySelectorAll('#modus [data-modus]')].map((b) => b.dataset.modus)
 document.addEventListener('keydown', (e) => {
   if (el('intro').open || el('foto').open || el('hulp').open) return
   const doel = e.target
@@ -2096,7 +2099,7 @@ document.addEventListener('keydown', (e) => {
     return
   }
   if (typen || cmd || e.altKey) return
-  if (/^[1-5]$/.test(e.key) && !stopper) {
+  if (/^[1-9]$/.test(e.key) && MODI[Number(e.key) - 1] && !stopper) {
     zetModus(MODI[Number(e.key) - 1])
     toonStap(2)
   }
