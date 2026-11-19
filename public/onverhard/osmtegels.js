@@ -8,27 +8,60 @@
 // elementen als Overpass geeft ({type: 'way', id, tags, geometry}), zodat
 // graaf.js er niets van merkt.
 
-import { Lezer, packed, leesWaarde } from './kern.js'
+import { Lezer, packed, leesWaarde, naarRd } from './kern.js'
 
 export const TEGEL_ZOOM = 14
-const N = 2 ** TEGEL_ZOOM
 
-/** Tegelnummers (x, y) op zoom 14 voor een punt. */
-export function tegelXY(lat, lon) {
-  const x = Math.floor(((lon + 180) / 360) * N)
+/** Tegelnummers (x, y) voor een punt, standaard op zoom 14. */
+export function tegelXY(lat, lon, zoom = TEGEL_ZOOM) {
+  const n = 2 ** zoom
+  const x = Math.floor(((lon + 180) / 360) * n)
   const r = (lat * Math.PI) / 180
-  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * N)
+  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n)
   return [x, y]
 }
 
 /** Alle tegels die een cirkel van 'straal' meter rond een punt raken. */
-export function tegelsRond(lat, lon, straal) {
+export function tegelsRond(lat, lon, straal, zoom = TEGEL_ZOOM) {
   const dLat = straal / 111320
   const dLon = straal / (111320 * Math.cos((lat * Math.PI) / 180))
-  const [x0, y0] = tegelXY(lat + dLat, lon - dLon)
-  const [x1, y1] = tegelXY(lat - dLat, lon + dLon)
+  const [x0, y0] = tegelXY(lat + dLat, lon - dLon, zoom)
+  const [x1, y1] = tegelXY(lat - dLat, lon + dLon, zoom)
   const uit = []
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) uit.push([x, y])
+  return uit
+}
+
+/** Hoek (lat, lon) linksboven van tegel (x, y). */
+function tegelHoek(x, y, zoom) {
+  const n = 2 ** zoom
+  return [(Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, (x / n) * 360 - 180]
+}
+
+/**
+ * De tegels (zoom 14) in een ellips met a en b ([lat, lon]) als brandpunten: een tegel doet mee als
+ * ergens op de tegel (hoeken of midden) de som van de afstanden tot a en b hooguit
+ * factor × (afstand a-b) + extra meter is. Zo haal je alleen op wat langs de weg van a naar b ligt.
+ */
+export function tegelsLangs(a, b, { factor = 1.35, extra = 1000, zoom = TEGEL_ZOOM } = {}) {
+  const [ax, ay] = naarRd(a[1], a[0])
+  const [bx, by] = naarRd(b[1], b[0])
+  const grens = factor * Math.hypot(bx - ax, by - ay) + extra
+  const marge = grens / 2 + 1500 // zoveel kan een punt van de ellips buiten het midden liggen, plus een tegel
+  const midden = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const uit = []
+  for (const [x, y] of tegelsRond(midden[0], midden[1], marge, zoom)) {
+    const [lat0, lon0] = tegelHoek(x, y, zoom)
+    const [lat1, lon1] = tegelHoek(x + 1, y + 1, zoom)
+    const punten = [[lat0, lon0], [lat0, lon1], [lat1, lon0], [lat1, lon1], [(lat0 + lat1) / 2, (lon0 + lon1) / 2]]
+    for (const [lat, lon] of punten) {
+      const [px, py] = naarRd(lon, lat)
+      if (Math.hypot(px - ax, py - ay) + Math.hypot(px - bx, py - by) <= grens) {
+        uit.push([x, y])
+        break
+      }
+    }
+  }
   return uit
 }
 
@@ -47,6 +80,10 @@ export const POI_SOORT = {
   'fuel/fuel': 'tank',
 }
 
+// treinstations (niet metro of tram) uit dezelfde laag 'poi'. RandstadRail-haltes staan in de tegels
+// ook als railway/station, dus die komen er (helaas) bij.
+export const STATION_SOORT = new Set(['railway/station', 'railway/halt'])
+
 function highwayVan(p) {
   const k = p.class
   if (k === 'path') return ['footway', 'cycleway', 'bridleway', 'steps', 'pedestrian', 'path'].includes(p.subclass) ? p.subclass : 'path'
@@ -63,7 +100,8 @@ function highwayVan(p) {
  * in twee tegels precies dezelfde coördinaten krijgt (een kruising blijft een
  * kruising).
  */
-export function leesOsmTegel(bytes, x, y, idStart = 0) {
+export function leesOsmTegel(bytes, x, y, idStart = 0, { zoom = TEGEL_ZOOM, lagen = ['transportation', 'landcover', 'poi'] } = {}) {
+  const N = 2 ** zoom
   const uit = []
   let id = idStart
   const l = new Lezer(bytes)
@@ -88,7 +126,7 @@ export function leesOsmTegel(bytes, x, y, idStart = 0) {
       else if (n === 5 && t === 0) extent = laag.varint()
       else laag.sla(t)
     }
-    if (naam !== 'transportation' && naam !== 'landcover' && naam !== 'poi') continue
+    if (!lagen.includes(naam)) continue
     const waardeCache = new Map()
     const waarde = (i) => {
       if (!waardeCache.has(i)) waardeCache.set(i, leesWaarde(waarden[i]))
@@ -153,7 +191,14 @@ export function leesOsmTegel(bytes, x, y, idStart = 0) {
         for (const st of stukken) if (st.length >= 2) uit.push({ type: 'way', id: ++id, tags: t, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel' })
       } else if (naam === 'poi' && soort === 1 && stukken.length && stukken[0].length) {
         const s2 = POI_SOORT[`${p.class}/${p.subclass}`]
-        if (s2) {
+        if (STATION_SOORT.has(`${p.class}/${p.subclass}`)) {
+          const { lat, lon } = naarLatLon(stukken[0][0][0], stukken[0][0][1])
+          // 'trein': waarschijnlijk een NS-station (de tegels noemen RandstadRail-haltes ook station); de
+          // Engelse naam eindigt dan op 'railway station' of de Nederlandse begint met 'station'. Een gok.
+          const trein = /railway station/i.test(p['name:en'] || '') || /^(station|halte) /i.test(p['name:nl'] || '')
+          const naamNl = String(p['name:nl'] || '').replace(/^(station|halte) /i, '')
+          uit.push({ type: 'station', id: ++id, soort: p.subclass, naam: naamNl || p.name || '', trein, rank: p.rank || 0, lat, lon })
+        } else if (s2) {
           const { lat, lon } = naarLatLon(stukken[0][0][0], stukken[0][0][1])
           uit.push({ type: 'poi', id: ++id, soort: s2, naam: p['name:nl'] || p.name || '', lat, lon })
         }

@@ -117,5 +117,64 @@ if (mobiel) {
 }
 
 assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], 'geen consolefouten')
+// ---- stationsmodus: routes van Delft naar stations, en 'Route hierheen' op een ander station ----
+{
+  const sp = await ctx.newPage()
+  const sf = []
+  sp.on('pageerror', (e) => sf.push('PAGEERROR ' + e.message))
+  let tegels12 = 0
+  let tegels14 = 0
+  sp.on('request', (r) => {
+    if (/openfreemap|tiles\.openfreemap/.test(r.url())) {
+      if (/\/12\/\d+\/\d+/.test(r.url())) tegels12 += 1
+      else if (/\/14\/\d+\/\d+/.test(r.url())) tegels14 += 1
+    }
+  })
+  const t0 = Date.now()
+  await sp.goto(`${basis}#p=52.0116,4.3571&station=15&plan=1`)
+  await sp.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  const sec = Math.round((Date.now() - t0) / 1000)
+  assert.equal(await sp.locator('#fout').textContent(), '', 'stationsmodus: geen foutmelding')
+  await sp.waitForLoadState('networkidle').catch(() => {})
+  await sp.waitForTimeout(1000)
+  const titels = await sp.locator('#opties .kies > span:nth-child(2) > b:first-child').allTextContents()
+  assert.ok(titels.length >= 2 && titels.length <= 4, `2-4 routes naar stations (${titels.length})`)
+  assert.ok(titels.every((t) => t.startsWith('→')), `elke route heeft een station: ${titels.join(' | ')}`)
+  const namen = await sp.evaluate(() => window.onverhard.krijgPlan().opties.map((o) => o.station))
+  assert.equal(new Set(namen).size, namen.length, 'verschillende stations')
+  const km = await sp.evaluate(() => window.onverhard.krijgPlan().opties.map((o) => o.km))
+  assert.ok(km.every((k) => k <= 15 * 1.3 + 0.01), `alle routes ≤ 1,3 × 15 km: ${km.map((k) => k.toFixed(1))}`)
+  const stationsInfo = await sp.evaluate(() => window.onverhard.uitslag().stations.map((s) => ({ naam: s.naam, km: s.km })))
+  assert.ok(stationsInfo.length >= namen.length)
+  const laag = sp.locator('.kaartlagen button[aria-label^="Stations"]')
+  assert.equal(await laag.count(), 1, '🚉 in de kaartlagen-knop')
+  assert.equal(await sp.locator('.stationico').count(), stationsInfo.length, 'een 🚉 per kandidaat-station')
+  await laag.click()
+  assert.equal(await sp.locator('.stationico').count(), 0, '🚉-laag uit')
+  await laag.click()
+  // een station zonder route in de lijst: tik, 'Route hierheen'
+  const extra = stationsInfo.find((s) => !namen.includes(s.naam))
+  if (extra) {
+    const marker = sp.locator('.stationico').nth(stationsInfo.findIndex((s) => s.naam === extra.naam))
+    await marker.click({ force: true })
+    await sp.locator('.leaflet-popup button', { hasText: 'Route hierheen' }).click()
+    await sp.waitForFunction((n) => document.querySelectorAll('#opties .optie').length > n, titels.length, { timeout: 120000 })
+    const na = await sp.locator('#opties .kies > span:nth-child(2) > b:first-child').allTextContents()
+    assert.ok(na.some((t) => t.includes(extra.naam)), `route naar ${extra.naam} erbij`)
+    // ↶ haalt hem weer weg
+    await sp.locator('#terug').click()
+    await sp.waitForFunction((n) => document.querySelectorAll('#opties .optie').length === n, titels.length, { timeout: 10000 })
+    stap(`'Route hierheen' naar ${extra.naam} voegt een route toe; ↶ haalt hem weer weg`)
+  }
+  // GPX-naam
+  const [download] = await Promise.all([sp.waitForEvent('download'), sp.locator('#gpx').click()])
+  assert.match(download.suggestedFilename(), /^Nopav\.es-.*\.gpx$/)
+  const gpx = (await import('node:fs')).readFileSync(await download.path(), 'utf8')
+  assert.match(gpx, /<name>Nopav\.es → /)
+  assert.deepEqual(sf, [], 'geen paginafouten')
+  stap(`stationsmodus: ${titels.length} routes (${namen.join(', ')}) in ${sec} s, ${tegels12} tegels z12, ${tegels14} tegels z14, stations: ${stationsInfo.map((s) => s.naam).join(', ')}`)
+  await sp.screenshot({ path: path.join(map, `nopaves_station_${soort}.png`) })
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)

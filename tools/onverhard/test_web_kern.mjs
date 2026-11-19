@@ -782,3 +782,89 @@ test('bottom sheet: drie standen die oplopen, en een veeg kiest de volgende stan
   assert.equal(Sheet.dichtsteStand(midden, hs, 0.6), 'half')
   assert.equal(Sheet.dichtsteStand(hs.half, hs, -1.2), 'piek') // snel omlaag
 })
+
+// ---------- Stationsmodus ----------
+test('leesOsmTegel met zoom 12: stations uit de laag poi, en tegelnummers per zoom', () => {
+  const waarde = (sv) => bytes(4, tekst(1, sv))
+  const punt = (x, y) => [1 | (1 << 3), zz(x), zz(y)]
+  const feat = (tags, geom) => bytes(2, [...bytes(2, tags.flatMap((t) => varint(t))), ...getal(3, 1), ...bytes(4, geom.flatMap((g) => varint(g)))])
+  // sleutels: class, subclass, name, name:en, name:nl; waarden hieronder
+  const sleutels = ['class', 'subclass', 'name', 'name:en', 'name:nl', 'rank'].flatMap((k) => tekst(3, k))
+  const poi = [
+    ...tekst(1, 'poi'),
+    ...feat([0, 0, 1, 1, 2, 2, 3, 3, 4, 4], punt(2048, 2048)), // een NS-station
+    ...feat([0, 0, 1, 1, 2, 5, 4, 6], punt(1000, 1000)), // een tramhalte zonder Engelse naam
+    ...feat([0, 0, 1, 7, 2, 8], punt(3000, 3000)), // railway/subway: telt niet
+    ...feat([0, 9, 1, 10, 2, 11], punt(500, 500)), // een gewone poi (drinkwater)
+    ...sleutels,
+    ...waarde('railway'), ...waarde('station'), ...waarde('Delft'), ...waarde('Delft railway station'), ...waarde('station Delft'),
+    ...waarde('Spui'), ...waarde('Spui'), ...waarde('subway'), ...waarde('Metro'), ...waarde('drinking_water'), ...waarde('drinking_water'), ...waarde('Kraan'),
+    ...getal(5, 4096),
+  ]
+  // de poi-laag moet los staan: sleutels en waarden zijn per laag; een tweede laag-kopie voor de gewone poi
+  const tegel = Uint8Array.from(bytes(3, poi))
+  const [x, y] = T.tegelXY(52.0, 4.36, 12)
+  const el = T.leesOsmTegel(tegel, x, y, 0, { zoom: 12, lagen: ['poi'] })
+  const stations = el.filter((e) => e.type === 'station')
+  assert.equal(stations.length, 2, 'station en halte, geen subway')
+  const delft = stations.find((s) => s.naam === 'Delft')
+  assert.ok(delft && delft.trein, 'Delft: waarschijnlijk een treinstation (name:en eindigt op railway station)')
+  assert.ok(stations.find((s) => s.naam === 'Spui' && !s.trein), 'Spui: geen vlag trein')
+  // zoom 12: het midden van de tegel ligt in Delft (de tegel is ±6 km breed)
+  assert.ok(Math.abs(delft.lat - 52.0) < 0.06 && Math.abs(delft.lon - 4.36) < 0.1, `${delft.lat},${delft.lon}`)
+  assert.equal(el.filter((e) => e.type === 'poi').length, 1, 'de gewone poi blijft een poi (waterlagen) en wordt geen station')
+  // tegelnummers: zoom 12 is 4 × 4 zo grof als zoom 14
+  const [x14, y14] = T.tegelXY(52.0, 4.36)
+  assert.deepEqual([x14 >> 2, y14 >> 2], [x, y])
+  const rond12 = T.tegelsRond(52.0, 4.36, 10000, 12)
+  assert.ok(rond12.length >= 12 && rond12.length <= 25, `${rond12.length} tegels van 6 km voor een straal van 10 km`)
+})
+
+test('tegelsLangs: tegels langs de weg naar het station, niet de hele cirkel', () => {
+  const a = [52.0116, 4.3571] // Delft
+  const b = [51.9225, 4.4700] // Rotterdam Centraal
+  const langs = T.tegelsLangs(a, b)
+  const cirkel = T.tegelsRond(52.0116, 4.3571, 14000)
+  assert.ok(langs.length > 20 && langs.length < cirkel.length / 2, `${langs.length} tegels langs, ${cirkel.length} in de cirkel`)
+  const sleutel = new Set(langs.map((t) => t.join('/')))
+  for (const p of [a, b, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]]) assert.ok(sleutel.has(T.tegelXY(...p).join('/')), 'begin, eind en midden doen mee')
+  // een zijpad ver weg doet niet mee
+  assert.ok(!sleutel.has(T.tegelXY(52.15, 4.2).join('/')))
+  // hoe meer marge, hoe meer tegels
+  assert.ok(T.tegelsLangs(a, b, { extra: 4000 }).length > langs.length)
+})
+
+test('stations kiezen: afstandsband, een per windrichting, treinstation wint van halte', () => {
+  const start = { lat: 52.0, lon: 4.35 }
+  const op = (peilingGraden, km, extra = {}) => {
+    const [x, y] = K.naarRd(start.lon, start.lat)
+    const r = (peilingGraden * Math.PI) / 180
+    const [lon, lat] = K.naarWgs(x + Math.sin(r) * km * 1000, y + Math.cos(r) * km * 1000)
+    return { naam: `s${peilingGraden}-${km}`, lat, lon, trein: true, ...extra }
+  }
+  const stations = [
+    op(0, 7), op(0, 6.2), // noord: 7 km komt het dichtst bij 0,7 × 10 km
+    op(90, 3), // te dichtbij
+    op(180, 9.5), // te ver (> 8,5 km)
+    op(45, 6.5, { trein: false }), op(45, 8, { trein: true }), // noordoost: een trein op 8 km wint van een halte op 6,5
+    op(270, 5.5),
+  ]
+  const k = G.kiesStations(start, stations, 10000)
+  const namen = k.map((s) => s.naam).sort()
+  assert.deepEqual(namen, ['s0-7', 's270-5.5', 's45-8'])
+  assert.ok(k.every((s) => s.afstand >= 5000 && s.afstand <= 8500))
+  assert.equal(new Set(k.map((s) => s.sector)).size, k.length, 'elk in een eigen sector')
+  assert.equal(G.sectorVan(start, op(0, 5)), 0)
+  assert.equal(G.sectorVan(start, op(90, 5)), 2)
+  assert.equal(G.sectorVan(start, op(350, 5)), 0)
+  assert.equal(G.sectorVan(start, op(200, 5)), 4)
+  // een knooppunt (rank 3) iets verder weg wint van een klein station dichter bij het ideaal
+  const hub = G.kiesStations(start, [op(180, 7, { naam: 'klein', rank: 1 }), op(180, 7.8, { naam: 'hub', rank: 3 })], 10000)
+  assert.deepEqual(hub.map((s) => s.naam), ['hub'])
+  // hooguit 6, ook als er 8 sectoren vol staan
+  const veel = Array.from({ length: 8 }, (_, i) => op(i * 45, 7))
+  assert.equal(G.kiesStations(start, veel, 10000).length, 6)
+  // dubbele stations (zelfde naam binnen 300 m) tellen één keer
+  const dubbel = G.ontdubbelStations([{ ...op(0, 7), naam: 'Delft' }, { ...op(0, 7.1), naam: 'Delft', trein: false }, { ...op(0, 9), naam: 'Delft' }])
+  assert.equal(dubbel.length, 2)
+})

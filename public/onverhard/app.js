@@ -3,7 +3,7 @@
 
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
-import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
@@ -105,8 +105,8 @@ function laad() {
   const hash = new URLSearchParams(location.hash.slice(1))
   if (hash.get('p')) {
     staat.punten = leesPunten(hash.get('p'))
-    staat.modus = hash.get('rondje') ? 'rondje' : 'route'
-    if (hash.get('rondje')) staat.km = Number(hash.get('rondje')) || staat.km
+    staat.modus = hash.get('rondje') ? 'rondje' : hash.get('station') ? 'station' : 'route'
+    if (hash.get('rondje') || hash.get('station')) staat.km = Number(hash.get('rondje') || hash.get('station')) || staat.km
     staat.law = Number(hash.get('law')) || 1
     if (hash.get('bgt') !== null) staat.grondig = Number(hash.get('bgt'))
     if (hash.get('trail') !== null) staat.trail = hash.get('trail') !== '0'
@@ -146,6 +146,7 @@ function deelLink() {
   }
   let hash = `#p=${p}`
   if (staat.modus === 'rondje') hash += `&rondje=${staat.km}`
+  if (staat.modus === 'station') hash += `&station=${staat.km}`
   if (staat.law !== 1) hash += `&law=${staat.law}`
   if (!staat.trail) hash += '&trail=0'
   if (!staat.strand) hash += '&strand=0'
@@ -280,10 +281,11 @@ function tekenPuntenlijst() {
     lijst.appendChild(li)
   })
   const rondje = staat.modus === 'rondje'
+  const station = staat.modus === 'station'
   const n = staat.punten.length
   const tm = tekenModus()
   // stap 2: kop per soort, en pas verder als de plek bekend is
-  el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken de wijk', tekenen: 'Teken je route' }[staat.modus]
+  el('stap2kop').textContent = { route: 'Start en eind', rondje: 'Startpunt', station: 'Startpunt', gebied: 'Teken het gebied', straten: 'Teken de wijk', tekenen: 'Teken je route' }[staat.modus]
   plaatsKlaar = tm ? !!tekening() : rondje ? n >= 1 : n >= 2
   el('naar3').disabled = !plaatsKlaar
   werkStapperBij()
@@ -339,22 +341,24 @@ function tekenPuntenlijst() {
     if (n === 0) hint = 'Zoek of tik het startpunt.'
     else if (n === 1) hint = 'Kies de lengte, of tik een keerpunt.'
     else hint = ''
-  } else if (n === 0) hint = 'Zoek of tik het startpunt.'
+  } else if (station) hint = n === 0 ? 'Zoek of tik waar je begint.' : 'Kies de lengte: de app zoekt de stations.'
+  else if (n === 0) hint = 'Zoek of tik het startpunt.'
   else if (n === 1) hint = 'Zoek of tik het eindpunt.'
   else hint = ''
   el('hint').textContent = hint
-  el('keerom').hidden = rondje || n < 2
+  el('keerom').hidden = rondje || station || n < 2
   el('wis').hidden = n === 0
-  el('kmveld').hidden = !rondje || n > 1
+  el('kmveld').hidden = !(rondje || station) || (rondje && n > 1)
   el('vormveld').hidden = !rondje || n > 1
-  el('plan').disabled = rondje ? n < 1 : n < 2
-  if (!rondje) el('plan').textContent = 'Plan route'
+  el('plan').disabled = rondje || station ? n < 1 : n < 2
+  if (station) el('plan').textContent = 'Zoek routes naar stations'
+  else if (!rondje) el('plan').textContent = 'Plan route'
   else el('plan').textContent = n > 1 ? 'Plan rondje via keerpunt' : 'Plan rondje'
 }
 
 function puntenGewijzigd() {
   if (staat.modus === 'rondje' && staat.punten.length > 2) staat.punten = [staat.punten[0], staat.punten[staat.punten.length - 1]]
-  if (tekenModus() && staat.punten.length > 1) staat.punten = staat.punten.slice(-1)
+  if ((tekenModus() || staat.modus === 'station') && staat.punten.length > 1) staat.punten = staat.punten.slice(-1)
   if (staat.modus === 'tekenen') staat.punten = []
   bewaar()
   tekenPunten()
@@ -377,7 +381,7 @@ function voegPuntToe(p) {
   toonFout('')
   onthoud()
   if (staat.modus === 'rondje') staat.punten = staat.punten.length ? [staat.punten[0], p] : [p]
-  else if (tekenModus()) staat.punten = [p]
+  else if (staat.modus === 'station' || tekenModus()) staat.punten = [p]
   else staat.punten.push(p)
   puntenGewijzigd()
 }
@@ -774,7 +778,7 @@ el('opnieuw').addEventListener('click', () => {
   gekozen = 0
   opKaart.clear()
   stopAfspelen()
-  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag]) laag.clearLayers()
+  for (const laag of [routeLaag, altLaag, profielLaag, tekenLaag, waterLaag, stationLaag]) laag.clearLayers()
   el('resultaat').hidden = true
   toonFout('')
   bewaar()
@@ -853,14 +857,15 @@ async function planNu() {
   let stap = ''
   try {
     const rondje = staat.modus === 'rondje'
+    const station = staat.modus === 'station'
     const resultaat = await maakPlan({
-      modus: tekenModus() ? staat.modus : undefined,
+      modus: tekenModus() || station ? staat.modus : undefined,
       tekening: tekenModus() ? tekening() : undefined,
       wegen: staat.wegen,
       zonderDoodlopend: staat.dood !== false,
       heuvels: !!staat.heuvels,
-      punten: rondje ? staat.punten.slice(0, 2) : staat.punten,
-      rondjeKm: rondje || staat.modus === 'gebied' ? staat.km : null,
+      punten: rondje ? staat.punten.slice(0, 2) : station ? staat.punten.slice(0, 1) : staat.punten,
+      rondjeKm: rondje || station || staat.modus === 'gebied' ? staat.km : null,
       law: staat.law,
       trail: staat.trail,
       alles: !!staat.alles,
@@ -1206,6 +1211,70 @@ el('tempo').addEventListener('click', (e) => {
   for (const b of el('tempo').children) b.setAttribute('aria-pressed', String(Number(b.dataset.tempo) === t))
 })
 
+// ---------- Stations (modus 'station') ----------
+const stationLaag = L.layerGroup().addTo(kaart)
+let stationsAan = true
+
+/** De kandidaat-stations als kleine 🚉 op de kaart; een tik geeft 'Route hierheen'. */
+function tekenStations() {
+  stationLaag.clearLayers()
+  if (!uitslag || !uitslag.stations || !stationsAan) return
+  for (const s of uitslag.stations) {
+    const m = L.marker([s.lat, s.lon], {
+      icon: L.divIcon({ className: '', html: `<div class="stationico${s.trein ? '' : ' halte'}">🚉</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
+      keyboard: false, zIndexOffset: 600,
+    }).addTo(stationLaag)
+    const inhoud = document.createElement('div')
+    inhoud.innerHTML = `<b>${veilig(s.naam)}</b><br>${nl(s.km, 1)} km over het netwerk${s.trein ? '' : '<br><small>misschien een tram- of metrohalte</small>'}<br>`
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.textContent = 'Route hierheen'
+    knop.addEventListener('click', () => {
+      kaart.closePopup()
+      naarStation(s)
+    })
+    inhoud.appendChild(knop)
+    m.bindPopup(inhoud)
+  }
+}
+
+/** Voeg de route naar dit station toe (of kies hem als hij er al is). */
+async function naarStation(s) {
+  const bestaand = uitslag.opties.findIndex((o) => o.station === s.naam)
+  if (bestaand >= 0) {
+    opKaart.add(bestaand)
+    if (bestaand === gekozen) return
+    kiesRoute(bestaand)
+    return
+  }
+  if (uitslag.opties.length >= 8) {
+    toonFout('Er staan al 8 routes. Haal een route weg (Ongedaan maken) of begin opnieuw.')
+    return
+  }
+  aanpassen = true
+  kaart.getContainer().classList.add('rekent')
+  try {
+    const nieuw = await routeNaarStation(uitslag, s)
+    if (!nieuw) {
+      toonFout('Daar kan de route niet langs.')
+      return
+    }
+    nieuw.naam = 'ABCDEFGH'[uitslag.opties.length]
+    onthoud()
+    uitslag = { ...uitslag, opties: [...uitslag.opties, nieuw] }
+    gekozen = uitslag.opties.length - 1
+    opKaart.add(gekozen)
+    plan = details(nieuw, MIN_TWIJFEL)
+    toonFout('')
+    toonResultaat(false)
+  } catch (fout) {
+    toonFout(`Route naar het station lukte niet: ${fout.melding || fout.message}`)
+  } finally {
+    aanpassen = false
+    kaart.getContainer().classList.remove('rekent')
+  }
+}
+
 // ---------- Water onderweg ----------
 const waterLaag = L.layerGroup().addTo(kaart)
 const WATER = { water: ['💧', 'Drinkwater'], horeca: ['☕', 'Horeca'], winkel: ['🛒', 'Winkel'], toilet: ['🚻', 'Toilet'], tank: ['⛽', 'Tankstation'] }
@@ -1236,7 +1305,22 @@ kaartlagenKnop.addTo(kaart)
 function tekenKaartlagen(w) {
   kaartlagenVak.innerHTML = ''
   const soorten = w ? Object.entries(WATER).filter(([soort]) => w.punten.some((p) => p.soort === soort)) : []
-  kaartlagenVak.hidden = !soorten.length
+  const stations = uitslag && uitslag.stations
+  kaartlagenVak.hidden = !soorten.length && !stations
+  if (stations) {
+    const knop = document.createElement('button')
+    knop.type = 'button'
+    knop.setAttribute('aria-pressed', String(stationsAan))
+    knop.setAttribute('aria-label', `Stations: ${stations.length}`)
+    knop.title = `Stations (${stations.length})`
+    knop.innerHTML = `<span>🚉</span><small>${stations.length}</small>`
+    knop.addEventListener('click', () => {
+      stationsAan = !stationsAan
+      tekenStations()
+      tekenKaartlagen(w)
+    })
+    kaartlagenVak.appendChild(knop)
+  }
   for (const [soort, [ico, naam]] of soorten) {
     const n = w.punten.filter((p) => p.soort === soort).length
     const knop = document.createElement('button')
@@ -1330,7 +1414,7 @@ function tekenOpties() {
     else if ((rondje || staat.modus === 'straten') && o.dubbel > 0.02) regel += ` · ${pct(o.dubbel)} dubbel gelopen`
     if (o.strand > 100) regel += ` · ${km(o.strand)} strand`
     if (o.kaartje > 50) regel += ` · ${km(o.kaartje)} met toegangskaart`
-    const titel = o.ingelezen ? veilig(o.ingelezen) : `${nl(o.km)} km${i === 0 && uitslag.opties.length > 1 ? '</b> · aanbevolen<b>' : ''}`
+    const titel = o.ingelezen ? veilig(o.ingelezen) : o.station ? `→ ${veilig(o.station)}</b> · ${nl(o.km)} km<b>` : `${nl(o.km)} km${i === 0 && uitslag.opties.length > 1 ? '</b> · aanbevolen<b>' : ''}`
     kies.innerHTML = `<span class="letter">${o.naam}</span><span><b>${titel}</b><small>${regel}</small></span><span class="badge ${scoreKlasse(o.score)}" title="Nopav.es-score: ${veilig(o.label)}">${o.score}</span>`
     kies.addEventListener('click', () => kiesRoute(i))
     const toon = document.createElement('label')
@@ -1702,6 +1786,7 @@ function toonResultaat(nieuw) {
   el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
   tekenOpties()
   tekenWater()
+  tekenStations()
   toonTab(tab)
   haalTijdenErbij()
   tekenAlternatieven()
@@ -1718,11 +1803,12 @@ el('gpx').addEventListener('click', () => {
   if (!plan) return
   const nu = new Date()
   const stempel = nu.toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-')
-  const naam = `onverhard-${stempel}-route-${plan.naam}`
+  const station = keuze().station
+  const naam = station ? `Nopav.es → ${station}` : `onverhard-${stempel}-route-${plan.naam}`
   const url = URL.createObjectURL(new Blob([K.maakGpx(plan.traject, naam, nu, `Nopav.es-score ${plan.score} (${plan.label}), ${pct(plan.zacht.eind)} onverhard`)], { type: 'application/gpx+xml' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = naam + '.gpx'
+  a.download = naam.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') + '.gpx'
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -1755,7 +1841,7 @@ function herstel(opname) {
     toonResultaat(false)
   } else {
     plan = null
-    for (const laag of [routeLaag, altLaag, profielLaag, waterLaag]) laag.clearLayers()
+    for (const laag of [routeLaag, altLaag, profielLaag, waterLaag, stationLaag]) laag.clearLayers()
     el('resultaat').hidden = true
     if (stap === 4) toonStap(2)
   }
@@ -1881,7 +1967,7 @@ function tekenBewaard() {
 el('bewaar').addEventListener('click', () => {
   if (!plan) return
   const o = keuze()
-  const soort = { route: 'Route', rondje: 'Rondje', gebied: 'Rondjes in gebied', straten: 'Elke straat', tekenen: 'Getekende route' }[staat.modus] || 'Route'
+  const soort = { route: 'Route', rondje: 'Rondje', station: 'Naar station', gebied: 'Rondjes in gebied', straten: 'Elke straat', tekenen: 'Getekende route' }[staat.modus] || 'Route'
   const datum = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
   const naam = prompt('Naam van de route', o.ingelezen ? o.ingelezen.replace(/^(★|GPX ·) /, '') : `${soort} ${nl(o.km, 0)} km · ${datum}`)
   if (!naam) return
@@ -2232,7 +2318,7 @@ sheet = maakSheet({ kaart, main: document.getElementById('paneel'), greep: el('s
 werkPiekbalk()
 
 // voor de end-to-end-test
-window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet }
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})

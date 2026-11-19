@@ -407,6 +407,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1.5px sol
 /* water onderweg */
 .waterico { font-size: 15px; line-height: 24px; text-align: center; width: 26px; height: 26px; border-radius: 50%;
             background: var(--vlak); border: 2px solid var(--balk); box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+.stationico { font-size: 13px; line-height: 20px; text-align: center; width: 24px; height: 24px; border-radius: 6px; background: #fff; border: 2px solid #c1272d; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+.stationico.halte { border-color: #6c7a89; opacity: .85; }
 .waterico.water { background: #d9f0ff; border-color: #1565c0; }
 
 /* route afspelen */

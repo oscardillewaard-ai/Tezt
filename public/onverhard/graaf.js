@@ -1403,3 +1403,49 @@ export function zonderLusjes(g, knopen, segs, vast = [], { maxLus = null } = {})
   }
   return { knopen: k, segs: s, vast: v, weg }
 }
+
+// ---------- Stations kiezen ----------
+const afstandLatLon = (a, b) => {
+  const [ax, ay] = K.naarRd(a.lon, a.lat)
+  const [bx, by] = K.naarRd(b.lon, b.lat)
+  return Math.hypot(bx - ax, by - ay)
+}
+/** Kompassector 0-7 (0 = noord, met de klok mee) van b gezien vanaf a. */
+export function sectorVan(a, b) {
+  const [ax, ay] = K.naarRd(a.lon, a.lat)
+  const [bx, by] = K.naarRd(b.lon, b.lat)
+  const hoek = (Math.atan2(bx - ax, by - ay) * 180) / Math.PI // 0 = noord
+  return Math.floor((((hoek + 22.5) % 360) + 360) % 360 / 45) % 8
+}
+
+/** Dezelfde naam binnen 'binnen' meter (of precies dezelfde plek): één station. */
+export function ontdubbelStations(stations, binnen = 300) {
+  const uit = []
+  for (const s of stations) {
+    const dubbel = uit.find((u) => u.naam === s.naam && afstandLatLon(u, s) < binnen)
+    if (!dubbel) uit.push(s)
+    else if (s.trein && !dubbel.trein) Object.assign(dubbel, { trein: true })
+  }
+  return uit
+}
+
+/**
+ * Welke stations proberen we? Hemelsbreed tussen 0,5 en 0,85 × doel (m) van de start (de eigen router
+ * komt op 1,2-1,4 × hemelsbreed uit). Per kompassector (8 stuks) het station dat het dichtst bij
+ * 0,7 × doel ligt, een waarschijnlijk treinstation wint van een tram- of metrohalte en een knooppunt
+ * (hoge rank) van een klein station. Hooguit 'max' in
+ * totaal, de beste eerst. Geeft de stations met 'afstand' (m) en 'sector' erbij.
+ */
+export function kiesStations(start, stations, doel, { max = 6, van = 0.5, tot = 0.85, ideaal = 0.7 } = {}) {
+  const perSector = new Map()
+  for (const s of stations) {
+    const afstand = afstandLatLon(start, s)
+    if (afstand < van * doel || afstand > tot * doel) continue
+    const sector = sectorVan(start, s)
+    // grote knooppunten (rank 2 of 3 in de tegels, zoals Rotterdam Centraal) zijn betere bestemmingen: tot 0,1 × doel voordeel
+    const straf = Math.abs(afstand - ideaal * doel) + (s.trein ? 0 : 0.2 * doel) - 0.05 * doel * Math.min(2, Math.max(0, (s.rank || 1) - 1))
+    const nu = perSector.get(sector)
+    if (!nu || straf < nu.straf) perSector.set(sector, { ...s, afstand, sector, straf })
+  }
+  return [...perSector.values()].sort((a, b) => a.straf - b.straf).slice(0, max)
+}
