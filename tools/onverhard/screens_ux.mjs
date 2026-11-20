@@ -21,7 +21,7 @@ for (const thema of ['licht', 'donker']) {
   await page.waitForTimeout(2500)
   await page.screenshot({ path: path.join(map, `${label}_leeg_${thema}.png`) })
   await page.goto(`${basis}#p=52.0116,4.3571&rondje=10&plan=1`)
-  await page.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await page.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   await page.waitForTimeout(3000)
   await page.screenshot({ path: path.join(map, `${label}_resultaat-piek_${thema}.png`) })
   await page.evaluate(() => window.onverhard.sheet.zet('half'))

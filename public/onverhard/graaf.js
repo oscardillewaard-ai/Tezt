@@ -509,6 +509,43 @@ export function routeLangs(g, knopen, strafFactor = 1) {
 }
 
 /**
+ * Een paar verschillende routes langs dezelfde knopen (A, tussenpunten, B): de eerste is de goedkoopste,
+ * elke volgende krijgt een straf op de stukken die eerdere routes al gebruiken. Routes die bijna gelijk
+ * zijn aan een eerdere (meer dan 'maxOverlap' van de lengte gedeeld) vallen af. Geeft [{knopen, segs, vast}]
+ * met in 'vast' de plek van elke opgegeven knoop in de route (voor verslepen).
+ */
+export function routesLangs(g, knopen, { aantal = 2, straf = 1.8, maxOverlap = 0.8 } = {}) {
+  const strafArr = new Float32Array(g.lengte.length).fill(1)
+  const uit = []
+  for (let poging = 0; poging < aantal + 2 && uit.length < aantal; poging++) {
+    const alle = [knopen[0]]
+    const segs = []
+    const vast = [0]
+    let gelukt = true
+    for (let i = 1; i < knopen.length; i++) {
+      const b = dijkstra(g, knopen[i - 1], { straf: poging ? strafArr : null, doel: knopen[i] })
+      if (!Number.isFinite(b.kosten[knopen[i]])) {
+        gelukt = false
+        break
+      }
+      const p = pad(b, knopen[i])
+      alle.push(...p.knopen.slice(1))
+      segs.push(...p.segs)
+      vast.push(alle.length - 1)
+    }
+    if (!gelukt) return uit
+    const lengte = segs.reduce((a, sg) => a + g.lengte[sg], 0)
+    const dubbel = (r) => {
+      const set = new Set(r.segs)
+      return segs.reduce((a, sg) => a + (set.has(sg) ? g.lengte[sg] : 0), 0) / (lengte || 1)
+    }
+    if (!uit.some((r) => dubbel(r) > maxOverlap)) uit.push({ knopen: alle, segs, vast })
+    for (const sg of segs) strafArr[sg] *= straf
+  }
+  return uit
+}
+
+/**
  * Haal uitstapjes weg: loopt een route een segment op en meteen weer terug
  * (een doodlopend stukje naar een tussenpunt), dan vallen beide weg.
  */

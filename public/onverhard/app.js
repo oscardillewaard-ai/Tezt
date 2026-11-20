@@ -4,14 +4,18 @@
 import * as K from './kern.js'
 import { maakSheet } from './sheet.js'
 import * as Teller from './teller.js'
+import * as Meting from './meting.js'
 import { korrelStijl as kaartStijl, koppelKorrels, kanWebgl, KAART_BRON } from './korrelkaart.js'
 import * as Gebieden from './gebieden.js'
-import { haalTegels, bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
+import { voorafOphalen, haalTegels, bekijkRoute, haalOpeningstijden, importeerGpx, pasRouteAan, routeNaarStation, zoekOmwegen, maakPlan, luchtfotoUrl, details, zoekPlaats } from './bronnen.js'
 
 /* global L */
 const SLEUTEL = 'onverhard.v1'
 // UX fase 2: de plankaart is de standaard; de oude interface blijft (tijdelijk) bereikbaar met ?ui=oud.
 const UI_NIEUW = new URLSearchParams(location.search).get('ui') !== 'oud'
+// A naar B: welke router standaard (snelheid, stap 6; zie VOORTGANG.md). 'auto' = eigen router tot
+// EIGEN_ROUTER_MAX_M, daarboven en bij fouten BRouter.
+const STANDAARD_ROUTER = 'brouter'
 const THEMA = 'onverhard.thema'
 const MIN_TWIJFEL = 30 // twijfelstukken korter dan dit (m) worden niet apart genoemd
 const MAX_FOTOS = 12
@@ -98,6 +102,7 @@ let gekozen = 0
 const opKaart = new Set() // routes die op de kaart staan
 let bron = 'eind' // waar de routekleur naar kijkt
 let stopper = null // AbortController van de lopende planning
+let eersteMs = null // ms tot het eerste (eventueel voorlopige) resultaat (snelheid, stap 3)
 let sheet = null // het paneel als bottom sheet op de telefoon (sheet.js)
 
 // ---------- Ongedaan maken ----------
@@ -449,6 +454,51 @@ function tekenPuntenlijst() {
   else el('plan').textContent = n > 1 ? 'Plan rondje via keerpunt' : 'Plan rondje'
 }
 
+/** Tijdens het wachten (stap 4): de kaart alvast op het gebied waar de route komt. */
+function zoomNaarPlangebied() {
+  try {
+    let grens = null
+    if (tekenModus() && tekening()) grens = L.latLngBounds(tekening())
+    else if (staat.modus === 'route' && staat.punten.length > 1) grens = L.latLngBounds(staat.punten)
+    else if (staat.punten.length) {
+      const straal = staat.modus === 'station' ? 0.7 * staat.km * 1000 : 0.3 * staat.km * 1000
+      grens = L.latLng(staat.punten[0]).toBounds(2 * straal)
+    }
+    if (grens) kaart.fitBounds(grens.pad(0.05), { animate: false })
+  } catch {
+    // geen kaart: niets
+  }
+}
+
+// ---------- Vooraf ophalen (snelheid, stap 2) ----------
+let voorafStopper = null
+let voorafSleutel = ''
+function stopVooraf() {
+  if (voorafStopper) voorafStopper.abort()
+  voorafStopper = null
+  voorafSleutel = ''
+}
+/** Zodra de start van een rondje of stationsroute bekend is: tegels alvast ophalen. */
+function startVooraf() {
+  if (stopper || !['rondje', 'station'].includes(staat.modus) || staat.punten.length !== 1) return stopVooraf()
+  const sleutel = `${staat.modus}|${staat.punten[0].map((v) => v.toFixed(4)).join(',')}|${Math.round(staat.km)}`
+  if (sleutel === voorafSleutel) return
+  stopVooraf()
+  voorafSleutel = sleutel
+  voorafStopper = new AbortController()
+  const signaal = voorafStopper.signal
+  const t0 = performance.now()
+  // even wachten: wie de pin nog versleept of de afstand nog verstelt, krijgt geen dubbel werk
+  setTimeout(() => {
+    if (signaal.aborted) return
+    voorafOphalen(staat.punten[0], staat.modus, staat.km, signaal)
+      .then((n) => {
+        if (window.onverhard) window.onverhard.vooraf = { tegels: n, ms: Math.round(performance.now() - t0), klaar: true }
+      })
+      .catch(() => {})
+  }, 600)
+}
+
 function puntenGewijzigd() {
   if (staat.modus === 'rondje' && staat.punten.length > 2) staat.punten = [staat.punten[0], staat.punten[staat.punten.length - 1]]
   if ((tekenModus() || staat.modus === 'station') && staat.punten.length > 1) staat.punten = staat.punten.slice(-1)
@@ -456,6 +506,7 @@ function puntenGewijzigd() {
   bewaar()
   tekenPunten()
   tekenPuntenlijst()
+  startVooraf()
 }
 
 function toonFout(tekst) {
@@ -748,11 +799,11 @@ function werkPiekbalk() {
     return
   }
   let h
-  if (stopper) h = '<span class="piekloop" aria-hidden="true">' + ico('loper') + '</span><span class="psamen"></span><button type="button" data-proxy="stop">Stop</button>'
+  if (stopper && !(stap === 4 && plan)) h = '<span class="piekloop" aria-hidden="true">' + ico('loper') + '</span><span class="psamen"></span><button type="button" data-proxy="stop">Stop</button>'
   else if (stap === 4 && plan) {
     h =
       `<span class="pscore ${scoreKlasse(plan.score)}">${plan.score}</span>` +
-      `<span class="psamen"><b>${veilig(plan.label)}</b><small>${nl(plan.analyse.lengte / 1000, 1)} km · ${ondergrondTekst(aandelen(plan.analyse))}</small></span>` +
+      `<span class="psamen"><b>${veilig(plan.label)}</b><small>${nl(plan.analyse.lengte / 1000, 1)} km · ${ondergrondTekst(aandelen(plan.analyse))}${voorlopig() ? ' · voorlopig' : ''}${laadt().length ? ` · nog bezig: ${veilig(laadt().join(', '))}` : ''}</small></span>` +
       (UI_NIEUW
         ? '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '<span class="knoptekst2">GPX</span></button></span>'
         : '<span class="pknoppen"><button type="button" data-proxy="gpx" aria-label="Download GPX">' + ico('gpx') + '</button><button type="button" data-proxy="bewaar" aria-label="Bewaar">' + ico('bewaar') + '</button><button type="button" data-proxy="deel" aria-label="Kopieer link">' + ico('link') + '</button></span>')
@@ -972,7 +1023,14 @@ async function planNu() {
   el('plan').hidden = true
   el('bezig').hidden = false
   zetVoortgang(null)
+  werkPiekbalk() // nu met Stop
+  stopVooraf() // wat er al is, staat in de cache; de rest haalt het plannen zelf
   const t0 = performance.now()
+  let onthouden = false
+  let tussenGetoond = false
+  eersteMs = null
+  Meting.reset()
+  zoomNaarPlangebied()
   Teller.log('plan_start', { soort: staat.modus, km: ['rondje', 'station', 'gebied'].includes(staat.modus) ? staat.km : null, start: startBron, pref: voorkeurKort() })
   let gelukt = 'fout'
   const status = (tekst) => {
@@ -997,6 +1055,8 @@ async function planNu() {
       punten: rondje ? staat.punten.slice(0, 2) : station ? staat.punten.slice(0, 1) : staat.punten,
       rondjeKm: rondje || station || staat.modus === 'gebied' ? staat.km : null,
       binnen: binnenVlak ? binnen.naam : undefined,
+      ringen: new URLSearchParams(location.search).get('stations') === 'ringen', // stap 5: alleen op verzoek (uitkomst kan afwijken)
+      router: ['eigen', 'brouter', 'auto'].includes(new URLSearchParams(location.search).get('router')) ? new URLSearchParams(location.search).get('router') : STANDAARD_ROUTER, // stap 6
       law: staat.law,
       trail: staat.trail,
       alles: !!staat.alles,
@@ -1006,6 +1066,26 @@ async function planNu() {
       alternatieven: Math.max(1, staat.grondig),
       metBgt: staat.grondig > 0,
       signal: stopper.signal,
+      // stap 3: route A meteen, de rest daarna
+      tussentijds: (deel) => {
+        if (!stopper || stopper.signal.aborted) return
+        if (!onthouden) {
+          onthoud() // zo brengt 'ongedaan maken' de vorige route terug
+          onthouden = true
+        }
+        const eerste = !tussenGetoond
+        tussenGetoond = true
+        uitslag = deel
+        gekozen = 0
+        opKaart.clear()
+        uitslag.opties.forEach((_, i) => opKaart.add(i))
+        plan = details(uitslag.opties[0], MIN_TWIJFEL)
+        if (eerste) {
+          eersteMs = Math.round(performance.now() - t0)
+          el('bezig').hidden = true
+        }
+        toonResultaat(eerste)
+      },
       meld: (tekst) => {
         stap = tekst
         status(tekst + '…')
@@ -1016,24 +1096,36 @@ async function planNu() {
         zetVoortgang(klaar / totaal)
       },
     })
-    onthoud() // zo brengt 'ongedaan maken' de vorige route terug
+    if (!onthouden) onthoud() // zo brengt 'ongedaan maken' de vorige route terug
+    const kiesWas = tussenGetoond && uitslag && uitslag.opties.length > 1 ? gekozen : 0
+    // stap 3: stonden dezelfde routes er al (alleen hoogte en water erbij)? dan alleen dat bijwerken
+    const alleenAanvulling = tussenGetoond && uitslag && !uitslag.voorlopig && uitslag.opties.length === resultaat.opties.length && uitslag.opties.every((o, i) => o === resultaat.opties[i])
     uitslag = resultaat
-    gekozen = 0
+    gekozen = Math.min(kiesWas, uitslag.opties.length - 1)
     opKaart.clear()
     uitslag.opties.forEach((_, i) => opKaart.add(i)) // eerst alle routes tonen, om te vergelijken
-    plan = details(uitslag.opties[0], MIN_TWIJFEL)
+    plan = details(uitslag.opties[gekozen], MIN_TWIJFEL)
     gelukt = 'ok'
+    if (eersteMs === null) eersteMs = Math.round(performance.now() - t0)
     stopBezig() // eerst de voortgangsbalk weg, dan pas naar het resultaat scrollen (anders schuift het weg)
-    toonResultaat(true)
+    if (alleenAanvulling) vulResultaatAan()
+    else toonResultaat(!tussenGetoond)
   } catch (fout) {
     gelukt = fout.name === 'AbortError' ? 'gestopt' : 'fout'
-    if (fout.name === 'AbortError') toonFout('Gestopt. Er is geen route gemaakt.')
+    if (fout.name === 'AbortError' && tussenGetoond) {
+      // gestopt na een tussenresultaat: dat laten staan, met de melding dat het niet af is
+      stopBezig()
+      toonFout(plan && plan.voorlopig ? 'Gestopt: de route is niet met de officiële kaart gecontroleerd (score en percentages voorlopig).' : 'Gestopt: hoogte of water ontbreekt.')
+      uitslag.laadt = []
+      toonResultaat(false)
+    } else if (fout.name === 'AbortError') toonFout('Gestopt. Er is geen route gemaakt.')
     else if (fout.bron) toonFout(`Het lukte niet bij ${fout.bron}: ${fout.melding}. Er is geen route gemaakt.`)
     else {
       toonFout(`Er ging iets mis: ${fout.message}`)
       console.error(fout)
     }
   } finally {
+    Meting.klaar()
     Teller.log('plan_done', { soort: staat.modus, ms: Math.round(performance.now() - t0), uit: gelukt, n: gelukt === 'ok' ? uitslag.opties.length : 0 })
     stopBezig()
   }
@@ -1878,17 +1970,24 @@ function strookHtml() {
   return `<div class="strook" role="img" aria-label="Ondergrond: ${beschrijving}">${delen}</div><p class="strookleg">${leg}</p>`
 }
 
+/** Stap 3: is het resultaat nog voorlopig (zonder officiële kaart), en wat laadt er nog? */
+const voorlopig = () => !!(uitslag && uitslag.voorlopig)
+const laadt = () => (stopper && uitslag && uitslag.laadt) || []
 function tekenKern() {
+  const vl = voorlopig() ? ' · <i class="voorlopig">voorlopig</i>' : ''
   el('kern').innerHTML =
-    `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}</span></div>` +
+    (laadt().length ? `<p class="laadregel" id="laadregel"><span class="piekloop" aria-hidden="true">${ico('loper')}</span><span>Nog bezig: ${veilig(laadt().join(', '))}</span><button type="button" class="klein" id="laadStop">Stop</button></p>` : '') +
+    `<div class="score ${scoreKlasse(plan.score)}"><b>${plan.score}</b><span>Nopav.es-score · ${veilig(plan.label)}${vl}</span></div>` +
     `<p class="waarom"><b>Waarom</b> ${veilig(waaromTekst(plan.analyse, plan.score))}</p>` +
     (tijdTekst() ? `<p class="tijdregel" id="tijdregel">${veilig(tijdTekst())}</p>` : '') +
     strookHtml() +
     `<div><b>${nl(plan.analyse.lengte / 1000)} km</b><span>route ${plan.naam}</span></div>` +
-    `<div class="ondergrondtegel"><b>${pct(aandelen(plan.analyse).onv)}</b><span>onverhard · ${pct(aandelen(plan.analyse).half)} half</span></div>` +
+    `<div class="ondergrondtegel"><b>${pct(aandelen(plan.analyse).onv)}</b><span>onverhard · ${pct(aandelen(plan.analyse).half)} half${vl}</span></div>` +
     (keuze().hoogte
       ? `<div><b>↗ ${Math.round(keuze().hoogte.stijgen)} m</b><span>hoogte&shy;meters</span></div>`
       : `<div><b>${plan.twijfels.length}</b><span>twijfel&shy;stukken</span></div>`)
+  const stopKnop = document.getElementById('laadStop')
+  if (stopKnop) stopKnop.addEventListener('click', () => stopper && stopper.abort())
   werkPiekbalk()
 }
 
@@ -2020,6 +2119,18 @@ function herteken() {
   kleurRoute()
   tekenBalken()
   tekenTabel()
+}
+
+/** Alleen wat hoogte en water veranderen (stap 3): de route zelf staat er al. */
+function vulResultaatAan() {
+  tekenKern()
+  el('meldingen').innerHTML = uitslag.meldingen.map((m) => `<p class="melding">${veilig(m)}</p>`).join('')
+  tekenOpties()
+  tekenWater()
+  tekenStations()
+  if (UI_NIEUW) el('andereRoute').hidden = uitslag.opties.length < 2
+  if (!el('profiel').closest('[hidden]') && (!UI_NIEUW || el('details').open)) toonTab(tab)
+  haalTijdenErbij()
 }
 
 function toonResultaat(nieuw) {
@@ -2844,6 +2955,7 @@ function zetKm(km) {
   el('km').value = nieuw
   bewaar()
   tekenAfstand()
+  startVooraf()
 }
 
 /** Vraag de locatie (alleen na een tik of als er al toestemming is) en zet de start daar. */
@@ -3218,7 +3330,7 @@ Teller.geoToestemming().then((geo) => Teller.log('app_open', { weergave: Teller.
 telWijzigingen() // beginstand van de voorkeuren, zonder te tellen
 
 // voor de end-to-end-test
-window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag, binnen: () => binnen }
+window.onverhard = { krijgPlan: () => plan && { ...plan, opties: uitslag.opties, vlakken: uitslag.vlakken, kies: kiesRoute }, kaart, sheet, uitslag: () => uitslag, binnen: () => binnen, meting: Meting, bezig: () => !!stopper, eersteMs: () => eersteMs }
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {})

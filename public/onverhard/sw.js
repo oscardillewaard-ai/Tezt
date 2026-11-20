@@ -1,7 +1,7 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent. Plannen zelf heeft internet nodig
 // (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v39'
+const CACHE = 'onverhard-v44'
 const SHELL = [
   './',
   'index.html',
@@ -10,6 +10,10 @@ const SHELL = [
   'sheet.js',
   'teller.js',
   'gebieden.js',
+  'meting.js',
+  'datacache.js',
+  'rekenen.js',
+  'rekenwerker.js',
   'korrelkaart.js',
   'bronnen.js',
   'kern.js',
@@ -41,7 +45,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // alleen oude app-caches weg; de datacache (kaarttegels, BGT, AHN) blijft staan
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('onverhard-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   )
 })

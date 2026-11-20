@@ -46,7 +46,7 @@ await page.waitForTimeout(600)
 await page.screenshot({ path: path.join(map, `nopaves_laden_${soort}.png`) })
 stap('geen zichtbare tekst tijdens het laden; poppetje en Stop staan er')
 
-await page.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+await page.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
 assert.equal(await page.locator('#fout').textContent(), '', 'geen foutmelding')
 await page.waitForLoadState('networkidle').catch(() => {})
 await page.waitForTimeout(1500)
@@ -85,7 +85,7 @@ await page.screenshot({ path: path.join(map, `nopaves_resultaat_${soort}.png`) }
   // een rondje bij Rijswijk Buiten: lange verharde stukken met een onverhard alternatief ernaast
   const og = await ctx.newPage()
   await og.goto(`${basis}#p=52.04,4.32&rondje=10&plan=1`)
-  await og.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await og.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   await og.waitForTimeout(2000)
   const meet = () => og.evaluate(() => {
     const p = window.onverhard.krijgPlan()
@@ -186,7 +186,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   })
   const t0 = Date.now()
   await sp.goto(`${basis}#p=52.0116,4.3571&station=15&plan=1`)
-  await sp.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await sp.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   const sec = Math.round((Date.now() - t0) / 1000)
   assert.equal(await sp.locator('#fout').textContent(), '', 'stationsmodus: geen foutmelding')
   await sp.waitForLoadState('networkidle').catch(() => {})
@@ -288,7 +288,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   // plannen via de knoppen
   await w.evaluate(() => document.getElementById('naar3').click())
   await w.evaluate(() => document.getElementById('plan').click())
-  await w.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await w.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   assert.equal(await w.locator('#fout').textContent(), '')
   await w.waitForTimeout(800)
   const ondergrond = /\d+% onverhard · \d+% half/
@@ -344,7 +344,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   q.on('pageerror', (e) => qf.push('PAGEERROR ' + e.message))
   q.on('dialog', (d) => { qf.push('BROWSERVENSTER ' + d.type() + ': ' + d.message()); d.dismiss() })
   let planVerzoeken = 0
-  q.on('request', (r) => { if (/openfreemap.*\/14\/|brouter/.test(r.url())) planVerzoeken += 1 })
+  q.on('request', (r) => { if (/brouter/.test(r.url())) planVerzoeken += 1 }) // tegels vooraf ophalen (stap 2) is geen plannen
   await q.goto(NIEUW)
   await q.waitForFunction(() => /Mijn locatie/.test(document.getElementById('startregel').textContent), null, { timeout: 15000 })
   assert.ok(await q.locator('#plankaart').isVisible(), 'plankaart zichtbaar')
@@ -355,6 +355,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await q.waitForTimeout(2500)
   assert.ok(await q.locator('#resultaat').isHidden(), 'nooit automatisch plannen bij openen')
   assert.equal(planVerzoeken, 0, 'geen planverzoeken bij openen')
+  assert.ok(!(await q.evaluate(() => (JSON.parse(localStorage.getItem('nopaves.log') || '[]')).some((r) => r.ev === 'plan_start'))), 'niet gepland bij openen')
   if (mobiel) {
     const pk = await q.evaluate(() => ({ stand: window.onverhard.sheet.stand(), knop: document.getElementById('planKnop').getBoundingClientRect().bottom, h: innerHeight }))
     assert.equal(pk.stand, 'piek', 'de plankaart staat in de piek')
@@ -424,7 +425,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
 
   // plannen met de hoofdknop
   await q.locator('#planKnop').click()
-  await q.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await q.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   assert.equal(await q.locator('#fout').textContent(), '')
   await q.waitForTimeout(800)
   assert.match(await q.locator('#tijdregel').textContent(), /^ca\. \d+ min \(5:45\/km, vlak\)$/, 'tijdsindicatie met tempo')
@@ -524,7 +525,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await q.locator('[data-soort="station"]').click()
   await q.locator('#snelkeuzes [data-waarde="10"]').click()
   await q.locator('#planKnop').click()
-  await q.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await q.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   assert.equal(await q.locator('#fout').textContent(), '')
   assert.match(await q.locator('#tijdregel').textContent(), /aankomst ca\. \d\d:\d\d bij vertrek nu/)
   const nummers = await q.locator('#opties .letter').allTextContents()
@@ -593,7 +594,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await m.locator('#kmEenheid').click() // weer minuten: 60 min = 10 km
   await m.locator('#snelkeuzes [data-waarde="60"]').click()
   await m.locator('#planKnop').click()
-  await m.waitForFunction(() => !document.getElementById('resultaat').hidden || !document.getElementById('fout').hidden, null, { timeout: 300000 })
+  await m.waitForFunction(() => (!document.getElementById('resultaat').hidden && !(window.onverhard.bezig && window.onverhard.bezig())) || !document.getElementById('fout').hidden, null, { timeout: 300000 })
   assert.equal(await m.locator('#fout').textContent(), '')
   // de route blijft binnen het gebied (met de marge die In gebied ook toestaat)
   const binnenDeel = await m.evaluate(() => {
@@ -625,6 +626,118 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   assert.deepEqual(mf, [])
   stap('lang drukken in Meijendel: "Rondjes in Meijendel & Berkheide", chip, plannen binnen het gebied; Delftse Hout: geen menu-item')
   await c3.close()
+}
+
+// ---- Snelheid: cache, vooraf ophalen, tussenresultaat, worker met echte Stop ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const cs = await browser.newContext(opties)
+  const v = await cs.newPage()
+  const vf = []
+  v.on('pageerror', (e) => vf.push('PAGEERROR ' + e.message))
+  await v.goto(basis)
+  await v.locator('[data-soort="rondje"]').click()
+  await v.locator('#snelkeuzes [data-waarde="10"]').click()
+  // stap 2: een start tikken haalt de tegels alvast op
+  await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  await v.waitForFunction(() => window.onverhard.vooraf && window.onverhard.vooraf.klaar, null, { timeout: 120000 })
+  const vooraf = await v.evaluate(() => window.onverhard.vooraf)
+  const inCache = () => v.evaluate(async () => (await (await caches.open('nopaves-data-v1')).keys()).length)
+  const n0 = await inCache()
+  assert.ok(vooraf.tegels > 10 && n0 >= vooraf.tegels, `vooraf opgehaald: ${vooraf.tegels} tegels in ${vooraf.ms} ms, ${n0} in de cache`)
+  stap(`vooraf ophalen na het tikken van de start: ${vooraf.tegels} tegels in ${(vooraf.ms / 1000).toFixed(1)} s`)
+
+  // stap 3: route A meteen (voorlopig), de rest daarna
+  let gezien = { voorlopig: false, laad: false }
+  await v.locator('#planKnop').click()
+  const t0 = Date.now()
+  while (Date.now() - t0 < 300000) {
+    const s = await v.evaluate(() => ({ res: !document.getElementById('resultaat').hidden, laad: !!document.getElementById('laadregel'), vl: !!document.querySelector('#kern i.voorlopig'), bezig: window.onverhard.bezig(), fout: document.getElementById('fout').textContent }))
+    if (s.res && s.laad) gezien.laad = true
+    if (s.res && s.vl) gezien.voorlopig = true
+    if ((s.res && !s.bezig) || s.fout) break
+    await v.waitForTimeout(40)
+  }
+  assert.equal(await v.locator('#fout').textContent(), '')
+  assert.ok(gezien.laad && gezien.voorlopig, `eerst voorlopig met een laadregel: ${JSON.stringify(gezien)}`)
+  assert.equal(await v.locator('#laadregel').count(), 0, 'na afloop geen laadregel meer')
+  assert.equal(await v.locator('#kern i.voorlopig').count(), 0, 'na de officiële kaart niet meer voorlopig')
+  const ms = await v.evaluate(() => ({ eerste: window.onverhard.eersteMs(), totaal: window.onverhard.meting.rapport().totaal }))
+  assert.ok(ms.eerste < ms.totaal, `eerst iets te zien (${ms.eerste} ms), daarna alles (${ms.totaal} ms)`)
+  stap(`tussenresultaat: route A na ${(ms.eerste / 1000).toFixed(1)} s (voorlopig, met "Nog bezig"), alles na ${(ms.totaal / 1000).toFixed(1)} s`)
+
+  // stap 1: tegels, BGT en AHN staan in de cache
+  const soorten = await v.evaluate(async () => {
+    const k = await (await caches.open('nopaves-data-v1')).keys()
+    return { tegels: k.filter((r) => r.url.includes('openfreemap')).length, bgt: k.filter((r) => r.url.includes('/bgt/')).length, ahn: k.filter((r) => r.url.includes('/ahn/')).length }
+  })
+  assert.ok(soorten.tegels > 0 && soorten.bgt > 0 && soorten.ahn > 0, `cache: ${JSON.stringify(soorten)}`)
+  stap(`cache: ${soorten.tegels} kaarttegels, ${soorten.bgt} BGT-tegels, ${soorten.ahn} AHN-blokken`)
+
+  // stap 4: rekenen in een worker; Stop breekt echt af
+  const werkerGeladen = await v.evaluate(() => performance.getEntriesByType('resource').some((e) => e.name.includes('rekenwerker.js')))
+  assert.ok(werkerGeladen, 'de rekenwerker is gestart')
+  await v.locator('[data-soort="station"]').click()
+  await v.locator('#snelkeuzes [data-waarde="20"]').click()
+  await v.locator('#planKnop').click()
+  await v.waitForTimeout(1500)
+  if (mobiel) await v.locator('#piekbalk [data-proxy="stop"]').click()
+  else await v.locator('#stop').click()
+  const tStop = Date.now()
+  await v.waitForFunction(() => !window.onverhard.bezig(), null, { timeout: 5000 })
+  assert.ok(Date.now() - tStop < 3000, 'Stop werkt meteen')
+  assert.match(await v.locator('#fout').textContent(), /Gestopt/)
+  // daarna gewoon weer plannen (een nieuwe worker)
+  await v.locator('[data-soort="rondje"]').click()
+  await v.locator('#planKnop').click()
+  await v.waitForFunction(() => (!document.getElementById('resultaat').hidden && !window.onverhard.bezig()) || (document.getElementById('fout').textContent && !/Gestopt/.test(document.getElementById('fout').textContent)), null, { timeout: 300000 })
+  assert.equal(await v.locator('#fout').textContent(), '')
+  assert.deepEqual(vf, [])
+  stap(`rekenwerker: Stop na 1,5 s breekt binnen 3 s af, daarna opnieuw plannen lukt`)
+  await cs.close()
+}
+
+// ---- Snelheid stap 6: A naar B met de eigen router, versleepbaar ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const c6 = await browser.newContext(opties)
+  const e = await c6.newPage()
+  const ef = []
+  e.on('pageerror', (x) => ef.push('PAGEERROR ' + x.message))
+  let brouter = 0
+  e.on('request', (r) => { if (/brouter\.de/.test(r.url())) brouter += 1 })
+  await e.goto(`${basis}?router=eigen`)
+  await e.locator('[data-soort="route"]').click()
+  await e.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  await e.waitForTimeout(450)
+  await e.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0170, 4.3830) }))
+  await e.locator('#planKnop').click()
+  await e.waitForFunction(() => (!document.getElementById('resultaat').hidden && !window.onverhard.bezig()) || !!document.getElementById('fout').textContent, null, { timeout: 300000 })
+  assert.equal(await e.locator('#fout').textContent(), '')
+  const info = await e.evaluate(() => ({ router: window.onverhard.uitslag().router, knopen: !!window.onverhard.uitslag().opties[0].knopen, km: window.onverhard.krijgPlan().opties[0].km }))
+  assert.equal(info.router, 'eigen', 'A naar B met de eigen router')
+  assert.equal(brouter, 0, 'geen BRouter-verzoeken')
+  assert.ok(info.knopen, 'de route ligt op het eigen netwerk (versleepbaar)')
+  // verslepen: een punt halverwege de route 80 px opzij trekken (alleen met een muis)
+  if (!mobiel) {
+    const voor = await e.evaluate(() => window.onverhard.krijgPlan().traject.coords.length)
+    const pt = await e.evaluate(() => {
+      const c = window.onverhard.krijgPlan().traject.coords
+      const [lon, lat] = c[Math.floor(c.length / 2)]
+      window.onverhard.kaart.setView([lat, lon], 16, { animate: false })
+      return window.onverhard.kaart.latLngToContainerPoint([lat, lon])
+    })
+    await e.waitForTimeout(500)
+    const vak = await e.locator('#kaart').boundingBox()
+    await e.mouse.move(vak.x + pt.x, vak.y + pt.y)
+    await e.mouse.down()
+    for (let i = 1; i <= 8; i++) await e.mouse.move(vak.x + pt.x + i * 10, vak.y + pt.y - i * 6)
+    await e.mouse.up()
+    await e.waitForFunction((n) => window.onverhard.krijgPlan().traject.coords.length !== n, voor, { timeout: 30000 })
+    stap(`eigen router: A naar B ${info.km.toFixed(2)} km zonder BRouter; route versleept`)
+  } else stap(`eigen router: A naar B ${info.km.toFixed(2)} km zonder BRouter, op het eigen netwerk`)
+  assert.deepEqual(ef, [])
+  await c6.close()
 }
 
 await browser.close()
