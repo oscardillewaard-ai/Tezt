@@ -95,17 +95,17 @@ export async function bouw(handvat, opbouw, { signal } = {}) {
  * De graaf uit vooraf bewerkte blokken (graaf-proef): ophalen, lezen en samenvoegen, in de worker.
  * Meet 'blokken' (ophalen en lezen) en 'graaf' (samenvoegen) apart.
  */
-export async function vooraf(urls, opbouw, { signal } = {}) {
+export async function vooraf(urls, opbouw, { signal, tegels = null } = {}) {
   if (!kanWerker()) {
     const t0 = performance.now()
     const blokken = await blokLezer(urls, signal)
     const t1 = performance.now()
-    const g = BG.bouwVoorafGraaf(blokken, opbouw)
+    const g = BG.bouwVoorafGraaf(blokken, opbouw, tegels)
     M.tijd('blokken', t1 - t0)
     M.tijd('graaf', performance.now() - t1)
     return g
   }
-  const { gid, g, ms } = await vraag('vooraf', { urls, opbouw }, { signal })
+  const { gid, g, ms } = await vraag('vooraf', { urls, opbouw, tegels }, { signal })
   M.tijd('blokken', ms.blokken)
   M.tijd('graaf', ms.graaf)
   Object.defineProperty(g, '__gid', { value: gid, enumerable: false })

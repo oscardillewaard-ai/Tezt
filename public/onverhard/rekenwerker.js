@@ -35,7 +35,7 @@ self.onmessage = async ({ data }) => {
       const t0 = performance.now()
       const blokken = await haalBlokkenRuw(data.urls)
       const t1 = performance.now()
-      const g = BG.bouwVoorafGraaf(blokken, data.opbouw)
+      const g = BG.bouwVoorafGraaf(blokken, data.opbouw, data.tegels)
       uit = { gid: bewaar(grafen, g, 2), g, ms: { blokken: t1 - t0, graaf: performance.now() - t1 } }
     } else if (taak === 'zoek') {
       const g = grafen.get(data.gid)

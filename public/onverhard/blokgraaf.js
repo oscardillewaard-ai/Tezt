@@ -5,6 +5,7 @@
 import * as K from './kern.js'
 import { STRAND_FACTOR, ALLES_FACTOR } from './graaf.js'
 import { profielVanReeks } from './hoogte.js'
+import { tegelXY } from './osmtegels.js'
 
 export const ONBEKEND_H = 32767
 export const VLAG = { AFGESLOTEN: 1, STRAND: 2, PAADJE: 4, NATUUR: 8, TWIJFEL: 16 }
@@ -96,7 +97,10 @@ export function leesBlok(buffer) {
  * Wat de app nu in een tweede zoekronde doet (strand en afgesloten stukken buiten de natuur mijden), zit
  * hier meteen in de kosten: dat oordeel is vooraf bekend.
  */
-export function bouwVoorafGraaf(blokken, { trail = true, alles = false, kaartje = false, strandMijden = true } = {}) {
+export function bouwVoorafGraaf(blokken, { trail = true, alles = false, kaartje = false, strandMijden = true } = {}, tegels = null) {
+  // tegels ([[x, y], ...] op zoom 14): alleen de wegstukken waarvan het midden daarin ligt, net als de app
+  // nu alleen die kaarttegels leest. Een kleinere graaf rekent sneller (Dijkstra schaalt met het aantal knopen).
+  const binnen = tegels ? new Set(tegels.map((t) => t[0] + '/' + t[1])) : null
   let maxN = 0
   let maxM = 0
   for (const b of blokken) {
@@ -131,8 +135,22 @@ export function bouwVoorafGraaf(blokken, { trail = true, alles = false, kaartje 
   blokken.forEach((b, bi) => {
     const isRand = new Uint8Array(b.n)
     for (const k of b.rand) isRand[k] = 1
+    // welke wegstukken doen mee (toegang, tegels), en dus welke knopen
+    const mee = new Uint8Array(b.m)
+    const gebruikt = new Uint8Array(b.n)
+    for (let s = 0; s < b.m; s++) {
+      if ((b.vlag[s] & VLAG.AFGESLOTEN) && !kaartje) continue // zoals bouwGraaf: afgesloten paden alleen met een toegangskaart
+      if (binnen) {
+        const [tx, ty] = tegelXY((b.lat[b.van[s]] + b.lat[b.naar[s]]) / 2e7, (b.lon[b.van[s]] + b.lon[b.naar[s]]) / 2e7)
+        if (!binnen.has(tx + '/' + ty)) continue
+      }
+      mee[s] = 1
+      gebruikt[b.van[s]] = 1
+      gebruikt[b.naar[s]] = 1
+    }
     const kaart = new Uint32Array(b.n)
     for (let i = 0; i < b.n; i++) {
+      if (!gebruikt[i]) continue
       if (isRand[i]) {
         const sleutel = b.lat[i] + ',' + b.lon[i]
         const al = randKnoop.get(sleutel)
@@ -170,9 +188,9 @@ export function bouwVoorafGraaf(blokken, { trail = true, alles = false, kaartje 
     }))
     for (const p of b.pois) pois.push({ type: 'poi', soort: p[0], naam: p[1], lat: p[2], lon: p[3] })
     for (let s = 0; s < b.m; s++) {
+      if (!mee[s]) continue
       const v = b.vlag[s]
       const afgesloten = (v & VLAG.AFGESLOTEN) !== 0
-      if (afgesloten && !kaartje) continue // zoals bouwGraaf: afgesloten paden alleen met een toegangskaart
       const ti = tagKaart[b.tag[s]]
       const a = kaart[b.van[s]]
       const c = kaart[b.naar[s]]

@@ -1,0 +1,768 @@
+{
+ "rondje-10 Delft Centraal": {
+  "hash": "p=52.0116,4.3571&rondje=10",
+  "koud": {
+   "ok": 5,
+   "van": 5,
+   "totaal": 3106,
+   "eerste": 2927,
+   "fasen": {
+    "blokken": 153,
+    "graaf": 215,
+    "route": 2142,
+    "ahn": 3,
+    "water": 49
+   },
+   "bronnen": {
+    "graaf": {
+     "n": 7,
+     "kB": 2293,
+     "cache": 0
+    }
+   },
+   "score": 50,
+   "km": 10.11,
+   "zacht": 54.3,
+   "router": "eigen",
+   "graaf": "vooraf",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "warm": {
+   "ok": 5,
+   "van": 5,
+   "totaal": 3378,
+   "eerste": 3214,
+   "fasen": {
+    "blokken": 162,
+    "graaf": 302,
+    "route": 1953,
+    "ahn": 2,
+    "water": 55
+   },
+   "bronnen": {
+    "graaf": {
+     "n": 7,
+     "kB": 2293,
+     "cache": 6
+    }
+   },
+   "score": 50,
+   "km": 10.11,
+   "zacht": 54.3,
+   "router": "eigen",
+   "graaf": "vooraf",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "ruw": {
+   "koud": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3374,
+     "meting": {
+      "totaal": 3134,
+      "fasen": {
+       "blokken": 153,
+       "graaf": 235,
+       "route": 2134,
+       "ahn": 2,
+       "water": 47
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 0,
+        "ms": 415
+       }
+      }
+     },
+     "eersteMs": 2998,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3440,
+     "meting": {
+      "totaal": 3180,
+      "fasen": {
+       "blokken": 156,
+       "graaf": 215,
+       "route": 2165,
+       "ahn": 2,
+       "water": 45
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 0,
+        "ms": 427
+       }
+      }
+     },
+     "eersteMs": 3039,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3375,
+     "meting": {
+      "totaal": 3106,
+      "fasen": {
+       "blokken": 138,
+       "graaf": 245,
+       "route": 2010,
+       "ahn": 5,
+       "water": 68
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 0,
+        "ms": 422
+       }
+      }
+     },
+     "eersteMs": 2910,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3301,
+     "meting": {
+      "totaal": 3080,
+      "fasen": {
+       "blokken": 157,
+       "graaf": 173,
+       "route": 2142,
+       "ahn": 4,
+       "water": 55
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 0,
+        "ms": 407
+       }
+      }
+     },
+     "eersteMs": 2901,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3318,
+     "meting": {
+      "totaal": 3081,
+      "fasen": {
+       "blokken": 149,
+       "graaf": 181,
+       "route": 2167,
+       "ahn": 3,
+       "water": 49
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 0,
+        "ms": 356
+       }
+      }
+     },
+     "eersteMs": 2927,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ],
+   "warm": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3684,
+     "meting": {
+      "totaal": 3486,
+      "fasen": {
+       "blokken": 203,
+       "graaf": 347,
+       "route": 1953,
+       "ahn": 2,
+       "water": 68
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 6,
+        "ms": 263
+       }
+      }
+     },
+     "eersteMs": 3316,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3585,
+     "meting": {
+      "totaal": 3380,
+      "fasen": {
+       "blokken": 140,
+       "graaf": 311,
+       "route": 2062,
+       "ahn": 3,
+       "water": 60
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 6,
+        "ms": 256
+       }
+      }
+     },
+     "eersteMs": 3214,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3615,
+     "meting": {
+      "totaal": 3378,
+      "fasen": {
+       "blokken": 178,
+       "graaf": 302,
+       "route": 1962,
+       "ahn": 2,
+       "water": 48
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 6,
+        "ms": 318
+       }
+      }
+     },
+     "eersteMs": 3238,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3381,
+     "meting": {
+      "totaal": 3180,
+      "fasen": {
+       "blokken": 110,
+       "graaf": 291,
+       "route": 1926,
+       "ahn": 2,
+       "water": 46
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 6,
+        "ms": 228
+       }
+      }
+     },
+     "eersteMs": 3049,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 3452,
+     "meting": {
+      "totaal": 3278,
+      "fasen": {
+       "blokken": 162,
+       "graaf": 257,
+       "route": 1930,
+       "ahn": 4,
+       "water": 55
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 7,
+        "bytes": 2348476,
+        "cache": 6,
+        "ms": 379
+       }
+      }
+     },
+     "eersteMs": 3098,
+     "score": 50,
+     "km": 10.11400622092986,
+     "zacht": 0.542900997989543,
+     "n": 2,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ]
+  }
+ },
+ "station-15 Delft Centraal": {
+  "hash": "p=52.0116,4.3571&station=15",
+  "koud": {
+   "ok": 5,
+   "van": 5,
+   "totaal": 2297,
+   "eerste": 1916,
+   "fasen": {
+    "blokken": 538,
+    "graaf": 805,
+    "route": 109,
+    "ahn": 5,
+    "water": 226
+   },
+   "bronnen": {
+    "graaf": {
+     "n": 21,
+     "kB": 8120,
+     "cache": 0
+    }
+   },
+   "score": 57,
+   "km": 11.78,
+   "zacht": 60.2,
+   "router": "eigen",
+   "graaf": "vooraf",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "warm": {
+   "ok": 5,
+   "van": 5,
+   "totaal": 2131,
+   "eerste": 1727,
+   "fasen": {
+    "blokken": 432,
+    "graaf": 660,
+    "route": 115,
+    "ahn": 4,
+    "water": 237
+   },
+   "bronnen": {
+    "graaf": {
+     "n": 21,
+     "kB": 8120,
+     "cache": 20
+    }
+   },
+   "score": 57,
+   "km": 11.78,
+   "zacht": 60.2,
+   "router": "eigen",
+   "graaf": "vooraf",
+   "verboden": 0,
+   "verbodenSoorten": {}
+  },
+  "ruw": {
+   "koud": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2654,
+     "meting": {
+      "totaal": 2446,
+      "fasen": {
+       "blokken": 562,
+       "graaf": 839,
+       "route": 109,
+       "ahn": 5,
+       "water": 224
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 0,
+        "ms": 1217
+       }
+      }
+     },
+     "eersteMs": 2065,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2542,
+     "meting": {
+      "totaal": 2297,
+      "fasen": {
+       "blokken": 525,
+       "graaf": 829,
+       "route": 121,
+       "ahn": 6,
+       "water": 226
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 0,
+        "ms": 1047
+       }
+      }
+     },
+     "eersteMs": 1916,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2503,
+     "meting": {
+      "totaal": 2287,
+      "fasen": {
+       "blokken": 538,
+       "graaf": 753,
+       "route": 106,
+       "ahn": 5,
+       "water": 248
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 0,
+        "ms": 989
+       }
+      }
+     },
+     "eersteMs": 1881,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2586,
+     "meting": {
+      "totaal": 2368,
+      "fasen": {
+       "blokken": 546,
+       "graaf": 805,
+       "route": 108,
+       "ahn": 7,
+       "water": 243
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 0,
+        "ms": 828
+       }
+      }
+     },
+     "eersteMs": 1922,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2390,
+     "meting": {
+      "totaal": 2175,
+      "fasen": {
+       "blokken": 505,
+       "graaf": 704,
+       "route": 112,
+       "ahn": 4,
+       "water": 214
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 0,
+        "ms": 1169
+       }
+      }
+     },
+     "eersteMs": 1791,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ],
+   "warm": [
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2378,
+     "meting": {
+      "totaal": 2205,
+      "fasen": {
+       "blokken": 412,
+       "graaf": 716,
+       "route": 127,
+       "ahn": 4,
+       "water": 256
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 20,
+        "ms": 869
+       }
+      }
+     },
+     "eersteMs": 1753,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2319,
+     "meting": {
+      "totaal": 2131,
+      "fasen": {
+       "blokken": 430,
+       "graaf": 655,
+       "route": 115,
+       "ahn": 4,
+       "water": 237
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 20,
+        "ms": 746
+       }
+      }
+     },
+     "eersteMs": 1727,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2264,
+     "meting": {
+      "totaal": 2082,
+      "fasen": {
+       "blokken": 432,
+       "graaf": 686,
+       "route": 110,
+       "ahn": 4,
+       "water": 226
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 20,
+        "ms": 923
+       }
+      }
+     },
+     "eersteMs": 1699,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2232,
+     "meting": {
+      "totaal": 2058,
+      "fasen": {
+       "blokken": 458,
+       "graaf": 647,
+       "route": 105,
+       "ahn": 4,
+       "water": 216
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 20,
+        "ms": 725
+       }
+      }
+     },
+     "eersteMs": 1687,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    },
+    {
+     "ok": true,
+     "fout": "",
+     "wand": 2399,
+     "meting": {
+      "totaal": 2199,
+      "fasen": {
+       "blokken": 433,
+       "graaf": 660,
+       "route": 141,
+       "ahn": 5,
+       "water": 252
+      },
+      "bronnen": {
+       "graaf": {
+        "n": 21,
+        "bytes": 8314806,
+        "cache": 20,
+        "ms": 813
+       }
+      }
+     },
+     "eersteMs": 1771,
+     "score": 57,
+     "km": 11.780697317854921,
+     "zacht": 0.6024133206255584,
+     "n": 4,
+     "router": "eigen",
+     "graaf": "vooraf",
+     "verboden": 0,
+     "verbodenSoorten": {}
+    }
+   ]
+  }
+ }
+}

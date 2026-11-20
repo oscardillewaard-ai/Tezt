@@ -2,6 +2,9 @@
 
 ## Samenvatting (eindstand)
 
+> Vervolg: de proef met een vooraf bewerkte routegraaf (regio Delft, `?graaf=vooraf`) staat in
+> `GRAAF-PROEF.md` (branch `graaf-proef`).
+
 Alle fasen zijn af: UX 1, 2, 3 en snelheid stap 0–6. Unit-tests (48) en de Playwright-test
 (telefoon 390 × 844: 35 stappen, desktop: 33) zijn groen op de eindcode. Service worker
 `onverhard-v44`. Terugzetten: zie onderaan.
