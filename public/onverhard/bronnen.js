@@ -984,9 +984,16 @@ let manifestBelofte = null
 export function laadManifest(signal) {
   if (!manifestBelofte) {
     manifestBelofte = (async () => {
-      const r = await vraag(GRAAF_BRON, new URL('actueel.json', GRAAF_MAP).href, { signal, tijdslimiet: 15000, cache: 'no-cache' }, 2)
-      if (!r.ok) throw new BronFout(GRAAF_BRON, `manifest: HTTP ${r.status}`)
-      const m = await r.json()
+      let m
+      if (GRAAF_MAP.protocol === 'file:') {
+        // Node (tests, vergelijkingen): rechtstreeks van schijf
+        const fs = await import('node:fs')
+        m = JSON.parse(fs.readFileSync(new URL('actueel.json', GRAAF_MAP), 'utf8'))
+      } else {
+        const r = await vraag(GRAAF_BRON, new URL('actueel.json', GRAAF_MAP).href, { signal, tijdslimiet: 15000, cache: 'no-cache' }, 2)
+        if (!r.ok) throw new BronFout(GRAAF_BRON, `manifest: HTTP ${r.status}`)
+        m = await r.json()
+      }
       if (m.formaat !== 'NPG1') throw new BronFout(GRAAF_BRON, `onbekend formaat ${m.formaat}`)
       m.index = new Map(m.blokken.map((b) => [b.x + '/' + b.y, b]))
       return m

@@ -81,7 +81,7 @@ async function bgtTegel(col, row) {
   return v
 }
 
-async function vlakkenVoor(tegels) {
+export async function vlakkenVoor(tegels) {
   const vlakken = new K.BgtVlakken(K.SNAP_M)
   // vaste volgorde (de app voegt ze toe in volgorde van binnenkomst; voor het oordeel maakt dat niet uit)
   for (const k of [...tegels].sort()) {

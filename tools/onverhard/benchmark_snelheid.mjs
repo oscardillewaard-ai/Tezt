@@ -67,7 +67,7 @@ async function eenRun(ctx, hash) {
         }
       }
       const u = window.onverhard.uitslag()
-      return { meting: window.onverhard.meting.rapport(), eersteMs: window.onverhard.eersteMs ? window.onverhard.eersteMs() : null, score: pl ? pl.score : null, km: pl ? pl.analyse.lengte / 1000 : null, zacht: pl ? pl.zacht.eind : null, n: pl ? pl.opties.length : 0, router: u && u.router, verboden: Math.round(verboden.m), verbodenSoorten: verboden.soorten }
+      return { meting: window.onverhard.meting.rapport(), eersteMs: window.onverhard.eersteMs ? window.onverhard.eersteMs() : null, score: pl ? pl.score : null, km: pl ? pl.analyse.lengte / 1000 : null, zacht: pl ? pl.zacht.eind : null, n: pl ? pl.opties.length : 0, router: u && u.router, graaf: u && u.graafBron, verboden: Math.round(verboden.m), verbodenSoorten: verboden.soorten }
     })
     return { ok: !fout, fout, wand: Date.now() - t0, ...r }
   } catch (e) {
@@ -99,6 +99,7 @@ function samenvatting(runs) {
     score: mediaan(ok.map((r) => r.score)), km: ok.length ? Math.round(mediaan(ok.map((r) => r.km * 100)) ) / 100 : null,
     zacht: ok.length ? mediaan(ok.map((r) => Math.round(r.zacht * 1000))) / 10 : null,
     router: [...new Set(ok.map((r) => r.router))].join('/'),
+    graaf: [...new Set(ok.map((r) => r.graaf))].join('/'),
     verboden: ok.length ? Math.max(...ok.map((r) => r.verboden || 0)) : null,
     verbodenSoorten: Object.assign({}, ...ok.map((r) => r.verbodenSoorten || {})),
   }

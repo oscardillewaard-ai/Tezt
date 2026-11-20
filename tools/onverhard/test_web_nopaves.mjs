@@ -740,5 +740,98 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   await c6.close()
 }
 
+// ---- Graaf-proef: de vooraf bewerkte graaf (?graaf=vooraf), via de knoppen ----
+{
+  const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
+  const cg = await browser.newContext(opties)
+  const v = await cg.newPage()
+  const vf = []
+  v.on('pageerror', (x) => vf.push('PAGEERROR ' + x.message))
+  let brouter = 0
+  v.on('request', (r) => { if (/brouter\.de/.test(r.url())) brouter += 1 })
+  const klaar = () => v.waitForFunction(() => (!document.getElementById('resultaat').hidden && !window.onverhard.bezig()) || !!document.getElementById('fout').textContent, null, { timeout: 300000 })
+  const bronnen = () => v.evaluate(() => {
+    const b = window.onverhard.meting.rapport().bronnen
+    return { graaf: (b.graaf || {}).n || 0, bgt: (b.bgt || {}).n || 0, ahn: (b.ahn || {}).n || 0, bron: window.onverhard.uitslag().graafBron }
+  })
+  // rondje: start tikken haalt de blokken alvast op; plannen zonder BGT en AHN
+  await v.goto(`${basis}?graaf=vooraf`)
+  await v.locator('[data-soort="rondje"]').click()
+  await v.locator('#snelkeuzes [data-waarde="10"]').click()
+  await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  await v.waitForFunction(() => window.onverhard.vooraf && window.onverhard.vooraf.klaar, null, { timeout: 120000 })
+  const blokkenInCache = await v.evaluate(async () => (await (await caches.open('nopaves-data-v1')).keys()).filter((r) => r.url.includes('/graaf/')).length)
+  assert.ok(blokkenInCache >= 1, `blokken vooraf in de cache: ${blokkenInCache}`)
+  await v.locator('#planKnop').click()
+  await klaar()
+  assert.equal(await v.locator('#fout').textContent(), '')
+  let b = await bronnen()
+  assert.equal(b.bron, 'vooraf', 'rondje uit de vooraf bewerkte graaf')
+  assert.ok(b.bgt === 0 && b.ahn === 0, `geen BGT- of AHN-verzoeken: ${JSON.stringify(b)}`)
+  const r1 = await v.evaluate(() => ({ score: window.onverhard.krijgPlan().score, km: window.onverhard.krijgPlan().km, hoogte: !!window.onverhard.krijgPlan().hoogte }))
+  assert.ok(r1.score > 0 && r1.km > 7 && r1.hoogte, `rondje: ${JSON.stringify(r1)}`)
+  assert.ok(Number(await v.locator('#kern .score b').textContent()) === r1.score, 'score in de tegel')
+  stap(`graaf-proef rondje: ${blokkenInCache} blokken vooraf opgehaald, score ${r1.score}, ${r1.km.toFixed(1)} km, hoogteprofiel, 0 BGT/AHN-verzoeken`)
+  // station via de segmentknop
+  await v.locator('[data-soort="station"]').click()
+  await v.locator('#snelkeuzes [data-waarde="15"]').click()
+  await v.locator('#planKnop').click()
+  await klaar()
+  assert.equal(await v.locator('#fout').textContent(), '')
+  b = await bronnen()
+  assert.equal(b.bron, 'vooraf', 'station uit de vooraf bewerkte graaf')
+  const nSt = await v.evaluate(() => window.onverhard.uitslag().opties.length)
+  assert.ok(nSt >= 2, `routes naar stations: ${nSt}`)
+  stap(`graaf-proef station: ${nSt} routes, 0 BGT/AHN-verzoeken (${b.bgt}/${b.ahn})`)
+  // buiten de regio: gewoon de huidige werking
+  await v.locator('[data-soort="rondje"]').click()
+  await v.locator('#snelkeuzes [data-waarde="5"]').click()
+  await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0907, 5.1214) }))
+  await v.waitForTimeout(450)
+  await v.locator('#planKnop').click()
+  await klaar()
+  assert.equal(await v.locator('#fout').textContent(), '')
+  b = await bronnen()
+  assert.equal(b.bron, 'tegels', 'buiten de regio: kaarttegels')
+  assert.ok(b.bgt > 0, 'buiten de regio: BGT zoals altijd')
+  stap('graaf-proef buiten de regio (Utrecht): terugval op kaarttegels + BGT')
+  // A naar B met de eigen router op de vooraf bewerkte graaf, en verslepen
+  await v.goto(`${basis}?graaf=vooraf&router=eigen`)
+  await v.locator('[data-soort="route"]').click()
+  await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
+  await v.waitForTimeout(450)
+  await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0170, 4.3830) }))
+  await v.locator('#planKnop').click()
+  await klaar()
+  assert.equal(await v.locator('#fout').textContent(), '')
+  b = await bronnen()
+  const ab = await v.evaluate(() => ({ router: window.onverhard.uitslag().router, knopen: !!window.onverhard.uitslag().opties[0].knopen }))
+  assert.equal(b.bron, 'vooraf')
+  assert.equal(ab.router, 'eigen')
+  assert.equal(brouter, 0, 'geen BRouter-verzoeken')
+  assert.ok(ab.knopen, 'versleepbaar')
+  if (!mobiel) {
+    const voor = await v.evaluate(() => window.onverhard.krijgPlan().traject.coords.length)
+    const pt = await v.evaluate(() => {
+      const c = window.onverhard.krijgPlan().traject.coords
+      const [lon, lat] = c[Math.floor(c.length / 2)]
+      window.onverhard.kaart.setView([lat, lon], 16, { animate: false })
+      return window.onverhard.kaart.latLngToContainerPoint([lat, lon])
+    })
+    await v.waitForTimeout(500)
+    const vak = await v.locator('#kaart').boundingBox()
+    await v.mouse.move(vak.x + pt.x, vak.y + pt.y)
+    await v.mouse.down()
+    for (let i = 1; i <= 8; i++) await v.mouse.move(vak.x + pt.x + i * 10, vak.y + pt.y - i * 6)
+    await v.mouse.up()
+    await v.waitForFunction((n) => window.onverhard.krijgPlan().traject.coords.length !== n, voor, { timeout: 30000 })
+    const naSlepen = await bronnen()
+    assert.equal(naSlepen.bgt, 0, 'verslepen op de vooraf bewerkte graaf: geen BGT')
+    stap('graaf-proef A naar B: eigen router op de vooraf bewerkte graaf, zonder BRouter; versleept zonder BGT')
+  } else stap('graaf-proef A naar B: eigen router op de vooraf bewerkte graaf, zonder BRouter')
+  assert.deepEqual(vf, [])
+  await cg.close()
+}
+
 await browser.close()
 console.log(`klaar (${soort})`)

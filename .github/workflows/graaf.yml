@@ -1,0 +1,83 @@
+# Graaf-proef: de vooraf bewerkte routegraaf (regio Delft) wekelijks opnieuw bouwen.
+# Bron: het OpenStreetMap-extract van Geofabrik (Zuid-Holland), BGT en AHN van PDOK.
+# Zie public/onverhard/GRAAF-PROEF.md en tools/graaf/bouw.mjs.
+#
+# Let op: een schema (cron) draait alleen vanaf de standaardbranch. Zolang dit bestand alleen op
+# graaf-proef staat, start je hem met de hand (Actions -> Graaf bouwen -> Run workflow).
+name: Graaf bouwen
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # maandag 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: graaf
+  cancel-in-progress: false
+
+jobs:
+  bouw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install osmium
+
+      # BGT-tegels (max 30 dagen oud) en AHN-blokken bewaren tussen de runs: zo halen we bij PDOK
+      # alleen op wat verouderd is, niet elke week alles opnieuw.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/nopaves-graaf
+          key: graaf-${{ github.run_id }}
+          restore-keys: graaf-
+
+      - name: OpenStreetMap-extract ophalen (Geofabrik)
+        run: |
+          mkdir -p ~/osm
+          curl -fsSL -o ~/osm/zh.osm.pbf https://download.geofabrik.de/europe/netherlands/zuid-holland-latest.osm.pbf
+          ls -l ~/osm
+
+      - name: Bijsnijden tot de regio
+        run: |
+          BBOX=$(node -e "console.log(require('./tools/graaf/regio.json').bbox_lonlat.join(' '))")
+          python3 -I tools/graaf/bron_pbf.py ~/osm/zh.osm.pbf ~/osm/regio.ndjson $BBOX
+
+      - name: Graaf bouwen
+        run: |
+          VERSIE=v$(date -u +%Y%m%d)
+          echo "VERSIE=$VERSIE" >> $GITHUB_ENV
+          node --max-old-space-size=12000 tools/graaf/bouw.mjs --bron ~/osm/regio.ndjson --versie $VERSIE
+
+      - name: Tests
+        run: node --test tools/onverhard/test_web_kern.mjs
+
+      - name: Oude versies weg, nieuwe committen
+        run: |
+          cd public/onverhard/graaf
+          for d in v*/; do [ "${d%/}" != "$VERSIE" ] && git rm -rq "$d" || true; done
+          cd -
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/onverhard/graaf
+          git commit -m "Graaf-proef: graaf $VERSIE (Geofabrik + BGT + AHN)" || exit 0
+          git push
+
+      # een push met GITHUB_TOKEN start geen andere workflows: de site zelf opnieuw laten bouwen
+      - name: Site bijwerken
+        if: github.ref_name == github.event.repository.default_branch
+        run: gh workflow run deploy-pages.yml --ref "${{ github.ref_name }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
