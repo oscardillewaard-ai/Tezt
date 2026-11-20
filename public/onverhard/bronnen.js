@@ -1066,6 +1066,7 @@ async function voorafGraafVoor(tegels, instel, meld, signal) {
     return await R.vooraf(urls, { trail: instel.trail, alles: instel.alles, kaartje: instel.kaartje, strandMijden: instel.strandMijden }, { signal })
   } catch (fout) {
     if (afgebroken(fout)) throw fout
+    console.warn('vooraf bewerkte graaf niet gebruikt:', fout.message) // terugval: de gewone werking
     return null
   }
 }

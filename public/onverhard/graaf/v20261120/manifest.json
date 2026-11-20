@@ -1,0 +1,1394 @@
+{
+ "formaat": "NPG1",
+ "versie": "v20261120",
+ "datum": "2026-11-20",
+ "gebouwd": "2026-11-20T05:33:31.560Z",
+ "regio": {
+  "naam": "delft-proef",
+  "zoom": 12,
+  "bbox": [
+   4.1309,
+   51.8358,
+   4.6582,
+   52.2682
+  ],
+  "blokken_x": [
+   2095,
+   2100
+  ],
+  "blokken_y": [
+   1348,
+   1355
+  ]
+ },
+ "bronnen": [
+  {
+   "soort": "osm",
+   "naam": "OpenFreeMap (OpenStreetMap-kaarttegels, zoom 14)",
+   "versie": "20261115_080022_pt",
+   "tegels": 768
+  },
+  {
+   "soort": "bgt",
+   "naam": "BGT-vectortegels (PDOK), NetherlandsRDNewQuad 12",
+   "opgehaald": "2026-11-20",
+   "maxLeeftijdDagen": 30
+  },
+  {
+   "soort": "ahn",
+   "naam": "AHN dtm_05m via WCS (PDOK), 10 m per pixel",
+   "opgehaald": "2026-11-20"
+  }
+ ],
+ "totaal": {
+  "blokken": 48,
+  "ruw": 55512428,
+  "gz": 14587608,
+  "knopen": 1175173,
+  "wegstukken": 1328149,
+  "oordelen": 3826,
+  "twijfel": 96008,
+  "strand": 919,
+  "afgesloten": 112915,
+  "natuur": 17409
+ },
+ "bouwtijdSeconden": {
+  "elementen": 2,
+  "graaf": 15,
+  "ondergrond": 273,
+  "hoogte": 278,
+  "blokken": 300
+ },
+ "blokken": [
+  {
+   "x": 2095,
+   "y": 1348,
+   "bestand": "z12_2095_1348.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "d117d881cd991aad",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2095,
+   "y": 1349,
+   "bestand": "z12_2095_1349.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "25df4e08d849ad73",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2095,
+   "y": 1350,
+   "bestand": "z12_2095_1350.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "fb9d5930f021d063",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2095,
+   "y": 1351,
+   "bestand": "z12_2095_1351.npg.gz",
+   "ruw": 74064,
+   "gz": 18964,
+   "sha256": "6cb921ae07ea78c7",
+   "knopen": 1153,
+   "wegstukken": 1253,
+   "rand": 59,
+   "pois": 13
+  },
+  {
+   "x": 2095,
+   "y": 1352,
+   "bestand": "z12_2095_1352.npg.gz",
+   "ruw": 896176,
+   "gz": 234162,
+   "sha256": "ac52e15ad7cce53c",
+   "knopen": 18221,
+   "wegstukken": 20623,
+   "rand": 255,
+   "pois": 105
+  },
+  {
+   "x": 2095,
+   "y": 1353,
+   "bestand": "z12_2095_1353.npg.gz",
+   "ruw": 919704,
+   "gz": 241173,
+   "sha256": "0554dd51f004fba7",
+   "knopen": 19092,
+   "wegstukken": 21538,
+   "rand": 305,
+   "pois": 76
+  },
+  {
+   "x": 2095,
+   "y": 1354,
+   "bestand": "z12_2095_1354.npg.gz",
+   "ruw": 638116,
+   "gz": 167902,
+   "sha256": "288b4c910eb131a9",
+   "knopen": 12676,
+   "wegstukken": 14001,
+   "rand": 157,
+   "pois": 67
+  },
+  {
+   "x": 2095,
+   "y": 1355,
+   "bestand": "z12_2095_1355.npg.gz",
+   "ruw": 433656,
+   "gz": 115766,
+   "sha256": "f3185bf2bec45e4e",
+   "knopen": 8874,
+   "wegstukken": 9870,
+   "rand": 78,
+   "pois": 25
+  },
+  {
+   "x": 2096,
+   "y": 1348,
+   "bestand": "z12_2096_1348.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "1bc89787a22f565d",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2096,
+   "y": 1349,
+   "bestand": "z12_2096_1349.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "f9151042bf738dc9",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2096,
+   "y": 1350,
+   "bestand": "z12_2096_1350.npg.gz",
+   "ruw": 209484,
+   "gz": 57734,
+   "sha256": "151e0a3ef099d80e",
+   "knopen": 3898,
+   "wegstukken": 4325,
+   "rand": 115,
+   "pois": 149
+  },
+  {
+   "x": 2096,
+   "y": 1351,
+   "bestand": "z12_2096_1351.npg.gz",
+   "ruw": 2085252,
+   "gz": 583045,
+   "sha256": "de16099208e60dba",
+   "knopen": 42637,
+   "wegstukken": 49425,
+   "rand": 516,
+   "pois": 1144
+  },
+  {
+   "x": 2096,
+   "y": 1352,
+   "bestand": "z12_2096_1352.npg.gz",
+   "ruw": 1708004,
+   "gz": 461616,
+   "sha256": "18f31977a5735bd2",
+   "knopen": 34834,
+   "wegstukken": 39751,
+   "rand": 488,
+   "pois": 218
+  },
+  {
+   "x": 2096,
+   "y": 1353,
+   "bestand": "z12_2096_1353.npg.gz",
+   "ruw": 670172,
+   "gz": 177137,
+   "sha256": "d3a68243c83ba50d",
+   "knopen": 13699,
+   "wegstukken": 15110,
+   "rand": 241,
+   "pois": 42
+  },
+  {
+   "x": 2096,
+   "y": 1354,
+   "bestand": "z12_2096_1354.npg.gz",
+   "ruw": 1278024,
+   "gz": 332969,
+   "sha256": "536bb58ddbff5dc3",
+   "knopen": 27297,
+   "wegstukken": 30920,
+   "rand": 213,
+   "pois": 105
+  },
+  {
+   "x": 2096,
+   "y": 1355,
+   "bestand": "z12_2096_1355.npg.gz",
+   "ruw": 647884,
+   "gz": 170831,
+   "sha256": "37b8f3a1a9b86d27",
+   "knopen": 13265,
+   "wegstukken": 14702,
+   "rand": 210,
+   "pois": 31
+  },
+  {
+   "x": 2097,
+   "y": 1348,
+   "bestand": "z12_2097_1348.npg.gz",
+   "ruw": 100,
+   "gz": 98,
+   "sha256": "26ffa69873c611aa",
+   "knopen": 0,
+   "wegstukken": 0,
+   "rand": 0,
+   "pois": 0
+  },
+  {
+   "x": 2097,
+   "y": 1349,
+   "bestand": "z12_2097_1349.npg.gz",
+   "ruw": 255848,
+   "gz": 65130,
+   "sha256": "e159021278596cf5",
+   "knopen": 5085,
+   "wegstukken": 5547,
+   "rand": 122,
+   "pois": 61
+  },
+  {
+   "x": 2097,
+   "y": 1350,
+   "bestand": "z12_2097_1350.npg.gz",
+   "ruw": 1079592,
+   "gz": 267319,
+   "sha256": "9ba0ccae9439671a",
+   "knopen": 23748,
+   "wegstukken": 25740,
+   "rand": 258,
+   "pois": 58
+  },
+  {
+   "x": 2097,
+   "y": 1351,
+   "bestand": "z12_2097_1351.npg.gz",
+   "ruw": 2912164,
+   "gz": 792532,
+   "sha256": "ed84c5d73e67296b",
+   "knopen": 62756,
+   "wegstukken": 71127,
+   "rand": 607,
+   "pois": 1270
+  },
+  {
+   "x": 2097,
+   "y": 1352,
+   "bestand": "z12_2097_1352.npg.gz",
+   "ruw": 2584104,
+   "gz": 699198,
+   "sha256": "1410ff0a69307a2d",
+   "knopen": 54376,
+   "wegstukken": 61909,
+   "rand": 551,
+   "pois": 579
+  },
+  {
+   "x": 2097,
+   "y": 1353,
+   "bestand": "z12_2097_1353.npg.gz",
+   "ruw": 1222432,
+   "gz": 323435,
+   "sha256": "c77f088763c18db9",
+   "knopen": 24969,
+   "wegstukken": 28039,
+   "rand": 355,
+   "pois": 111
+  },
+  {
+   "x": 2097,
+   "y": 1354,
+   "bestand": "z12_2097_1354.npg.gz",
+   "ruw": 2064248,
+   "gz": 529656,
+   "sha256": "2767d55cea96ffe8",
+   "knopen": 43569,
+   "wegstukken": 49717,
+   "rand": 289,
+   "pois": 206
+  },
+  {
+   "x": 2097,
+   "y": 1355,
+   "bestand": "z12_2097_1355.npg.gz",
+   "ruw": 1580132,
+   "gz": 414475,
+   "sha256": "8adde8c606628e2f",
+   "knopen": 33478,
+   "wegstukken": 38221,
+   "rand": 251,
+   "pois": 170
+  },
+  {
+   "x": 2098,
+   "y": 1348,
+   "bestand": "z12_2098_1348.npg.gz",
+   "ruw": 1096900,
+   "gz": 281945,
+   "sha256": "40684b24f6b440b5",
+   "knopen": 23902,
+   "wegstukken": 26775,
+   "rand": 170,
+   "pois": 147
+  },
+  {
+   "x": 2098,
+   "y": 1349,
+   "bestand": "z12_2098_1349.npg.gz",
+   "ruw": 1969804,
+   "gz": 512806,
+   "sha256": "cae3ced772d46936",
+   "knopen": 42245,
+   "wegstukken": 48220,
+   "rand": 386,
+   "pois": 208
+  },
+  {
+   "x": 2098,
+   "y": 1350,
+   "bestand": "z12_2098_1350.npg.gz",
+   "ruw": 1793992,
+   "gz": 464637,
+   "sha256": "726e9a0a6d6d4658",
+   "knopen": 38381,
+   "wegstukken": 43716,
+   "rand": 314,
+   "pois": 165
+  },
+  {
+   "x": 2098,
+   "y": 1351,
+   "bestand": "z12_2098_1351.npg.gz",
+   "ruw": 1707080,
+   "gz": 446587,
+   "sha256": "72f38a50bf222501",
+   "knopen": 37073,
+   "wegstukken": 41440,
+   "rand": 427,
+   "pois": 128
+  },
+  {
+   "x": 2098,
+   "y": 1352,
+   "bestand": "z12_2098_1352.npg.gz",
+   "ruw": 1420088,
+   "gz": 366800,
+   "sha256": "8c2ad16e3e89637e",
+   "knopen": 30107,
+   "wegstukken": 33883,
+   "rand": 465,
+   "pois": 87
+  },
+  {
+   "x": 2098,
+   "y": 1353,
+   "bestand": "z12_2098_1353.npg.gz",
+   "ruw": 1124828,
+   "gz": 302025,
+   "sha256": "e13b33f1ee92b185",
+   "knopen": 23463,
+   "wegstukken": 26077,
+   "rand": 413,
+   "pois": 122
+  },
+  {
+   "x": 2098,
+   "y": 1354,
+   "bestand": "z12_2098_1354.npg.gz",
+   "ruw": 1985324,
+   "gz": 550551,
+   "sha256": "e2292cf229b82c26",
+   "knopen": 41473,
+   "wegstukken": 47769,
+   "rand": 495,
+   "pois": 1165
+  },
+  {
+   "x": 2098,
+   "y": 1355,
+   "bestand": "z12_2098_1355.npg.gz",
+   "ruw": 1108924,
+   "gz": 292366,
+   "sha256": "08ee43dea52730eb",
+   "knopen": 23192,
+   "wegstukken": 26002,
+   "rand": 290,
+   "pois": 77
+  },
+  {
+   "x": 2099,
+   "y": 1348,
+   "bestand": "z12_2099_1348.npg.gz",
+   "ruw": 1657016,
+   "gz": 419346,
+   "sha256": "05a6da7bfb9b6d10",
+   "knopen": 36002,
+   "wegstukken": 40663,
+   "rand": 190,
+   "pois": 174
+  },
+  {
+   "x": 2099,
+   "y": 1349,
+   "bestand": "z12_2099_1349.npg.gz",
+   "ruw": 1693488,
+   "gz": 433297,
+   "sha256": "1bb1981b38d94345",
+   "knopen": 36375,
+   "wegstukken": 41256,
+   "rand": 390,
+   "pois": 259
+  },
+  {
+   "x": 2099,
+   "y": 1350,
+   "bestand": "z12_2099_1350.npg.gz",
+   "ruw": 1357020,
+   "gz": 358427,
+   "sha256": "084c82134cfe9970",
+   "knopen": 28500,
+   "wegstukken": 32191,
+   "rand": 349,
+   "pois": 290
+  },
+  {
+   "x": 2099,
+   "y": 1351,
+   "bestand": "z12_2099_1351.npg.gz",
+   "ruw": 1765676,
+   "gz": 459689,
+   "sha256": "63c9460665867086",
+   "knopen": 37578,
+   "wegstukken": 42987,
+   "rand": 323,
+   "pois": 200
+  },
+  {
+   "x": 2099,
+   "y": 1352,
+   "bestand": "z12_2099_1352.npg.gz",
+   "ruw": 1091232,
+   "gz": 286696,
+   "sha256": "9ee0184d382510fa",
+   "knopen": 22748,
+   "wegstukken": 25526,
+   "rand": 415,
+   "pois": 72
+  },
+  {
+   "x": 2099,
+   "y": 1353,
+   "bestand": "z12_2099_1353.npg.gz",
+   "ruw": 1787600,
+   "gz": 457344,
+   "sha256": "0220e4d52a0d789e",
+   "knopen": 38585,
+   "wegstukken": 43505,
+   "rand": 436,
+   "pois": 163
+  },
+  {
+   "x": 2099,
+   "y": 1354,
+   "bestand": "z12_2099_1354.npg.gz",
+   "ruw": 2276392,
+   "gz": 616705,
+   "sha256": "ea0b55e821902e40",
+   "knopen": 49574,
+   "wegstukken": 56935,
+   "rand": 597,
+   "pois": 796
+  },
+  {
+   "x": 2099,
+   "y": 1355,
+   "bestand": "z12_2099_1355.npg.gz",
+   "ruw": 2001984,
+   "gz": 519304,
+   "sha256": "7293815c3dc54868",
+   "knopen": 43054,
+   "wegstukken": 49184,
+   "rand": 356,
+   "pois": 275
+  },
+  {
+   "x": 2100,
+   "y": 1348,
+   "bestand": "z12_2100_1348.npg.gz",
+   "ruw": 881016,
+   "gz": 225613,
+   "sha256": "5ea10a9fdb595ba0",
+   "knopen": 18918,
+   "wegstukken": 20755,
+   "rand": 79,
+   "pois": 49
+  },
+  {
+   "x": 2100,
+   "y": 1349,
+   "bestand": "z12_2100_1349.npg.gz",
+   "ruw": 585216,
+   "gz": 154970,
+   "sha256": "829e655dbcd37a28",
+   "knopen": 11978,
+   "wegstukken": 13074,
+   "rand": 76,
+   "pois": 44
+  },
+  {
+   "x": 2100,
+   "y": 1350,
+   "bestand": "z12_2100_1350.npg.gz",
+   "ruw": 937228,
+   "gz": 242432,
+   "sha256": "51960bd0d8069f08",
+   "knopen": 19466,
+   "wegstukken": 21765,
+   "rand": 106,
+   "pois": 58
+  },
+  {
+   "x": 2100,
+   "y": 1351,
+   "bestand": "z12_2100_1351.npg.gz",
+   "ruw": 743808,
+   "gz": 184881,
+   "sha256": "02cae1b9b0f293ee",
+   "knopen": 15452,
+   "wegstukken": 17017,
+   "rand": 152,
+   "pois": 44
+  },
+  {
+   "x": 2100,
+   "y": 1352,
+   "bestand": "z12_2100_1352.npg.gz",
+   "ruw": 1092716,
+   "gz": 283004,
+   "sha256": "d507bc69db9bf314",
+   "knopen": 23728,
+   "wegstukken": 26693,
+   "rand": 128,
+   "pois": 69
+  },
+  {
+   "x": 2100,
+   "y": 1353,
+   "bestand": "z12_2100_1353.npg.gz",
+   "ruw": 1178252,
+   "gz": 305501,
+   "sha256": "bd3d20cb8d4878b0",
+   "knopen": 25273,
+   "wegstukken": 28152,
+   "rand": 208,
+   "pois": 60
+  },
+  {
+   "x": 2100,
+   "y": 1354,
+   "bestand": "z12_2100_1354.npg.gz",
+   "ruw": 1505732,
+   "gz": 384178,
+   "sha256": "13e9e71245c753bb",
+   "knopen": 32393,
+   "wegstukken": 36627,
+   "rand": 260,
+   "pois": 131
+  },
+  {
+   "x": 2100,
+   "y": 1355,
+   "bestand": "z12_2100_1355.npg.gz",
+   "ruw": 1491456,
+   "gz": 384872,
+   "sha256": "c2b9db7f65035006",
+   "knopen": 32086,
+   "wegstukken": 36119,
+   "rand": 121,
+   "pois": 113
+  }
+ ],
+ "stations": [
+  {
+   "soort": "station",
+   "naam": "Hoek van Holland Haven",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9766728,
+   "lon": 4.127512
+  },
+  {
+   "soort": "station",
+   "naam": "Steendijkpolder",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9325971,
+   "lon": 4.224844
+  },
+  {
+   "soort": "station",
+   "naam": "Maassluis West",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.9260739,
+   "lon": 4.2354012
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Centraal",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0808379,
+   "lon": 4.3245578
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Centraal",
+   "trein": true,
+   "rank": 3,
+   "lat": 52.0811016,
+   "lon": 4.3242145
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag HS",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0701421,
+   "lon": 4.3222833
+  },
+  {
+   "soort": "station",
+   "naam": "Grote Markt",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0755892,
+   "lon": 4.309516
+  },
+  {
+   "soort": "station",
+   "naam": "Spui",
+   "trein": false,
+   "rank": 3,
+   "lat": 52.0772773,
+   "lon": 4.314301
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Moerwijk",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0545225,
+   "lon": 4.3085504
+  },
+  {
+   "soort": "station",
+   "naam": "Rijswijk",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0375511,
+   "lon": 4.3220472
+  },
+  {
+   "soort": "station",
+   "naam": "Maassluis Centrum",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9164264,
+   "lon": 4.253726
+  },
+  {
+   "soort": "station",
+   "naam": "Vlaardingen West",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9037717,
+   "lon": 4.3151164
+  },
+  {
+   "soort": "station",
+   "naam": "Beatrixkwartier",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0799807,
+   "lon": 4.3349648
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Laan van NOI",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0789653,
+   "lon": 4.3432689
+  },
+  {
+   "soort": "station",
+   "naam": "Voorburg 't Loo",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.082328,
+   "lon": 4.3653059
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Mariahoeve",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.0910037,
+   "lon": 4.3700695
+  },
+  {
+   "soort": "station",
+   "naam": "Voorburg",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0665939,
+   "lon": 4.3595552
+  },
+  {
+   "soort": "station",
+   "naam": "Forepark",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0698783,
+   "lon": 4.3929863
+  },
+  {
+   "soort": "station",
+   "naam": "Leidschendam-Voorburg",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0775806,
+   "lon": 4.3820643
+  },
+  {
+   "soort": "station",
+   "naam": "Den Haag Ypenburg",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0558155,
+   "lon": 4.3908405
+  },
+  {
+   "soort": "station",
+   "naam": "Leidschenveen",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0647339,
+   "lon": 4.4003892
+  },
+  {
+   "soort": "station",
+   "naam": "Nootdorp",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0475552,
+   "lon": 4.4147015
+  },
+  {
+   "soort": "station",
+   "naam": "Delft",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0075516,
+   "lon": 4.3565726
+  },
+  {
+   "soort": "station",
+   "naam": "Delft Campus",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.991104,
+   "lon": 4.3646836
+  },
+  {
+   "soort": "station",
+   "naam": "Vlaardingen Centrum",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9031362,
+   "lon": 4.3438053
+  },
+  {
+   "soort": "station",
+   "naam": "Vlaardingen Oost",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9101524,
+   "lon": 4.3616366
+  },
+  {
+   "soort": "station",
+   "naam": "Schiedam Nieuwland",
+   "trein": false,
+   "rank": 3,
+   "lat": 51.9227657,
+   "lon": 4.3834376
+  },
+  {
+   "soort": "station",
+   "naam": "Schiedam Centrum",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.9220378,
+   "lon": 4.4087362
+  },
+  {
+   "soort": "station",
+   "naam": "Voorhout",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.2253547,
+   "lon": 4.4840527
+  },
+  {
+   "soort": "halt",
+   "naam": "Wassenaarse Wetering/Zandwinning",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.1623632,
+   "lon": 4.4320178
+  },
+  {
+   "soort": "halt",
+   "naam": "Depot",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.1662855,
+   "lon": 4.4437122
+  },
+  {
+   "soort": "station",
+   "naam": "Valkenburg ZH",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.1594146,
+   "lon": 4.4437122
+  },
+  {
+   "soort": "station",
+   "naam": "De Vink",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.147184,
+   "lon": 4.4563079
+  },
+  {
+   "soort": "station",
+   "naam": "Museum",
+   "trein": false,
+   "rank": 3,
+   "lat": 52.1594278,
+   "lon": 4.4438195
+  },
+  {
+   "soort": "station",
+   "naam": "Leiden Centraal",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.166325,
+   "lon": 4.4822931
+  },
+  {
+   "soort": "station",
+   "naam": "Voorschoten",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.1262301,
+   "lon": 4.43367
+  },
+  {
+   "soort": "station",
+   "naam": "Leiden Lammenschans",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.1467495,
+   "lon": 4.4929361
+  },
+  {
+   "soort": "station",
+   "naam": "Buytenwegh",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0667654,
+   "lon": 4.4786668
+  },
+  {
+   "soort": "station",
+   "naam": "Voorweg",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0627683,
+   "lon": 4.4705772
+  },
+  {
+   "soort": "station",
+   "naam": "Voorweg",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0629398,
+   "lon": 4.4711781
+  },
+  {
+   "soort": "station",
+   "naam": "Meerzicht",
+   "trein": false,
+   "rank": 3,
+   "lat": 52.0554329,
+   "lon": 4.4699121
+  },
+  {
+   "soort": "station",
+   "naam": "Driemanspolder",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0484526,
+   "lon": 4.4772935
+  },
+  {
+   "soort": "station",
+   "naam": "Zoetermeer",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.0475552,
+   "lon": 4.4769073
+  },
+  {
+   "soort": "station",
+   "naam": "De Leyens",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0719491,
+   "lon": 4.4949102
+  },
+  {
+   "soort": "station",
+   "naam": "Centrum West",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0606443,
+   "lon": 4.4834948
+  },
+  {
+   "soort": "station",
+   "naam": "Dorp",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0544169,
+   "lon": 4.4921422
+  },
+  {
+   "soort": "station",
+   "naam": "Stadhuis",
+   "trein": false,
+   "rank": 3,
+   "lat": 52.0610929,
+   "lon": 4.4931078
+  },
+  {
+   "soort": "station",
+   "naam": "Delftsewallen",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0508279,
+   "lon": 4.4870353
+  },
+  {
+   "soort": "station",
+   "naam": "Zoetermeer Oost",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.0463411,
+   "lon": 4.4934297
+  },
+  {
+   "soort": "station",
+   "naam": "Pijnacker Centrum",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.02056,
+   "lon": 4.4369745
+  },
+  {
+   "soort": "station",
+   "naam": "Pijnacker Zuid",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0050023,
+   "lon": 4.4458151
+  },
+  {
+   "soort": "station",
+   "naam": "Berkel Westpolder",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9900734,
+   "lon": 4.4543552
+  },
+  {
+   "soort": "station",
+   "naam": "Rodenrijs",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9754039,
+   "lon": 4.4608355
+  },
+  {
+   "soort": "station",
+   "naam": "Meijersplein / Airport",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9559164,
+   "lon": 4.4622302
+  },
+  {
+   "soort": "station",
+   "naam": "Melanchthonweg",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9484709,
+   "lon": 4.4646335
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Noord",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.9422675,
+   "lon": 4.481585
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Centraal",
+   "trein": true,
+   "rank": 3,
+   "lat": 51.925055,
+   "lon": 4.4692254
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Blaak",
+   "trein": true,
+   "rank": 3,
+   "lat": 51.920066,
+   "lon": 4.4890738
+  },
+  {
+   "soort": "station",
+   "naam": "Sassenheim",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.2149565,
+   "lon": 4.5162392
+  },
+  {
+   "soort": "station",
+   "naam": "Leidsewallen",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0690078,
+   "lon": 4.5095873
+  },
+  {
+   "soort": "station",
+   "naam": "Seghwaert",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0630454,
+   "lon": 4.5153165
+  },
+  {
+   "soort": "station",
+   "naam": "Palenstein",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0596813,
+   "lon": 4.5064116
+  },
+  {
+   "soort": "station",
+   "naam": "Lansingerland-Zoetermeer",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0409564,
+   "lon": 4.5189214
+  },
+  {
+   "soort": "station",
+   "naam": "Lansingerland-Zoetermeer",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.0415107,
+   "lon": 4.5192003
+  },
+  {
+   "soort": "station",
+   "naam": "Willem Dreeslaan",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0652748,
+   "lon": 4.5346069
+  },
+  {
+   "soort": "station",
+   "naam": "Oosterheem",
+   "trein": false,
+   "rank": 2,
+   "lat": 52.0603277,
+   "lon": 4.5426536
+  },
+  {
+   "soort": "station",
+   "naam": "Javalaan",
+   "trein": false,
+   "rank": 3,
+   "lat": 52.053744,
+   "lon": 4.5378256
+  },
+  {
+   "soort": "station",
+   "naam": "Van Tuyllpark",
+   "trein": false,
+   "rank": 1,
+   "lat": 52.0470669,
+   "lon": 4.528985
+  },
+  {
+   "soort": "station",
+   "naam": "Binnenhof",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9603329,
+   "lon": 4.5356584
+  },
+  {
+   "soort": "station",
+   "naam": "Romeynshof",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9615097,
+   "lon": 4.5428681
+  },
+  {
+   "soort": "station",
+   "naam": "Ambachtsland",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.965767,
+   "lon": 4.5702696
+  },
+  {
+   "soort": "station",
+   "naam": "Hesseplaats",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9632153,
+   "lon": 4.5531678
+  },
+  {
+   "soort": "station",
+   "naam": "Nieuw Verlaat",
+   "trein": false,
+   "rank": 3,
+   "lat": 51.9648151,
+   "lon": 4.5614505
+  },
+  {
+   "soort": "station",
+   "naam": "Graskruid",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9572256,
+   "lon": 4.5494556
+  },
+  {
+   "soort": "station",
+   "naam": "Oosterflank",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9452304,
+   "lon": 4.5546269
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Alexander",
+   "trein": true,
+   "rank": 3,
+   "lat": 51.9517111,
+   "lon": 4.5524812
+  },
+  {
+   "soort": "station",
+   "naam": "Alexander",
+   "trein": false,
+   "rank": 4,
+   "lat": 51.9514334,
+   "lon": 4.5519018
+  },
+  {
+   "soort": "station",
+   "naam": "Prinsenlaan",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9407728,
+   "lon": 4.5565367
+  },
+  {
+   "soort": "station",
+   "naam": "Schenkel",
+   "trein": false,
+   "rank": 2,
+   "lat": 51.9319355,
+   "lon": 4.5634675
+  },
+  {
+   "soort": "station",
+   "naam": "Nesselande",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9796863,
+   "lon": 4.5865345
+  },
+  {
+   "soort": "station",
+   "naam": "De Tochten",
+   "trein": false,
+   "rank": 1,
+   "lat": 51.9688738,
+   "lon": 4.5784664
+  },
+  {
+   "soort": "station",
+   "naam": "Capelle Schollevaar",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.954118,
+   "lon": 4.5840883
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Zuid",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.904897,
+   "lon": 4.5098448
+  },
+  {
+   "soort": "halt",
+   "naam": "Rotterdam Stadion",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.8938678,
+   "lon": 4.5196724
+  },
+  {
+   "soort": "station",
+   "naam": "Rotterdam Lombardijen",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.880359,
+   "lon": 4.531045
+  },
+  {
+   "soort": "station",
+   "naam": "Barendrecht",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.8552906,
+   "lon": 4.5526528
+  },
+  {
+   "soort": "station",
+   "naam": "Nieuw Vennep",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.2588594,
+   "lon": 4.64535
+  },
+  {
+   "soort": "station",
+   "naam": "Alphen aan den Rijn",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.1248074,
+   "lon": 4.6571088
+  },
+  {
+   "soort": "station",
+   "naam": "Boskoop Snijdelwijk",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0673458,
+   "lon": 4.6462727
+  },
+  {
+   "soort": "station",
+   "naam": "Boskoop",
+   "trein": true,
+   "rank": 2,
+   "lat": 52.0770663,
+   "lon": 4.6466374
+  },
+  {
+   "soort": "station",
+   "naam": "Waddinxveen Noord",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0552614,
+   "lon": 4.6483755
+  },
+  {
+   "soort": "station",
+   "naam": "Waddinxveen",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.044058,
+   "lon": 4.649899
+  },
+  {
+   "soort": "station",
+   "naam": "Waddinxveen Triangel",
+   "trein": true,
+   "rank": 1,
+   "lat": 52.0272146,
+   "lon": 4.6490407
+  },
+  {
+   "soort": "station",
+   "naam": "Nieuwerkerk a/d IJssel",
+   "trein": true,
+   "rank": 1,
+   "lat": 51.9653043,
+   "lon": 4.6168756
+  }
+ ]
+}

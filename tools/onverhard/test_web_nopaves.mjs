@@ -744,7 +744,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
 {
   const opties = mobiel ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } }
   const cg = await browser.newContext(opties)
-  const v = await cg.newPage()
+  let v = await cg.newPage()
   const vf = []
   v.on('pageerror', (x) => vf.push('PAGEERROR ' + x.message))
   let brouter = 0
@@ -768,7 +768,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   let b = await bronnen()
   assert.equal(b.bron, 'vooraf', 'rondje uit de vooraf bewerkte graaf')
   assert.ok(b.bgt === 0 && b.ahn === 0, `geen BGT- of AHN-verzoeken: ${JSON.stringify(b)}`)
-  const r1 = await v.evaluate(() => ({ score: window.onverhard.krijgPlan().score, km: window.onverhard.krijgPlan().km, hoogte: !!window.onverhard.krijgPlan().hoogte }))
+  const r1 = await v.evaluate(() => { const o = window.onverhard.uitslag().opties[0]; return { score: o.score, km: o.km, hoogte: !!(o.hoogte && o.hoogte.afstand.length > 10), stijgen: o.stijgen } })
   assert.ok(r1.score > 0 && r1.km > 7 && r1.hoogte, `rondje: ${JSON.stringify(r1)}`)
   assert.ok(Number(await v.locator('#kern .score b').textContent()) === r1.score, 'score in de tegel')
   stap(`graaf-proef rondje: ${blokkenInCache} blokken vooraf opgehaald, score ${r1.score}, ${r1.km.toFixed(1)} km, hoogteprofiel, 0 BGT/AHN-verzoeken`)
@@ -795,7 +795,13 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   assert.equal(b.bron, 'tegels', 'buiten de regio: kaarttegels')
   assert.ok(b.bgt > 0, 'buiten de regio: BGT zoals altijd')
   stap('graaf-proef buiten de regio (Utrecht): terugval op kaarttegels + BGT')
-  // A naar B met de eigen router op de vooraf bewerkte graaf, en verslepen
+  // A naar B met de eigen router op de vooraf bewerkte graaf, en verslepen (verse context: de start in
+  // Utrecht van hierboven wordt onthouden, en dat zou terecht een terugval geven)
+  await v.close()
+  const cg2 = await browser.newContext(opties)
+  v = await cg2.newPage()
+  v.on('pageerror', (x) => vf.push('PAGEERROR ' + x.message))
+  v.on('request', (r) => { if (/brouter\.de/.test(r.url())) brouter += 1 })
   await v.goto(`${basis}?graaf=vooraf&router=eigen`)
   await v.locator('[data-soort="route"]').click()
   await v.evaluate(() => window.onverhard.kaart.fire('click', { latlng: L.latLng(52.0116, 4.3571) }))
@@ -831,6 +837,7 @@ assert.deepEqual(fouten.filter((f) => !/Failed to load resource/.test(f)), [], '
   } else stap('graaf-proef A naar B: eigen router op de vooraf bewerkte graaf, zonder BRouter')
   assert.deepEqual(vf, [])
   await cg.close()
+  await cg2.close()
 }
 
 await browser.close()
