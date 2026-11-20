@@ -1,73 +1,13 @@
-// Network-first: haal altijd de nieuwste versie op als er internet is, val
-// terug op de cache als je offline bent. Plannen zelf heeft internet nodig
-// (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v44'
-const SHELL = [
-  './',
-  'index.html',
-  'styles.css',
-  'app.js',
-  'sheet.js',
-  'teller.js',
-  'gebieden.js',
-  'meting.js',
-  'datacache.js',
-  'rekenen.js',
-  'rekenwerker.js',
-  'korrelkaart.js',
-  'bronnen.js',
-  'kern.js',
-  'graaf.js',
-  'osmtegels.js',
-  'hoogte.js',
-  'vendor/leaflet.js',
-  'vendor/leaflet.css',
-  'vendor/maplibre-gl.js',
-  'vendor/maplibre-gl.css',
-  'vendor/leaflet-maplibre-gl.js',
-  'manifest.webmanifest',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/apple-touch-icon.png',
-  'fonts/darker-grotesque-latin-variable.woff2',
-  'fonts/karla-latin-variable.woff2',
-  'fonts/overpass-mono-latin-variable.woff2',
-]
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))),
-  )
-  self.skipWaiting()
-})
-
+// Nopav.es is verhuisd naar https://oscardillewaard-ai.github.io/nopaves/.
+// Deze service worker vervangt de oude: hij wist de oude app-caches (onverhard-*), meldt zichzelf af
+// en laat open vensters opnieuw laden, zodat ze de doorverwijspagina krijgen.
+self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      // alleen oude app-caches weg; de datacache (kaarttegels, BGT, AHN) blijft staan
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('onverhard-') && k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  )
-})
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return
-  // Alleen de app zelf; kaarttegels, BRouter en PDOK gaan rechtstreeks.
-  if (new URL(event.request.url).origin !== self.location.origin) return
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE)
-      try {
-        // no-cache: altijd bij de server navragen of er iets nieuws is (GitHub
-        // Pages laat de browser anders tot 10 minuten een oude kopie gebruiken).
-        const res = await fetch(event.request, { cache: 'no-cache' })
-        if (res.ok) cache.put(event.request, res.clone())
-        return res
-      } catch {
-        const cached = await cache.match(event.request, { ignoreSearch: true })
-        return cached || Response.error()
-      }
-    })(),
-  )
+  event.waitUntil((async () => {
+    const keys = await caches.keys()
+    await Promise.all(keys.filter((k) => k.startsWith('onverhard-')).map((k) => caches.delete(k)))
+    await self.registration.unregister()
+    const vensters = await self.clients.matchAll({ type: 'window' })
+    for (const v of vensters) v.navigate(v.url).catch(() => {})
+  })())
 })

@@ -1,401 +1,59 @@
 <!doctype html>
 <html lang="nl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Nopav.es: plan trailrunroutes over zo veel mogelijk onverharde paden, met een score voor hoe onverhard een route is, routes naar treinstations en groene omwegen." />
-    <meta name="theme-color" content="#F1F3D4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#28301F" media="(prefers-color-scheme: dark)" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Nopav.es" />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="vendor/leaflet.css" />
-    <link rel="stylesheet" href="vendor/maplibre-gl.css" />
-    <link rel="stylesheet" href="styles.css" />
-    <script>
-      // thema meteen zetten, vóór de pagina zichtbaar wordt (geen witte flits)
-      try {
-        const k = localStorage.getItem('onverhard.thema') || 'auto'
-        const donker = k === 'donker' || (k === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
-        document.documentElement.dataset.theme = donker ? 'dark' : 'light'
-      } catch {
-        // geen opslag: de media-query in de css regelt het
-      }
-    </script>
-    <title>Nopav.es</title>
-  </head>
-  <body>
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-      <defs>
-        <symbol id="i-water" viewBox="0 0 24 24"><path d="M12 3C12 3 5.5 10 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10 12 3 12 3Z"/></symbol>
-        <symbol id="i-winkel" viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7zM9 8V6.5a3 3 0 0 1 6 0V8"/></symbol>
-        <symbol id="i-horeca" viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2"/></symbol>
-        <symbol id="i-toilet" viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4.5 4h5M14.5 4h5M7 12H4.5M17 12h2.5"/><circle cx="12" cy="8" r="0.1"/></symbol>
-        <symbol id="i-tank" viewBox="0 0 24 24"><path d="M5 20V5h9v15M4 20h11M14 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V9l-2.5-2.5M8 8h3"/></symbol>
-        <symbol id="i-sluit" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
-        <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
-        <symbol id="i-locatie" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
-        <symbol id="i-pijl" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
-        <symbol id="i-station" viewBox="0 0 24 24"><path d="M6 4h12v12H6zM6 10h12M8 21l2-5M16 21l-2-5"/><path d="M9 13h.01M15 13h.01"/></symbol>
-        <symbol id="i-omweg" viewBox="0 0 24 24"><path d="M3 19H21"/><path d="M3 19C6 5 18 5 21 19" stroke-dasharray="2.5 3"/></symbol>
-        <symbol id="i-gpx" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
-        <symbol id="i-bewaar" viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/></symbol>
-        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
-        <symbol id="i-paadjes" viewBox="0 0 24 24"><path d="M7 21C7 15 17 15 17 10S9 8 12 3"/><path d="M5 21h4M15 21h4" /></symbol>
-        <symbol id="i-onverhard" viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M6 15h.01M10 13h.01M14 15h.01M18 13h.01M8 10h.01M12 8h.01M16 10h.01M12 17h.01" stroke-width="2.6"/></symbol>
-        <symbol id="i-asfalt" viewBox="0 0 24 24"><path d="M9 3L5 21M15 3l4 18M12 5v3M12 11v3M12 17v3"/></symbol>
-        <symbol id="i-strand" viewBox="0 0 24 24"><path d="M3 15q3-3 6 0t6 0t6 0M3 20q3-3 6 0t6 0t6 0"/><circle cx="17" cy="7" r="3"/></symbol>
-        <symbol id="i-kaartje" viewBox="0 0 24 24"><path d="M3 8h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M14 9v2M14 13v2" stroke-width="1.6"/></symbol>
-        <symbol id="i-heuvels" viewBox="0 0 24 24"><path d="M3 19L9 8l4 6 3-4 5 9z"/></symbol>
-        <symbol id="i-foto" viewBox="0 0 24 24"><path d="M4 8h4l2-3h4l2 3h4v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
-        <symbol id="i-loper" viewBox="0 0 24 24"><circle cx="14.5" cy="4.5" r="2"/><path d="M13 9l-3 4 3.5 3-1.5 5M13 9l4 2.5 2-2M10 13l-4-1"/></symbol>
-        <symbol id="i-start" viewBox="0 0 24 24"><path d="M12 21s6-5.5 6-11a6 6 0 0 0-12 0c0 5.5 6 11 6 11z"/><circle cx="12" cy="10" r="2"/></symbol>
-        <symbol id="i-eind" viewBox="0 0 24 24"><path d="M6 21V4M6 5h11l-2 3.5 2 3.5H6"/></symbol>
-        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-        <symbol id="i-zoek" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l6 6"/></symbol>
-        <symbol id="i-kopie" viewBox="0 0 24 24"><path d="M8 8h12v12H8zM5 16V4h12"/></symbol>
-        <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></symbol>
-        <symbol id="i-potlood" viewBox="0 0 24 24"><path d="M4 20l1-5L16 4l4 4L9 19zM14 6l4 4"/></symbol>
-        <symbol id="i-schaar" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8 8l12 9M8 16l12-9"/></symbol>
-        <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" class="vol"/></symbol>
-        <symbol id="i-pauze" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></symbol>
-        <symbol id="i-nogeens" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5"/></symbol>
-        <symbol id="i-route" viewBox="0 0 24 24"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><path d="M5 17C5 9 19 14 19 7"/></symbol>
-        <symbol id="i-rondje" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.2-5.1M19 4v5h-5"/></symbol>
-        <symbol id="i-gebied" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" stroke-dasharray="3 2.5"/></symbol>
-        <symbol id="i-straten" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></symbol>
-        <symbol id="i-vlag" viewBox="0 0 24 24"><path d="M6 21V4M6 5h11l-2 3.5 2 3.5H6"/></symbol>
-      </defs>
-    </svg>
-    <div class="app">
-      <div id="kaart" aria-label="Kaart: tik om punten te zetten"></div>
-      <div class="welkom" id="welkom" hidden>
-        <p>Hardlooprondjes over onverhard. Tik op de kaart waar je wilt starten, of:</p>
-        <button type="button" class="hoofd" id="welkomLocatie"><svg class="ico" aria-hidden="true"><use href="#i-start"/></svg>Gebruik mijn locatie</button>
-      </div>
-      <main id="paneel">
-        <button type="button" class="sheetgreep" id="sheetgreep" aria-label="Paneel groter of kleiner" aria-expanded="true"><span></span></button>
-        <header>
-          <div>
-            <h1 class="wm" aria-label="Nopav.es">no<span class="pav">pav</span>.es</h1>
-            <p class="sub">Trailroutes over onverhard</p>
-          </div>
-          <div class="kopknoppen">
-            <button type="button" id="uitleg" class="klein" aria-label="Uitleg">?</button>
-            <button type="button" id="terug" class="klein" aria-label="Ongedaan maken" title="Ongedaan maken (Ctrl+Z)" disabled>↶</button>
-            <button type="button" id="opnieuw" class="klein" title="Opnieuw beginnen (N)" aria-label="Opnieuw beginnen">↺<span class="knoptekst"> Opnieuw</span></button>
-            <button type="button" id="thema" class="klein" aria-label="Thema: automatisch">◐</button>
-            <button type="button" id="nieuwKnop" class="klein alleen-nieuw" title="Nieuwe route (N)" hidden><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Nieuw</button>
-            <button type="button" id="sluitSheet" class="klein alleen-nieuw" aria-label="Paneel sluiten" hidden><svg class="ico" aria-hidden="true"><use href="#i-sluit"/></svg></button>
-          </div>
-        </header>
-
-        <div class="piekbalk" id="piekbalk" aria-live="polite"></div>
-
-        <nav class="stapper" id="stapper" aria-label="Stappen">
-          <button type="button" data-stap="1"><span class="stapnr" data-nr="1"></span><span>Soort</span></button>
-          <button type="button" data-stap="2"><span class="stapnr" data-nr="2"></span><span>Waar</span></button>
-          <button type="button" data-stap="3"><span class="stapnr" data-nr="3"></span><span>Opties</span></button>
-          <button type="button" data-stap="4"><span class="stapnr" data-nr="4"></span><span>Route</span></button>
-        </nav>
-        <p class="fout" id="fout" role="alert" hidden></p>
-
-        <section id="plankaart" class="plankaart" hidden aria-label="Plan een route">
-          <div class="segment" id="soortkeuze" role="group" aria-label="Soort route">
-            <button type="button" data-soort="rondje" aria-pressed="true">Rondje</button>
-            <button type="button" data-soort="station" aria-pressed="false">Station</button>
-            <button type="button" data-soort="route" aria-pressed="false">A naar B</button>
-            <button type="button" data-soort="meer" aria-pressed="false" aria-expanded="false">Meer</button>
-          </div>
-          <div class="meerlijst" id="meerlijst" hidden>
-            <button type="button" data-meer="tekenen"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg>Tekenen</button>
-            <button type="button" data-meer="gebied"><svg class="ico" aria-hidden="true"><use href="#i-gebied"/></svg>In gebied</button>
-            <button type="button" data-meer="straten"><svg class="ico" aria-hidden="true"><use href="#i-straten"/></svg>Elke straat</button>
-            <button type="button" data-meer="gpx"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg>GPX openen</button>
-            <button type="button" data-meer="mijn"><svg class="ico" aria-hidden="true"><use href="#i-bewaar"/></svg>Mijn routes</button>
-            <div class="mijnplek" id="mijnplek" hidden></div>
-          </div>
-          <div class="pkregels" id="pkregels">
-            <div class="startregel" id="startregel"></div>
-            <div class="binnenchip" id="binnenchip" hidden><span>Binnen: <b id="binnenNaam"></b></span><button type="button" class="klein" id="binnenWeg" aria-label="Niet binnen dit gebied"><svg class="ico" aria-hidden="true"><use href="#i-sluit"/></svg></button></div>
-            <div class="zoekplek" id="zoekplek" hidden></div>
-            <div class="afstandregel" id="afstandregel">
-              <button type="button" class="stepknop" id="kmMin" aria-label="1 km korter"><svg class="ico" aria-hidden="true"><use href="#i-min"/></svg></button>
-              <span class="afstandvak"><button type="button" class="afstandwaarde" id="kmWaarde" aria-label="Afstand, tik om te typen"><b id="kmGetal">10</b></button><input type="number" id="kmInvoer" class="afstandinvoer" min="2" max="60" step="1" inputmode="numeric" aria-label="Afstand in km (2 tot 60)" hidden /><button type="button" class="eenheid" id="kmEenheid" aria-label="Eenheid: km (tik voor minuten)" disabled>km</button></span>
-              <button type="button" class="stepknop" id="kmPlus" aria-label="1 km langer"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
-              <span class="snelkeuzes" id="snelkeuzes">
-
-              </span>
-            </div>
-            <p class="afstandnoot" id="afstandnoot" hidden></p>
-            <button type="button" class="voorkeurregel" id="voorkeurregel"><span id="voorkeurtekst">Paadjes</span><svg class="ico" aria-hidden="true"><use href="#i-pijl"/></svg></button>
-          </div>
-          <button type="button" class="hoofd planknop" id="planKnop">Plan rondje</button>
-        </section>
-
-        <section id="invoer">
-          <div class="stapvlak" id="stap1">
-            <h2 class="stapkop">Wat voor route?</h2>
-            <div class="modi" id="modus" role="group" aria-label="Soort route">
-              <button type="button" data-modus="route" aria-pressed="true"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-route"/></svg></span><span><b>A naar B</b><small>Van punt naar punt, zo onverhard mogelijk</small></span></button>
-              <button type="button" data-modus="rondje" aria-pressed="false"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-rondje"/></svg></span><span><b>Rondje</b><small>Start, lengte, klaar</small></span></button>
-              <button type="button" data-modus="station" aria-pressed="false"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-station"/></svg></span><span><b>Naar station</b><small>Rennen naar het station, met de trein terug</small></span></button>
-              <button type="button" data-modus="gebied" aria-pressed="false"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-gebied"/></svg></span><span><b>In gebied</b><small>Rondjes binnen een bos of park</small></span></button>
-              <button type="button" data-modus="straten" aria-pressed="false"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-straten"/></svg></span><span><b>Elke straat</b><small>Elke straat of elk pad in een wijk</small></span></button>
-              <button type="button" data-modus="tekenen" aria-pressed="false"><span class="mico"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg></span><span><b>Tekenen</b><small>Trek een lijn, de app volgt hem</small></span></button>
-            </div>
-            <button type="button" id="gpxOpen" class="tekstknop" title="Of sleep een GPX-bestand op de kaart"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg>Of open een GPX-bestand</button>
-            <input type="file" id="gpxBestand" accept=".gpx,application/gpx+xml" hidden />
-            <div id="mijnRoutes" hidden>
-              <h3 class="subkop">Mijn routes</h3>
-              <ul class="bewaardlijst" id="bewaardlijst"></ul>
-            </div>
-          </div>
-
-          <div class="stapvlak" id="stap2" hidden>
-            <h2 class="stapkop" id="stap2kop">Waar</h2>
-            <div class="zoek">
-              <input type="search" id="zoek" placeholder="Zoek een plek, adres of postcode" autocomplete="off" enterkeyhint="search" aria-label="Zoek een plek" aria-controls="zoekresultaten" />
-              <ul id="zoekresultaten" role="listbox" hidden></ul>
-            </div>
-            <p class="hint" id="hint"></p>
-            <div id="tekenpaneel" hidden>
-              <p class="tekenstatus" id="tekenstatus" hidden></p>
-              <div class="knoppen">
-                <button type="button" id="tekenVrij" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg>Teken</button>
-                <button type="button" id="tekenVierkant" aria-pressed="false">▭ Rechthoek</button>
-                <button type="button" id="tekenWis">Wis tekening</button>
-              </div>
-            </div>
-            <ol class="punten" id="punten"></ol>
-            <div class="knoppen">
-              <button type="button" id="locatie">◎ Mijn locatie</button>
-              <button type="button" id="keerom">Keer om</button>
-              <button type="button" id="wis">Wis punten</button>
-            </div>
-            <div class="stapvoet">
-              <button type="button" class="klein terugknop" data-naar="1">← Terug</button>
-              <button type="button" class="hoofd" id="naar3">Verder →</button>
-            </div>
-          </div>
-
-          <div class="stapvlak" id="stap3" hidden>
-            <h2 class="stapkop">Opties</h2>
-            <label class="veld" id="kmveld" hidden>
-              <span>Lengte</span>
-              <span class="metEenheid"><input type="number" id="km" min="2" max="60" step="1" value="10" inputmode="decimal" /> km</span>
-            </label>
-            <label class="veld" id="vormveld" hidden>
-              <span>Vorm</span>
-              <select id="vorm">
-                <option value="lus">Grote lus</option>
-                <option value="kronkel">Kronkelen in de buurt</option>
-              </select>
-            </label>
-            <label class="veld" id="wegenveld" hidden>
-              <span>Welke wegen</span>
-              <select id="wegen">
-                <option value="straten">Straten</option>
-                <option value="paden">Paden</option>
-                <option value="alles">Straten én paden</option>
-              </select>
-            </label>
-            <label class="vinkje" id="doodveld" hidden><input type="checkbox" id="dood" checked /> Doodlopende straten overslaan</label>
-            <div id="instellingen">
-              <h3 class="subkop">Instellingen <small id="instSamenvatting"></small></h3>
-              <div class="veld">
-                <span>Ondergrond</span>
-                <div class="keuze klein" id="ondergrond" role="group" aria-label="Ondergrond">
-                  <button type="button" data-waarde="1" aria-pressed="true"><svg class="ico" aria-hidden="true"><use href="#i-paadjes"/></svg>Paadjes eerst</button>
-                  <button type="button" data-waarde="0" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-onverhard"/></svg>Onverhard</button>
-                  <button type="button" data-waarde="a" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-asfalt"/></svg>Maakt niet uit</button>
-                </div>
-                <small class="vhint" id="ondergrondHint"></small>
-                <select id="trail" hidden aria-hidden="true" tabindex="-1">
-                  <option value="1">Smalle paadjes eerst (trail)</option>
-                  <option value="0">Alles wat onverhard is, ook brede zandwegen</option>
-                  <option value="a">Maakt niet uit (ook verhard)</option>
-                </select>
-              </div>
-              <label class="vinkje"><input type="checkbox" id="strand" checked /><span class="vtekst"><b><svg class="ico" aria-hidden="true"><use href="#i-strand"/></svg>Strand overslaan</b><small>geen mul zand</small></span></label>
-              <label class="vinkje"><input type="checkbox" id="kaartje" /><span class="vtekst"><b><svg class="ico" aria-hidden="true"><use href="#i-kaartje"/></svg>Toegangskaart-gebieden</b><small>ook betaalde natuur</small></span></label>
-              <label class="vinkje"><input type="checkbox" id="heuvels" /><span class="vtekst"><b><svg class="ico" aria-hidden="true"><use href="#i-heuvels"/></svg>Meer hoogtemeters</b><small>zoekt heuvels op</small></span></label>
-              <label class="vinkje" hidden><input type="checkbox" id="luchtfoto" /><span class="vtekst"><b><svg class="ico" aria-hidden="true"><use href="#i-foto"/></svg>Luchtfoto's bij twijfel</b></span></label>
-              <details class="meer">
-                <summary>Meer</summary>
-                <label class="veld">
-                  <span>Landelijke wandelroutes (LAW)</span>
-                  <select id="law">
-                    <option value="1">Geen voorkeur</option>
-                    <option value="0.6">Lichte voorkeur</option>
-                    <option value="0.3">Sterke voorkeur</option>
-                  </select>
-                </label>
-                <label class="veld">
-                  <span>Hoeveel routes vergelijken</span>
-                  <select id="grondig">
-                    <option value="2">2 routes</option>
-                    <option value="4">4 routes (duurt langer)</option>
-                    <option value="1">1 route (snelst)</option>
-                    <option value="0">1 route, zonder officiële kaart</option>
-                  </select>
-                </label>
-              </details>
-            </div>
-            <div class="stapvoet">
-              <button type="button" class="klein terugknop" data-naar="2">← Terug</button>
-              <button type="button" class="hoofd" id="plan">Plan route</button>
-            </div>
-            <div id="bezig" hidden>
-              <div class="baan" id="baan" aria-hidden="true"><span class="looppop"><svg class="ico" aria-hidden="true"><use href="#i-loper"/></svg></span><div class="balkje"><i id="voortgang"></i></div></div>
-              <p id="status" class="sr-only" role="status" aria-live="polite"></p>
-              <button type="button" id="stop">Stop</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="resultaat" hidden>
-          <div class="kern" id="kern"></div>
-          <div id="meldingen"></div>
-
-          <h2>Routes</h2>
-          <ul class="opties" id="opties"></ul>
-          <button type="button" id="omwegen" class="klein omwegknop" aria-pressed="false" hidden><svg class="ico" aria-hidden="true"><use href="#i-omweg"/></svg>Groene omwegen</button>
-          <div class="keuze tabs" id="tabs" role="tablist" aria-label="Details">
-            <button type="button" data-tab="hoogte" aria-pressed="true">Hoogte</button>
-            <button type="button" data-tab="ondergrond" aria-pressed="false">Ondergrond</button>
-          </div>
-          <div class="tabvlak" id="tab-hoogte">
-          <div class="profiel" id="profiel" hidden>
-            <div class="profielkop">
-              <h2 id="profielkop">Hoogteprofiel</h2>
-              <button type="button" id="afspeel" class="ikoon" aria-label="Route afspelen" title="Route afspelen"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></button>
-              <div class="keuze klein afspeelsnelheid" id="afspeelsnelheid" role="group" aria-label="Afspeelsnelheid" hidden>
-                <span class="keuzelabel">Afspeelsnelheid</span>
-                <button type="button" data-snelheid="1" aria-pressed="true">1×</button>
-                <button type="button" data-snelheid="2" aria-pressed="false">2×</button>
-                <button type="button" data-snelheid="4" aria-pressed="false">4×</button>
-              </div>
-              <span class="afspeelstand" id="afspeelstand"></span>
-            </div>
-            <div class="profielvlak" id="profielvlak"></div>
-            <p class="noot" id="profielnoot"></p>
-          </div>
-          <p class="noot" id="waterregel" hidden></p>
-          </div>
-          <div class="tabvlak" id="tab-ondergrond" hidden>
-          <div class="keuze klein" id="bron" role="group" aria-label="Kleur de route naar">
-            <button type="button" data-bron="eind" aria-pressed="true">Eindoordeel</button>
-            <button type="button" data-bron="bgt" aria-pressed="false">Officiële kaart</button>
-            <button type="button" data-bron="osm" aria-pressed="false">OpenStreetMap</button>
-          </div>
-
-          <div id="balken"></div>
-          <ul class="legenda" id="legenda"></ul>
-          <p class="noot" id="noot"></p>
-
-          <details class="blok">
-            <summary>Bronnen vergelijken</summary>
-            <table id="tabel"></table>
-          </details>
-          </div>
-          <details class="blok" hidden>
-            <summary>Langste onverharde stukken</summary>
-            <table id="zacht"></table>
-          </details>
-          <details class="blok" id="twijfelblok" hidden>
-            <summary id="twijfelkop">Twijfelstukken</summary>
-            <ul class="twijfels" id="twijfels"></ul>
-            <p class="noot" id="twijfelnoot"></p>
-          </details>
-
-          <div class="knoppen eindknoppen">
-            <button type="button" class="hoofd" id="gpx" title="Download GPX"><svg class="ico" aria-hidden="true"><use href="#i-gpx"/></svg>GPX</button>
-            <button type="button" id="bewaar" title="Bewaar in je browser"><svg class="ico" aria-hidden="true"><use href="#i-bewaar"/></svg>Bewaar</button>
-            <button type="button" id="deel" title="Kopieer link"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg>Link</button>
-          </div>
-          <div class="stapvoet">
-            <button type="button" class="klein terugknop" data-naar="2"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg>Aanpassen</button>
-            <button type="button" class="klein" id="nieuw">＋ Nieuwe route</button>
-          </div>
-        </section>
-
-      </main>
-    </div>
-    <dialog id="hulp" aria-label="Uitleg">
-      <div class="hulp-kop">
-        <h2>Zo werkt het</h2>
-        <button type="button" id="hulpDicht" class="klein" aria-label="Sluiten">✕</button>
-      </div>
-      <ol class="hulp-stappen">
-        <li><b>Kies een soort route</b> bovenaan.</li>
-        <li><b>Tik je start</b> op de kaart of zoek een plek. Bij In gebied, Elke straat en Tekenen: <b>teken</b> met je vinger.</li>
-        <li><b>Plan</b>. Sleep daarna de route, kies water onderweg, speel hem af of download de GPX.</li>
-      </ol>
-      <h3>Soorten routes</h3>
-      <ul class="hulp-soorten">
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-route"/></svg></span><div><b>A naar B</b><small>Van punt naar punt, zo onverhard mogelijk. Tik meer punten voor tussenpunten.</small></div><button type="button" class="klein" data-voorbeeld="route">Voorbeeld</button></li>
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-rondje"/></svg></span><div><b>Rondje</b><small>Kies start en lengte; je krijgt een paar echte lussen.</small></div><button type="button" class="klein" data-voorbeeld="rondje">Voorbeeld</button></li>
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-station"/></svg></span><div><b>Naar station</b><small>Kies start en lengte; je krijgt routes naar treinstations in verschillende richtingen. Tik op een station op de kaart voor de route erheen. Let op: RandstadRail-haltes kunnen erbij staan.</small></div><button type="button" class="klein" data-voorbeeld="station">Voorbeeld</button></li>
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-gebied"/></svg></span><div><b>In gebied</b><small>Teken een bos of park; rondjes blijven erbinnen.</small></div><button type="button" class="klein" data-voorbeeld="gebied">Voorbeeld</button></li>
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-straten"/></svg></span><div><b>Elke straat</b><small>Teken een wijk; één route door elke straat of elk pad.</small></div><button type="button" class="klein" data-voorbeeld="straten">Voorbeeld</button></li>
-        <li><span class="hulp-ico"><svg class="ico" aria-hidden="true"><use href="#i-potlood"/></svg></span><div><b>Tekenen</b><small>Trek een lijn; de app volgt hem over echte paden.</small></div><button type="button" class="klein" data-voorbeeld="tekenen">Voorbeeld</button></li>
-      </ul>
-      <h3>Handig</h3>
-      <p class="noot">De Nopav.es-score (0–100) telt vooral hoeveel onverhard je loopt, met extra punten voor smalle paadjes en een kort verhard stuk, en min voor heen en terug of strand. Groene omwegen: tik de knop onder de routes en daarna een stippellijn.</p>
-      <p class="noot">GPX openen om een bestaande route te bekijken · ↶ ongedaan maken · ↺ opnieuw beginnen · ▶ route afspelen · instellingen voor strand, toegangskaart en meer hoogtemeters.</p>
-      <p class="noot toetsen"><kbd>1</kbd>–<kbd>6</kbd> soort, in de volgorde van het scherm (1 A naar B · 2 Rondje · 3 Naar station · 4 In gebied · 5 Elke straat · 6 Tekenen) · <kbd>P</kbd> plan · <kbd>T</kbd> teken · <kbd>Esc</kbd> stop · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ongedaan · <kbd>Spatie</kbd> afspelen · <kbd>G</kbd> GPX</p>
-      <p class="noot">Officiële kaart = BGT; eindoordeel = BGT, anders OpenStreetMap. Toegangskaart: afgesloten duinpaden doen mee; let ter plekke op de borden.</p>
-      <p class="noot">Bronnen: © OpenStreetMap-bijdragers (OpenFreeMap, Overpass, BRouter) · BGT, AHN, luchtfoto en zoeken: PDOK.</p>
-      <details class="blok gebruik" id="gebruik">
-        <summary>Mijn gebruik</summary>
-        <p class="noot">Een teller van wat je in de app doet, alleen in deze browser. Er gaat niets naar buiten.</p>
-        <table id="gebruiktabel"></table>
-        <div class="knoppen">
-          <button type="button" class="klein" id="gebruikKopieer"><svg class="ico" aria-hidden="true"><use href="#i-kopie"/></svg>Kopieer als JSON</button>
-          <button type="button" class="klein" id="gebruikWis">Wis</button>
-        </div>
-        <p class="noot" id="gebruikMelding" role="status"></p>
-      </details>
-    </dialog>
-    <dialog id="voorkeuren" class="voorkeuren" aria-label="Voorkeuren">
-      <div class="hulp-kop">
-        <h2>Voorkeuren</h2>
-        <button type="button" id="voorkeurenDicht" class="klein">Klaar</button>
-      </div>
-      <div class="voorkeurvlak" id="voorkeurvlak">
-        <div class="veld" id="tempoveld">
-          <span>Tempo <small>voor een tijdsindicatie; leeg = geen</small></span>
-          <div class="tempostepper">
-            <button type="button" class="stepknop" id="tempoMin" aria-label="5 seconden sneller"><svg class="ico" aria-hidden="true"><use href="#i-min"/></svg></button>
-            <button type="button" class="tempowaarde" id="tempoWaarde" aria-label="Tempo, tik om te typen">geen</button>
-            <input type="text" id="tempoInvoer" class="tempoinvoer" inputmode="numeric" autocomplete="off" placeholder="m:ss" maxlength="5" aria-label="Tempo in minuten en seconden per km" hidden />
-            <button type="button" class="stepknop" id="tempoPlus" aria-label="5 seconden langzamer"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
-            <button type="button" class="klein" id="tempoWis" hidden>Wis</button>
-          </div>
-        </div>
-        <div class="veld">
-          <span>Thema</span>
-          <div class="keuze klein" id="themakeuze" role="group" aria-label="Thema">
-            <button type="button" data-thema="auto" aria-pressed="true">Automatisch</button>
-            <button type="button" data-thema="licht" aria-pressed="false">Licht</button>
-            <button type="button" data-thema="donker" aria-pressed="false">Donker</button>
-          </div>
-        </div>
-      </div>
-    </dialog>
-    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-    <div class="tip" id="tip"></div>
-    <div class="kaartmenu" id="kaartmenu" role="menu" hidden></div>
-    <dialog id="foto"><form method="dialog"><button aria-label="Sluiten">Sluiten</button></form><img alt="" /><p></p></dialog>
-
-    <script src="vendor/leaflet.js"></script>
-    <script src="vendor/maplibre-gl.js"></script>
-    <script src="vendor/leaflet-maplibre-gl.js"></script>
-    <script type="module" src="app.js"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nopav.es is verhuisd</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://oscardillewaard-ai.github.io/nopaves/">
+<script>
+  // Nopav.es staat nu op https://oscardillewaard-ai.github.io/nopaves/.
+  // Meld de oude service worker af, wis de oude app-caches (onverhard-*) en stuur door
+  // met behoud van querystring en hash, zodat gedeelde routelinks blijven werken.
+  // De datacache (nopaves-data-*) blijft staan: die gebruikt de nieuwe app ook.
+  (function () {
+    var doel = 'https://oscardillewaard-ai.github.io/nopaves/' + location.search + location.hash
+    var ga = function () { location.replace(doel) }
+    var wis = function () {
+      if (!window.caches) return Promise.resolve()
+      return caches.keys().then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return k.indexOf('onverhard-') === 0 })
+          .map(function (k) { return caches.delete(k) }))
+      })
+    }
+    var wacht = function (ms) { return new Promise(function (r) { setTimeout(r, ms) }) }
+    // Eerst afmelden, dan wissen: de oude service worker bewaart deze pagina nog in zijn cache
+    // terwijl ze laadt, dus wissen we na een korte pauze nog een keer.
+    var klaar = Promise.resolve().then(function () {
+      if (!('serviceWorker' in navigator)) return
+      return navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.filter(function (r) { return r.scope.indexOf('/Tezt/onverhard/') !== -1 })
+          .map(function (r) { return r.unregister() }))
+      })
+    }).then(wis).then(function () { return wacht(300) }).then(wis)
+    var weg = setTimeout(ga, 1500)
+    klaar.then(function () { clearTimeout(weg); ga() }, function () { clearTimeout(weg); ga() })
+  })()
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #DDE5B3; color: #2E3320;
+         font: 18px/1.5 Karla, system-ui, sans-serif; }
+  main { background: #F1F3D4; border: 2px solid #2E3320; padding: 24px; margin: 16px; max-width: 28em; }
+  h1 { font-size: 1.4em; margin: 0 0 8px; }
+  a { color: #4F6B2A; font-weight: 700; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1E2215; color: #F1F3D4; }
+    main { background: #2E3320; border-color: #9BC046; }
+    a { color: #9BC046; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nopav.es is verhuisd</h1>
+  <p>De app staat nu op <a id="link" href="https://oscardillewaard-ai.github.io/nopaves/">oscardillewaard-ai.github.io/nopaves</a>.
+  Je bewaarde routes en instellingen gaan mee.</p>
+</main>
+<script>document.getElementById('link').href = 'https://oscardillewaard-ai.github.io/nopaves/' + location.search + location.hash</script>
+</body>
 </html>
