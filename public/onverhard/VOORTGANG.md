@@ -1,5 +1,92 @@
 # Nopav.es: voortgang UX en snelheid
 
+## Samenvatting (eindstand)
+
+Alle fasen zijn af: UX 1, 2, 3 en snelheid stap 0–6. Unit-tests (48) en de Playwright-test
+(telefoon 390 × 844: 35 stappen, desktop: 33) zijn groen op de eindcode. Service worker
+`onverhard-v44`. Terugzetten: zie onderaan.
+
+**Wat er per fase veranderde**
+- **UX 1**: lokale teller (`nopaves.log`, "Mijn gebruik" onder [?]); overal "26% onverhard · 28% half"
+  met een regel Waarom bij de score (formule ongewijzigd); zoeken met de start/het kaartmidden
+  erbij (juiste treffer bovenaan: 5 → 9 van 10 termen); piekbalk zonder afkapping; sneltoetsen 1–6
+  in schermvolgorde; kaartlagen leeg bij opnieuw; introslides weg (één zin + "Gebruik mijn
+  locatie"); "Afspeelsnelheid".
+- **UX 2**: de plankaart is de standaard (oude interface: `?ui=oud`): soort, start (Mijn locatie
+  bij bestaande toestemming, nooit vragen of plannen bij openen), afstand met stepper en snelkeuzes,
+  één voorkeurregel, hoofdknop; voorkeuren op één plek (incl. thema en tempo); Meer voor Tekenen, In
+  gebied, Elke straat, GPX en Mijn routes; één knop Nieuw; compact resultaat met Details ingeklapt;
+  geen prompt/confirm meer; Back verkleint eerst het paneel; tempo met tijdsindicatie; GPX zonder tijden.
+- **UX 3**: afstand in minuten (met tempo); lang drukken in een Natura 2000-gebied → "Rondjes in
+  <naam>", chip "Binnen", plannen binnen het gebied ∩ cirkel L/2 (5 van 5 gebieden gelukt).
+- **Snelheid**: meetpunten en benchmark (stap 0); datacache voor tegels/BGT/AHN (1); vooraf ophalen
+  na het kiezen van de start (2); route A meteen, voorlopig, de rest daarna (3); rekenwerk in een Web
+  Worker met echte Stop (4); stations in ringen achter `?stations=ringen` (5, uitkomst niet altijd
+  gelijk); eigen A-naar-B-router achter `?router=eigen` (6, haalt de beslisregel niet: score lager).
+
+**Gemaakte keuzes** (details per stap verderop): geen `main` op GitHub en tags mogen niet gepusht
+worden → integratie op de sessiebranch, terugzetpunten als `terugzet/*`-branches, niet zelf live
+gezet; een tik op de lege kaart start een rondje; tweede tik verplaatst de start (geen keerpunt in de
+nieuwe interface); bestaande instellingen verhuisd naar het voorkeurenvenster; Natura 2000 eerst,
+OpenFreeMap alleen als terugval bij een storing; geen graaf in IndexedDB (graaf bouwen < 20%); BGT
+10 tegelijk; GPX ook zonder `<time>` in de metadata; de oude interface blijft staan tot na deze opdracht.
+
+**Snelheid voor en na** (mediaan van 5, seconden; "eerste" = tot route A op het scherm staat):
+
+| Geval | Cache | Totaal voor → na (s) | Eerste resultaat na (s) | BGT voor → na | Tegels voor → na | Graaf voor → na | Score voor → na |
+|---|---|---|---|---|---|---|---|
+| rondje-10 Delft Centraal | koud | 10,7 → 11,8 | 3,8 | 4,7 → 5,9 | 2,1 → 1,7 | 0,6 → 0,7 | 50 → 50 |
+| rondje-10 Delft Centraal | warm | 5,7 → 5,3 | 3,4 | 0,4 → 1,4 | 2,0 → 1,0 | 0,6 → 0,7 | 50 → 50 |
+| station-15 Delft Centraal | koud | 24,9 → 26,2 | 8,0 | 11,9 → 13,1 | 4,8 → 4,2 | 4,2 → 4,1 | 58 → 58 |
+| station-15 Delft Centraal | warm | 24,8 → 9,3 | 6,2 | 13,9 → 2,1 | 3,2 → 2,4 | 4,0 → 3,8 | 58 → 58 |
+| gebied Delftse Hout (voorbeeld, 8 km) | koud | 3,4 → 4,0 | 1,6 | 1,2 → 1,6 | 0,7 → 0,8 | 0,3 → 0,4 | 0 → 0 |
+| gebied Delftse Hout (voorbeeld, 8 km) | warm | 2,5 → 1,6 | 1,3 | 0,8 → 0,0 | 0,6 → 0,6 | 0,3 → 0,5 | 0 → 0 |
+| tekenen (voorbeeld) | koud | 2,1 → 2,5 | 1,7 | 0,7 → 0,8 | 0,6 → 0,7 | 0,0 → 0,1 | 94 → 94 |
+| tekenen (voorbeeld) | warm | 1,0 → 0,9 | 0,8 | 0,4 → 0,1 | 0,4 → 0,4 | 0,1 → 0,3 | 94 → 94 |
+| ab-kort-1 Delftse Hout | koud | 4,3 → 5,1 | 3,2 | 1,2 → 1,1 | 0,3 → 0,2 | – → – | 57 → 57 |
+| ab-kort-1 Delftse Hout | warm | 2,9 → 4,2 | 2,5 | 0,1 → 0,1 | 0,2 → 0,2 | – → – | 57 → 57 |
+| ab-kort-2 Den Hoorn | koud | 5,5 → 5,6 | 3,9 | 1,9 → 1,8 | 0,4 → 0,3 | – → – | 22 → 22 |
+| ab-kort-2 Den Hoorn | warm | 3,4 → 3,8 | 2,7 | 0,2 → 0,2 | 0,2 → 0,1 | – → – | 22 → 22 |
+| ab-kort-3 Delfgauw | koud | 6,4 → 6,2 | 4,4 | 2,2 → 2,3 | 0,3 → 0,3 | – → – | 48 → 48 |
+| ab-kort-3 Delfgauw | warm | 3,8 → 3,8 | 2,5 | 0,3 → 0,2 | 0,2 → 0,1 | – → – | 48 → 48 |
+| ab-kort-4 Nootdorp | koud | 6,5 → 6,9 | 4,7 | 2,7 → 2,6 | 0,4 → 0,4 | – → – | 55 → 55 |
+| ab-kort-4 Nootdorp | warm | 4,0 → 4,2 | 2,5 | 0,3 → 0,2 | 0,2 → 0,2 | – → – | 55 → 55 |
+| ab-kort-5 Schipluiden | koud | 6,3 → 6,6 | 4,5 | 2,5 → 2,4 | 0,4 → 0,4 | – → – | 22 → 22 |
+| ab-kort-5 Schipluiden | warm | 3,7 → 4,1 | 2,7 | 0,3 → 0,2 | 0,2 → 0,1 | – → – | 22 → 22 |
+| ab-lang-1 Rotterdam Centraal | koud | 11,3 → 10,6 | 7,6 | 4,9 → 4,3 | 0,6 → 0,7 | – → – | 23 → 23 |
+| ab-lang-1 Rotterdam Centraal | warm | 6,0 → 3,6 | 3,2 | 0,6 → 0,3 | 0,4 → 0,3 | – → – | 23 → 23 |
+| ab-lang-2 Scheveningen | koud | 16,5 → 16,9 | 13,5 | 7,5 → 7,6 | 0,8 → 1,0 | – → – | 16 → 16 |
+| ab-lang-2 Scheveningen | warm | 8,9 → 7,7 | 6,5 | 0,9 → 0,7 | 0,4 → 0,4 | – → – | 16 → 16 |
+| ab-lang-3 Zoetermeer | koud | 9,1 → 9,3 | 6,4 | 3,6 → 3,8 | 0,4 → 0,6 | – → – | 49 → 49 |
+| ab-lang-3 Zoetermeer | warm | 5,5 → 4,3 | 2,8 | 0,4 → 0,2 | 0,3 → 0,3 | – → – | 49 → 49 |
+| ab-lang-4 Maassluis | koud | 11,7 → 12,0 | 8,1 | 5,2 → 5,1 | 0,6 → 0,7 | – → – | 32 → 32 |
+| ab-lang-4 Maassluis | warm | 5,9 → 4,6 | 3,2 | 0,5 → 0,3 | 0,3 → 0,4 | – → – | 32 → 32 |
+| ab-lang-5 Leiden Centraal | koud | 18,4 → 17,1 | 11,6 | 9,1 → 7,6 | 1,0 → 0,8 | – → – | 49 → 49 |
+| ab-lang-5 Leiden Centraal | warm | 8,7 → 5,9 | 4,2 | 0,9 → 0,6 | 0,6 → 1,2 | – → – | 49 → 49 |
+
+
+Kort: **route A staat er veel eerder** (rondje koud 10,7 → 3,8 s, Station koud 24,9 → 8,0 s, A naar
+B koud 3,2–13,5 s i.p.v. 4,3–18,4 s), en **met warme cache is alles sneller** waar de BGT de
+bottleneck was (Station 24,8 → 9,3 s, Rotterdam 6,0 → 3,6 s, Leiden 8,7 → 5,9 s). **Het koude totaal
+is niet sneller** (gelijk tot 1 s trager): het tussenresultaat moet getekend worden en de cache
+schrijft alles weg. Scores zijn overal gelijk: de uitkomst veranderde niet.
+
+**Niet gelukt of bewust laten liggen**
+- Stap 5 (ringen) en stap 6 (eigen router) zijn gebouwd en getest, maar niet de standaard: ze halen
+  "resultaat gelijk" resp. de beslisregel niet (cijfers in de secties).
+- "Delft Centraal" zoeken vindt de Locatieserver niet (geen stations).
+- In-gebied-rondjes zijn vaak langer dan gevraagd (bestaand gedrag).
+- De oude interface (`?ui=oud`) en de code ervan staan er nog; wat weg kan staat bij "Opruimen".
+- Hill repeat-modus: op de planning voor later (verzoek tijdens het werk).
+
+**Opruimen na deze opdracht (nog niet gedaan)**: als `?ui=oud` niet meer nodig is, kunnen weg: in
+`index.html` de stappenbalk `#stapper`, `#stap1` (soortenraster `#modus`), de oude knoppen in
+`#resultaat .stapvoet`, `#opnieuw`, `#thema` en `#welkom`; in `app.js` `werkWelkom`, de
+`UI_NIEUW`-takken voor de oude piekbalk en `tekenOpties` (vinkjes "op kaart"), en de
+`welkom`/`stapper`-css. De rekenkern, de Meer-soorten (die het stappenplan nog gebruiken) en alle
+bronnen blijven nodig.
+
+
 Uitgangspunt: commit `f58e0da`, service worker `onverhard-v36`. Terugzetpunt: tag `voor-ux`.
 
 ## Hervatten
@@ -32,7 +119,7 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 | Snelheid stap 0 (meten) | klaar |
 | Snelheid stap 1–5 | klaar |
 | Snelheid stap 6 (eigen router) | klaar: BRouter blijft standaard |
-| Hermeting na stap 6 | todo |
+| Hermeting na stap 6 | klaar (tag `na-snelheid`) |
 
 ## Testen
 
@@ -426,7 +513,61 @@ BRouter); er is dus geen lengtegrens actief. Vervolgstap die de score kan dichte
 router 3–4 alternatieven langs de BGT leggen en de beste kiezen (zoals bij rondjes), en dan opnieuw
 `beslis_router.py` draaien.
 
+### Hermeting na stap 6
+
+Zelfde testset en werkwijze als stap 0, op code `e49eec8` (alles klaar, BRouter standaard voor A
+naar B), zonder andere zware taken ernaast. Ruwe cijfers: `docs/snelheid/hermeting-rest.json` en
+`docs/snelheid/hermeting-ab.json`. De drie langste A-naar-B-paren zijn na een herstart van de
+omgeving apart bijgemeten op dezelfde snapshot.
+
+| Geval | Cache | Totaal (s) | Eerste (s) | tegels | graaf | route | bgt | ahn | water | brouter | tegels n / kB / cache | ok |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| rondje-10 Delft Centraal | koud | 11,8 | 3,8 | 1,7 | 0,7 | 1,5 | 5,9 | 1,3 | 0,4 | – | 61 / 11620 / 19 | 5/5 |
+| rondje-10 Delft Centraal | warm | 5,3 | 3,4 | 1,0 | 0,7 | 1,6 | 1,4 | 0,1 | 0,2 | – | 61 / 11620 / 60 | 5/5 |
+| station-15 Delft Centraal | koud | 26,2 | 8,0 | 4,2 | 4,1 | 0,1 | 13,1 | 3,5 | 0,4 | – | 330 / 52215 / 89 | 5/5 |
+| station-15 Delft Centraal | warm | 9,3 | 6,2 | 2,4 | 3,8 | 0,1 | 2,1 | 0,2 | 0,4 | – | 330 / 52215 / 329 | 5/5 |
+| gebied Delftse Hout (voorbeeld, 8 km) | koud | 4,0 | 1,6 | 0,8 | 0,4 | 0,5 | 1,6 | 0,6 | 0,1 | – | 19 / 4396 / 9 | 5/5 |
+| gebied Delftse Hout (voorbeeld, 8 km) | warm | 1,6 | 1,3 | 0,6 | 0,5 | 0,5 | 0,0 | 0,0 | 0,1 | – | 19 / 4396 / 18 | 5/5 |
+| tekenen (voorbeeld) | koud | 2,5 | 1,7 | 0,7 | 0,1 | 0,3 | 0,8 | 0,6 | 0,2 | – | 12 / 2574 / 2 | 5/5 |
+| tekenen (voorbeeld) | warm | 0,9 | 0,8 | 0,4 | 0,3 | 0,1 | 0,1 | 0,0 | 0,1 | – | 12 / 2574 / 11 | 5/5 |
+| ab-kort-1 Delftse Hout | koud | 5,1 | 3,2 | 0,2 | – | – | 1,1 | 1,5 | 0,2 | 2,1 | 16 / 3474 / 1 | 5/5 |
+| ab-kort-1 Delftse Hout | warm | 4,2 | 2,5 | 0,2 | – | – | 0,1 | 1,4 | 0,3 | 2,4 | 16 / 3474 / 15 | 5/5 |
+| ab-kort-2 Den Hoorn | koud | 5,6 | 3,9 | 0,3 | – | – | 1,8 | 1,2 | 0,4 | 2,0 | 17 / 3799 / 1 | 5/5 |
+| ab-kort-2 Den Hoorn | warm | 3,8 | 2,7 | 0,1 | – | – | 0,2 | 0,9 | 0,2 | 2,4 | 17 / 3799 / 17 | 5/5 |
+| ab-kort-3 Delfgauw | koud | 6,2 | 4,4 | 0,3 | – | – | 2,3 | 1,4 | 0,4 | 2,0 | 20 / 3861 / 1 | 5/5 |
+| ab-kort-3 Delfgauw | warm | 3,8 | 2,5 | 0,1 | – | – | 0,2 | 1,1 | 0,2 | 2,3 | 20 / 3861 / 20 | 5/5 |
+| ab-kort-4 Nootdorp | koud | 6,9 | 4,7 | 0,4 | – | – | 2,6 | 1,8 | 0,5 | 2,0 | 26 / 5128 / 1 | 5/5 |
+| ab-kort-4 Nootdorp | warm | 4,2 | 2,5 | 0,2 | – | – | 0,2 | 1,1 | 0,2 | 2,3 | 26 / 5128 / 26 | 5/5 |
+| ab-kort-5 Schipluiden | koud | 6,6 | 4,5 | 0,4 | – | – | 2,4 | 1,5 | 0,4 | 2,1 | 24 / 3993 / 1 | 5/5 |
+| ab-kort-5 Schipluiden | warm | 4,1 | 2,7 | 0,1 | – | – | 0,2 | 1,2 | 0,2 | 2,4 | 24 / 3993 / 24 | 5/5 |
+| ab-lang-1 Rotterdam Centraal | koud | 10,6 | 7,6 | 0,7 | – | – | 4,3 | 2,1 | 0,8 | 3,2 | 44 / 9331 / 1 | 5/5 |
+| ab-lang-1 Rotterdam Centraal | warm | 3,6 | 3,2 | 0,3 | – | – | 0,3 | 0,1 | 0,3 | 2,8 | 44 / 9331 / 44 | 5/5 |
+| ab-lang-2 Scheveningen | koud | 16,9 | 13,5 | 1,0 | – | – | 7,6 | 2,1 | 1,1 | 5,6 | 48 / 13513 / 1 | 5/5 |
+| ab-lang-2 Scheveningen | warm | 7,7 | 6,5 | 0,4 | – | – | 0,7 | 0,5 | 0,5 | 5,4 | 48 / 13513 / 48 | 5/5 |
+| ab-lang-3 Zoetermeer | koud | 9,3 | 6,4 | 0,6 | – | – | 3,8 | 2,3 | 0,7 | 2,4 | 39 / 7448 / 1 | 5/5 |
+| ab-lang-3 Zoetermeer | warm | 4,3 | 2,8 | 0,3 | – | – | 0,2 | 1,0 | 0,4 | 2,4 | 39 / 7448 / 39 | 5/5 |
+| ab-lang-4 Maassluis | koud | 12,0 | 8,1 | 0,7 | – | – | 5,1 | 2,9 | 0,8 | 2,8 | 54 / 7734 / 1 | 5/5 |
+| ab-lang-4 Maassluis | warm | 4,6 | 3,2 | 0,4 | – | – | 0,3 | 1,0 | 0,4 | 2,6 | 54 / 7734 / 54 | 5/5 |
+| ab-lang-5 Leiden Centraal | koud | 17,1 | 11,6 | 0,8 | – | – | 7,6 | 4,6 | 0,9 | 3,6 | 72 / 12671 / 1 | 5/5 |
+| ab-lang-5 Leiden Centraal | warm | 5,9 | 4,2 | 1,2 | – | – | 0,6 | 0,2 | 1,3 | 3,3 | 72 / 12671 / 72 | 5/5 |
+
+
+Een eerdere hermeting (tijdens een gelijktijdige e2e-run) gaf 15–40% hogere tijden; een rustige
+herhaling van het rondje (3× koud/warm, oude en nieuwe code direct na elkaar,
+`docs/snelheid/rustig-rondje-voor.json` / `-na.json`) liet zien dat dat aan de belasting lag (koud
+9,8 → 9,8 s, warm 5,5 → 4,7 s, eerste resultaat 3,4 s). Die hermeting is weggegooid. Daarna bleek
+uit de fasen dat het eindresultaat na een tussenresultaat alles opnieuw tekende (A naar B warm
+2,9 → 5,4 s); dat is gerepareerd (`vulResultaatAan`: alleen hoogte, water en tegels bijwerken) en pas
+daarna is definitief gemeten.
+
 ## Open punten
+
+- **Koud totaal niet sneller** (zie de tabel). Vervolgstappen: de BGT-tegels zelf zijn groot (170 kB
+  per tegel); alleen de collecties lezen die de app gebruikt, of het tekenen van het tussenresultaat
+  lichter maken (geen profiel, water en POI's bij het eerste beeld).
+- **BGT warm bij een rondje 0,4 → 1,4 s**: Cache Storage lezen (21 MB) is trager dan de geheugencache
+  van de browser die het eerder toevallig deed. Vervolgstap: de gelezen BGT-vlakken per tegel in het
+  geheugen houden tussen plannen in dezelfde sessie.
 
 - In-gebied-rondjes worden vaak 20–40% langer dan gevraagd (bestaand gedrag van `planGebied`).
 - **Op de planning voor later (verzoek gebruiker): hill repeat-modus.** Niet in deze opdracht.
