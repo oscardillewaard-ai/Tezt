@@ -9,7 +9,7 @@ import * as K from './kern.js'
 
 const NOOIT = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'construction', 'proposed', 'raceway', 'bus_guideway', 'platform', 'elevator', 'abandoned', 'razed'])
 export const STRAND_FACTOR = 40 // strand mag alleen als er echt niets anders is
-const ALLES_FACTOR = { primary: 2, primary_link: 2, secondary: 1.6, secondary_link: 1.6, tertiary: 1.25, tertiary_link: 1.25, steps: 1.3 }
+export const ALLES_FACTOR = { primary: 2, primary_link: 2, secondary: 1.6, secondary_link: 1.6, tertiary: 1.25, tertiary_link: 1.25, steps: 1.3 }
 
 /**
  * De Overpass-vraag: alle wegen en paden plus de stranden binnen 'straal'
@@ -83,7 +83,7 @@ function opStrand(x, y, stranden) {
  * Werkt op de losse arrays (segmenten met factor -1 zijn weggehaald).
  */
 function verbindLosseEinden(d, snap) {
-  const { van, naar, lengte, factor, segTags, xs, ys, lat, lon } = d
+  const { van, naar, lengte, factor, segTags, xs, ys, lat, lon, segBron } = d
   const graad = new Map()
   for (let i = 0; i < van.length; i++) {
     if (factor[i] < 0) continue
@@ -145,19 +145,21 @@ function verbindLosseEinden(d, snap) {
     // lat/lon terug uit de twee eindpunten (lineair: op een paar meter nauwkeurig genoeg)
     return xs.length - 1
   }
-  const segment = (a, b, tags, f) => {
+  const segment = (a, b, tags, f, bron = -1) => {
     van.push(a)
     naar.push(b)
     lengte.push(Math.max(0.01, Math.hypot(xs[a] - xs[b], ys[a] - ys[b])))
     factor.push(f)
     segTags.push(tags)
+    if (segBron) segBron.push(bron)
   }
   for (const [knoop, i, t] of verbindingen) {
     const a = van[i]
     const b = naar[i]
     const l = lengte[i]
-    if (t * l < 0.3) segment(knoop, a, segTags[i], factor[i])
-    else if ((1 - t) * l < 0.3) segment(knoop, b, segTags[i], factor[i])
+    const br = segBron ? segBron[i] : -1
+    if (t * l < 0.3) segment(knoop, a, segTags[i], factor[i], br)
+    else if ((1 - t) * l < 0.3) segment(knoop, b, segTags[i], factor[i], br)
     else {
       if (!splitsingen.has(i)) splitsingen.set(i, [])
       splitsingen.get(i).push({ t, knoop })
@@ -174,11 +176,12 @@ function verbindLosseEinden(d, snap) {
       const n = nieuweKnoop(x, y)
       lat.push(lat[a] + t * (lat[b] - lat[a]))
       lon.push(lon[a] + t * (lon[b] - lon[a]))
-      segment(vorige, n, segTags[i], factor[i])
-      segment(knoop, n, segTags[i], factor[i])
+      const br = segBron ? segBron[i] : -1
+      segment(vorige, n, segTags[i], factor[i], br)
+      segment(knoop, n, segTags[i], factor[i], br)
       vorige = n
     }
-    segment(vorige, b, segTags[i], factor[i])
+    segment(vorige, b, segTags[i], factor[i], segBron ? segBron[i] : -1)
     factor[i] = -1
   }
 }
@@ -188,7 +191,7 @@ function verbindLosseEinden(d, snap) {
  * (extraStranden: vlakken {polygonen, bbox} uit de officiële kaart).
  * Knopen zijn de punten van de OSM-wegen (gedeelde punten = kruisingen).
  */
-export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0, gebied = null, buitenFactor = 30 } = {}) {
+export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = false, strandMijden = true, extraStranden = [], mijdPunten = [], snap = 0, gebied = null, buitenFactor = 30, metBron = false } = {}) {
   const stranden = strandMijden ? strandRingen(elementen).concat(extraStranden) : []
   // te mijden plekken (RD-punten, 20 m eromheen), via een rooster van 50 m
   const mijd = new Set()
@@ -226,9 +229,10 @@ export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = fa
   const lengte = []
   const factor = []
   const segTags = []
+  const segBron = metBron ? [] : null // per segment: het element (voorbewerking, tools/graaf)
   const tagLijst = []
   const tagIndex = new Map()
-  for (const e of elementen) {
+  for (const [ei, e] of elementen.entries()) {
     if (e.type !== 'way' || !e.tags || !e.tags.highway || !e.geometry) continue
     const t = e.tags
     if (NOOIT.has(t.highway) || t.area === 'yes') continue
@@ -258,6 +262,7 @@ export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = fa
       lengte.push(l)
       factor.push(f0 * (strand ? STRAND_FACTOR : 1))
       segTags.push(ti)
+      if (segBron) segBron.push(ei)
     }
   }
   // dubbele segmenten (zelfde twee knopen, bijvoorbeeld uit de overlap van twee kaarttegels) eruit
@@ -268,7 +273,7 @@ export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = fa
     else gezien.add(k)
   }
   if (snap > 0) {
-    verbindLosseEinden({ van, naar, lengte, factor, segTags, xs, ys, lat, lon }, snap)
+    verbindLosseEinden({ van, naar, lengte, factor, segTags, xs, ys, lat, lon, segBron }, snap)
   }
   // weggehaalde segmenten (factor -1) echt weghalen
   {
@@ -280,9 +285,11 @@ export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = fa
       lengte[j] = lengte[i]
       factor[j] = factor[i]
       segTags[j] = segTags[i]
+      if (segBron) segBron[j] = segBron[i]
       j++
     }
     van.length = naar.length = lengte.length = factor.length = segTags.length = j
+    if (segBron) segBron.length = j
   }
   // een getekend gebied: segmenten erbuiten zijn duur (wel bruikbaar om er te komen)
   const binnenSeg = new Uint8Array(van.length)
@@ -318,6 +325,7 @@ export function bouwGraaf(elementen, { trail = true, alles = false, kaartje = fa
     lengte: Float64Array.from(lengte), factor: Float64Array.from(factor), segTags: Uint32Array.from(segTags), tagLijst, binnenSeg,
     van: Uint32Array.from(van), naar: Uint32Array.from(naar),
     aantalStrand: factor.filter((f) => f >= STRAND_FACTOR).length,
+    ...(segBron ? { segBron: Int32Array.from(segBron) } : {}),
   }
 }
 
@@ -476,7 +484,11 @@ export function maakTraject(g, knopen, segs, punten = []) {
     }
   }
   if (!uit.length) uit.push([0, coords.length - 1, ''])
-  return { coords, segs: uit, punten }
+  const traject = { coords, segs: uit, punten }
+  // vooraf bewerkte graaf (graaf-proef): onthoud de knopen en segmenten, dan vindt blokgraaf.js het oordeel
+  // en de hoogtes terug. Niet opsommen: zo komt het niet in JSON (Mijn routes) of in een kopie terecht.
+  if (g.vooraf) Object.defineProperty(traject, 'vooraf', { value: { g, knopen: Array.from(knopen), segs: Array.from(segs) }, enumerable: false })
+  return traject
 }
 
 /** Kosten, meters en strandmeters van een rij segmenten. */

@@ -1,0 +1,8 @@
+{
+  "naam": "delft-proef",
+  "omschrijving": "Proefregio rond Delft: rondje 10 km en station 15 km vanaf Delft Centraal, de 10 A-naar-B-paren, Meijendel & Berkheide (zie tools/graaf/regio.mjs)",
+  "zoom": 12,
+  "blokken_x": [2095, 2100],
+  "blokken_y": [1348, 1355],
+  "bbox_lonlat": [4.1309, 51.8358, 4.6582, 52.2682]
+}

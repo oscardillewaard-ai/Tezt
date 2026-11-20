@@ -2,7 +2,8 @@
 // Zie rekenen.js voor de kant van de pagina.
 import * as G from './graaf.js'
 import * as M from './meting.js'
-import { haalTegelsRuw, zetOfmSjabloon } from './bronnen.js'
+import * as BG from './blokgraaf.js'
+import { haalTegelsRuw, zetOfmSjabloon, haalBlokkenRuw } from './bronnen.js'
 
 const verzamelingen = new Map() // handvat -> elementen
 const grafen = new Map() // gid -> graaf
@@ -30,6 +31,12 @@ self.onmessage = async ({ data }) => {
       if (!el) throw new Error('rekenwerker: onbekende verzameling')
       const g = G.bouwGraaf(el, data.opbouw)
       uit = { gid: bewaar(grafen, g, 2), g }
+    } else if (taak === 'vooraf') {
+      const t0 = performance.now()
+      const blokken = await haalBlokkenRuw(data.urls)
+      const t1 = performance.now()
+      const g = BG.bouwVoorafGraaf(blokken, data.opbouw)
+      uit = { gid: bewaar(grafen, g, 2), g, ms: { blokken: t1 - t0, graaf: performance.now() - t1 } }
     } else if (taak === 'zoek') {
       const g = grafen.get(data.gid)
       if (!g) throw new Error('rekenwerker: onbekende graaf')

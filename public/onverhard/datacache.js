@@ -14,7 +14,7 @@ const kan = () => typeof caches !== 'undefined' && typeof Response !== 'undefine
 /** Welke adressen in deze cache horen. */
 export function cachebaar(url) {
   const u = String(url)
-  return (/tiles\.openfreemap\.org\/.+\/\d+\/\d+\/\d+\.pbf/.test(u) && !u.endsWith('/planet')) || /api\.pdok\.nl\/kadaster\/bgt\/ogc\/v1\/tiles\//.test(u) || /service\.pdok\.nl\/rws\/ahn\/wcs\//.test(u)
+  return (/tiles\.openfreemap\.org\/.+\/\d+\/\d+\/\d+\.pbf/.test(u) && !u.endsWith('/planet')) || /api\.pdok\.nl\/kadaster\/bgt\/ogc\/v1\/tiles\//.test(u) || /service\.pdok\.nl\/rws\/ahn\/wcs\//.test(u) || /\/graaf\/[^?]+\.npg\.gz$/.test(u)
 }
 
 /** Is een opgeslagen antwoord (tijd in ms) nog bruikbaar, en moet het ververst worden? */

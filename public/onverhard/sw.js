@@ -1,7 +1,7 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent. Plannen zelf heeft internet nodig
 // (BRouter en PDOK); offline zie je alleen de app en je bewaarde punten.
-const CACHE = 'onverhard-v44'
+const CACHE = 'onverhard-v45'
 const SHELL = [
   './',
   'index.html',
@@ -20,6 +20,7 @@ const SHELL = [
   'graaf.js',
   'osmtegels.js',
   'hoogte.js',
+  'blokgraaf.js',
   'vendor/leaflet.js',
   'vendor/leaflet.css',
   'vendor/maplibre-gl.js',
@@ -55,6 +56,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
   // Alleen de app zelf; kaarttegels, BRouter en PDOK gaan rechtstreeks.
   if (new URL(event.request.url).origin !== self.location.origin) return
+  // de blokken van de vooraf bewerkte graaf: die bewaart de datacache al (onveranderlijk, versie in het pad)
+  if (/\/graaf\/[^?]+\.npg\.gz$/.test(new URL(event.request.url).pathname)) return
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE)

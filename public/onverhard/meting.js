@@ -49,6 +49,7 @@ export function bronVan(url) {
   if (u.includes('overpass')) return 'water'
   if (u.includes('brouter')) return 'brouter'
   if (u.includes('natura2000')) return 'natura2000'
+  if (u.includes('/graaf/')) return 'graaf' // vooraf bewerkte graaf (graaf-proef)
   return 'overig'
 }
 

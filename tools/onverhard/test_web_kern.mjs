@@ -1011,3 +1011,109 @@ test('datacache: welke adressen, hoe vers, en niets in Node', async () => {
   assert.equal(DC.versheid(nu - 31 * 24 * 3600e3, nu).bruikbaar, false, 'na 30 dagen niet meer')
   if (typeof caches === 'undefined') assert.equal(await DC.uitCache('https://tiles.openfreemap.org/planet/x/14/1/1.pbf'), null)
 })
+
+// ---------- graaf-proef: vooraf bewerkte graaf (tools/graaf/schrijf.mjs <-> public/onverhard/blokgraaf.js) ----------
+const BG = await import('../../public/onverhard/blokgraaf.js')
+const { schrijfBlok, ONBEKEND_H } = await import('../graaf/schrijf.mjs')
+
+/** Een klein netwerk: een raster van straten en paden, één afgesloten pad, rond Delft. */
+function proefElementen() {
+  const p = (i, j) => ({ lat: 52.0 + i * 0.001, lon: 4.35 + j * 0.0015 })
+  const el = []
+  let id = 0
+  const weg = (punten, tags) => el.push({ type: 'way', id: ++id, osm: 1000 + id, tags, geometry: punten })
+  for (let i = 0; i < 4; i++) weg([p(i, 0), p(i, 1), p(i, 2), p(i, 3)], { highway: i % 2 ? 'path' : 'unclassified', surface: i === 2 ? 'unpaved' : undefined })
+  for (let j = 0; j < 4; j++) weg([p(0, j), p(1, j), p(2, j), p(3, j)], { highway: j === 3 ? 'footway' : 'track' })
+  weg([p(0, 0), p(3, 3)], { highway: 'path', access: 'no' })
+  for (const e of el) for (const k of Object.keys(e.tags)) if (e.tags[k] === undefined) delete e.tags[k]
+  return el
+}
+
+/** Blokken zoals tools/graaf/bouw.mjs ze schrijft, met een nep-oordeel; 'splits' verdeelt over twee blokken. */
+function proefBlokken(g, elementen, splits = Infinity) {
+  const delen = [[], []]
+  for (let s = 0; s < g.van.length; s++) delen[(g.lon[g.van[s]] + g.lon[g.naar[s]]) / 2 < splits ? 0 : 1].push(s)
+  const gebruik = new Map()
+  delen.forEach((segs, bi) => segs.forEach((s) => [g.van[s], g.naar[s]].forEach((k) => gebruik.set(k, (gebruik.get(k) || new Set()).add(bi)))))
+  return delen.filter((d) => d.length).map((segs, bi) => {
+    const lokaal = new Map()
+    const knopen = []
+    const lok = (k) => (lokaal.has(k) ? lokaal.get(k) : (lokaal.set(k, knopen.push(k) - 1), knopen.length - 1))
+    const tags = [...new Set(segs.map((s) => g.tagLijst[g.segTags[s]]))]
+    const b = { blok: [bi, 0], van: [], naar: [], tag: [], klasse: [], vlag: [], op: [], af: [], osm: [], rleN: [], rleOordeel: [], extra: [], pois: [['water', 'Kraan', 52.001, 4.351]],
+      tags, oordelen: [[0, 'begroeid terreindeel: grasland', 'terrein', 0], [3, 'wegdeel: gesloten verharding', 'wegdeel', 0]] }
+    for (const s of segs) {
+      const tekst = g.tagLijst[g.segTags[s]]
+      b.van.push(lok(g.van[s]))
+      b.naar.push(lok(g.naar[s]))
+      b.tag.push(tags.indexOf(tekst))
+      b.klasse.push(K.KLASSEN.indexOf(K.osmKlasse(tekst).klasse))
+      b.vlag.push(K.alleenMetKaartje(tekst) ? 1 : 0)
+      b.op.push(3)
+      b.af.push(1)
+      b.osm.push(elementen[g.segBron[s]].osm)
+      // eerste helft onverhard, tweede helft verhard (om de runs te testen)
+      b.rleN.push([2, 3])
+      b.rleOordeel.push([0, 1])
+      b.extra.push(Array.from({ length: Math.max(0, Math.ceil(g.lengte[s] / 10) - 1) }, (_, k) => 10 + k))
+    }
+    b.lat = Int32Array.from(knopen, (k) => Math.round(g.lat[k] * 1e7))
+    b.lon = Int32Array.from(knopen, (k) => Math.round(g.lon[k] * 1e7))
+    b.hoogte = Int16Array.from(knopen, (k, i) => (i === 1 ? ONBEKEND_H : 10))
+    b.rand = []
+    b.buren = []
+    knopen.forEach((k, i) => {
+      if (gebruik.get(k).size > 1) {
+        b.rand.push(i)
+        b.buren.push(bi ? 64 : 4)
+      }
+    })
+    return BG.leesBlok(zlib.gunzipSync(schrijfBlok(b).gz))
+  })
+}
+
+test('graaf-proef: blok schrijven en lezen geeft dezelfde graaf als bouwGraaf (ook over twee blokken)', () => {
+  const el = proefElementen()
+  const ruw = G.bouwGraaf(el, { kaartje: true, strandMijden: false, metBron: true })
+  for (const splits of [Infinity, 4.3525]) {
+    const blokken = proefBlokken(ruw, el, splits)
+    assert.equal(blokken.length, splits === Infinity ? 1 : 2)
+    if (splits !== Infinity) assert.ok(blokken[0].rand.length > 0, 'randknopen')
+    for (const opbouw of [{ trail: true, kaartje: false }, { trail: false, kaartje: true }, { alles: true }]) {
+      const g = BG.bouwVoorafGraaf(blokken, opbouw)
+      const ref = G.bouwGraaf(el, { strandMijden: false, ...opbouw })
+      assert.equal(g.van.length, ref.van.length, `segmenten ${JSON.stringify(opbouw)}`)
+      // kosten van alle segmenten gelijk (als multiset), en zelfde kortste pad tussen twee hoeken
+      const kosten = (gr) => Array.from(gr.lengte, (l, s) => (l * gr.factor[s]).toFixed(1)).sort().join()
+      if (!opbouw.kaartje) assert.equal(kosten(g), kosten(ref))
+      const hoek = (gr, i) => G.dichtsteKnoop(gr, ...K.naarRd(4.35 + 3 * 0.0015 * i, 52.0 + 0.003 * i)).knoop
+      const d1 = G.dijkstra(g, hoek(g, 0), { doel: hoek(g, 1) })
+      const d2 = G.dijkstra(ref, hoek(ref, 0), { doel: hoek(ref, 1) })
+      // met kaartje: afgesloten paden buiten de natuur zijn vooraf al duur (de tweede zoekronde van de app)
+      if (opbouw.kaartje) assert.ok(d1.kosten[hoek(g, 1)] >= d2.kosten[hoek(ref, 1)] - 0.5, 'kaartje: niet goedkoper')
+      else assert.ok(Math.abs(d1.kosten[hoek(g, 1)] - d2.kosten[hoek(ref, 1)]) < 0.5, 'zelfde kortste pad')
+    }
+  }
+})
+
+test('graaf-proef: oordeel per meetpunt, toegangskaart, hoogteprofiel en waterpunten langs een route', () => {
+  const el = proefElementen()
+  const ruw = G.bouwGraaf(el, { kaartje: true, strandMijden: false, metBron: true })
+  const g = BG.bouwVoorafGraaf(proefBlokken(ruw, el, 4.3525), { trail: true })
+  const a = G.dichtsteKnoop(g, ...K.naarRd(4.35, 52.0)).knoop
+  const b = G.dichtsteKnoop(g, ...K.naarRd(4.3545, 52.003)).knoop
+  const { knopen, segs } = G.pad(G.dijkstra(g, a, { doel: b }), b)
+  const traject = G.maakTraject(g, knopen, segs, [])
+  assert.ok(BG.heeftVooraf(traject))
+  assert.equal(JSON.stringify(traject).includes('vooraf'), false, 'niet in JSON')
+  const an = K.analyseer(traject, BG.voorafVlakken(traject))
+  assert.ok(an.bgtGebruikt)
+  const klassen = new Set(an.stukken.map((s) => s.bgt))
+  assert.ok(klassen.has(K.ONVERHARD) && klassen.has(K.GESLOTEN), [...klassen].join())
+  assert.equal(BG.inNatuur(traject, 0, 10), false)
+  const v = BG.voorafProfiel(traject)
+  assert.equal(v.perKnoop.length, traject.coords.length)
+  assert.ok(v.profiel.stijgen >= 0 && v.profiel.afstand.length > 10)
+  assert.equal(BG.voorafPois(traject)[0].soort, 'water')
+  assert.deepEqual(BG.blokkenVoorTegels([[8390, 5410], [8391, 5411], [8395, 5410]]), [[2097, 1352], [2098, 1352]])
+})

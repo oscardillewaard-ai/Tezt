@@ -4,6 +4,7 @@
 // benchmarks) gebeurt hetzelfde gewoon hier, met dezelfde aanroepen.
 import * as G from './graaf.js'
 import * as M from './meting.js'
+import * as BG from './blokgraaf.js'
 
 const kanWerker = () => typeof Worker !== 'undefined' && typeof window !== 'undefined' && !globalThis.__geenWerker
 
@@ -14,6 +15,10 @@ let tegelLezer = null // haalTegelsRuw uit bronnen.js (voor zonder worker); bron
 
 export function zetTegelLezer(fn) {
   tegelLezer = fn
+}
+let blokLezer = null // haalBlokkenRuw uit bronnen.js (vooraf bewerkte graaf)
+export function zetBlokLezer(fn) {
+  blokLezer = fn
 }
 
 function afgebroken() {
@@ -82,6 +87,27 @@ export async function viaElementen(elementen, { signal } = {}) {
 export async function bouw(handvat, opbouw, { signal } = {}) {
   if (handvat.elementen) return G.bouwGraaf(handvat.elementen, opbouw)
   const { gid, g } = await vraag('bouw', { handvat: handvat.handvat, opbouw }, { signal })
+  Object.defineProperty(g, '__gid', { value: gid, enumerable: false })
+  return g
+}
+
+/**
+ * De graaf uit vooraf bewerkte blokken (graaf-proef): ophalen, lezen en samenvoegen, in de worker.
+ * Meet 'blokken' (ophalen en lezen) en 'graaf' (samenvoegen) apart.
+ */
+export async function vooraf(urls, opbouw, { signal } = {}) {
+  if (!kanWerker()) {
+    const t0 = performance.now()
+    const blokken = await blokLezer(urls, signal)
+    const t1 = performance.now()
+    const g = BG.bouwVoorafGraaf(blokken, opbouw)
+    M.tijd('blokken', t1 - t0)
+    M.tijd('graaf', performance.now() - t1)
+    return g
+  }
+  const { gid, g, ms } = await vraag('vooraf', { urls, opbouw }, { signal })
+  M.tijd('blokken', ms.blokken)
+  M.tijd('graaf', ms.graaf)
   Object.defineProperty(g, '__gid', { value: gid, enumerable: false })
   return g
 }

@@ -151,6 +151,15 @@ export function hoogteprofiel(xy, rasters, { stap = 10, drempel = 2 } = {}) {
       hoogte.push(op(xy[0][0], xy[0][1]))
     }
   }
+  return profielVanReeks(afstand, hoogte, drempel)
+}
+
+/**
+ * Het tweede deel van hoogteprofiel: uit een reeks hoogtes om de 10 m (NaN = onbekend) gaten opvullen,
+ * gladstrijken en stijgen/dalen tellen. Ook gebruikt voor de vooraf berekende hoogtes (blokgraaf.js).
+ */
+export function profielVanReeks(afstand, hoogte, drempel = 2) {
+  hoogte = hoogte.slice()
   // gaten opvullen: lineair tussen de dichtstbijzijnde bekende hoogtes
   const bekend = hoogte.map((h, i) => (Number.isNaN(h) ? -1 : i)).filter((i) => i >= 0)
   if (!bekend.length) return null

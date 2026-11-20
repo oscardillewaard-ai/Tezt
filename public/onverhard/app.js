@@ -16,6 +16,13 @@ const UI_NIEUW = new URLSearchParams(location.search).get('ui') !== 'oud'
 // A naar B: welke router standaard (snelheid, stap 6; zie VOORTGANG.md). 'auto' = eigen router tot
 // EIGEN_ROUTER_MAX_M, daarboven en bij fouten BRouter.
 const STANDAARD_ROUTER = 'brouter'
+// graaf-proef: de vooraf bewerkte routegraaf (regio Delft). 'vooraf' = blokken gebruiken binnen de regio
+// (buiten de regio of bij een fout: de gewone werking); null = alleen met ?graaf=vooraf. Zie GRAAF-PROEF.md.
+const STANDAARD_GRAAF = null
+const GRAAF = (() => {
+  const q = new URLSearchParams(location.search).get('graaf')
+  return q === 'vooraf' ? 'vooraf' : q === 'tegels' ? null : STANDAARD_GRAAF
+})()
 const THEMA = 'onverhard.thema'
 const MIN_TWIJFEL = 30 // twijfelstukken korter dan dit (m) worden niet apart genoemd
 const MAX_FOTOS = 12
@@ -491,7 +498,7 @@ function startVooraf() {
   // even wachten: wie de pin nog versleept of de afstand nog verstelt, krijgt geen dubbel werk
   setTimeout(() => {
     if (signaal.aborted) return
-    voorafOphalen(staat.punten[0], staat.modus, staat.km, signaal)
+    voorafOphalen(staat.punten[0], staat.modus, staat.km, signaal, { graaf: GRAAF })
       .then((n) => {
         if (window.onverhard) window.onverhard.vooraf = { tegels: n, ms: Math.round(performance.now() - t0), klaar: true }
       })
@@ -1056,6 +1063,7 @@ async function planNu() {
       rondjeKm: rondje || station || staat.modus === 'gebied' ? staat.km : null,
       binnen: binnenVlak ? binnen.naam : undefined,
       ringen: new URLSearchParams(location.search).get('stations') === 'ringen', // stap 5: alleen op verzoek (uitkomst kan afwijken)
+      graaf: GRAAF, // graaf-proef
       router: ['eigen', 'brouter', 'auto'].includes(new URLSearchParams(location.search).get('router')) ? new URLSearchParams(location.search).get('router') : STANDAARD_ROUTER, // stap 6
       law: staat.law,
       trail: staat.trail,

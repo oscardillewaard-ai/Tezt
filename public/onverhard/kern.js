@@ -1034,7 +1034,8 @@ export function meetpunten(stukken) {
     const osmGroep = s.osmZeker ? groep(s.osm) : null
     for (let j = 0; j < k; j++) {
       const [x, y] = puntOpLijn(s.xy, (lengte * (j + 0.5)) / k)
-      uit.push({ x, y, stuk: si, niveau, osmGroep })
+      // af: afstand vanaf de start van de route (voor het vooraf berekende oordeel, blokgraaf.js)
+      uit.push({ x, y, stuk: si, niveau, osmGroep, af: s.van + ((s.tot - s.van) * (j + 0.5)) / k })
     }
   })
   return uit
@@ -1078,7 +1079,7 @@ export function analyseer(traject, vlakken, klaar = null) {
   if (vlakken && stukken.length) {
     const perStuk = stukken.map(() => [])
     for (const m of (klaar && klaar.punten) || meetpunten(stukken)) {
-      perStuk[m.stuk].push(vlakken.zoek(m.x, m.y, m.niveau, m.osmGroep))
+      perStuk[m.stuk].push(vlakken.zoekMeetpunt ? vlakken.zoekMeetpunt(m) : vlakken.zoek(m.x, m.y, m.niveau, m.osmGroep))
     }
     stukken.forEach((s, si) => {
       const lijst = perStuk[si]

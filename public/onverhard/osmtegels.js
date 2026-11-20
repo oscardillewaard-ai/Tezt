@@ -190,7 +190,7 @@ export function leesOsmTegel(bytes, x, y, idStart = 0, { zoom = TEGEL_ZOOM, lage
         if (p.brunnel === 'bridge') t.bridge = 'yes'
         if (p.brunnel === 'tunnel') t.tunnel = 'yes'
         if (p.layer) t.layer = String(p.layer)
-        for (const st of stukken) if (st.length >= 2) uit.push({ type: 'way', id: ++id, tags: t, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel' })
+        for (const st of stukken) if (st.length >= 2) uit.push({ type: 'way', id: ++id, tags: t, geometry: st.map(([gx, gy]) => naarLatLon(gx, gy)), bron: 'tegel', osm: fid % 10 === 2 ? Math.floor(fid / 10) : 0 })
       } else if (naam === 'poi' && soort === 1 && stukken.length && stukken[0].length) {
         const s2 = POI_SOORT[`${p.class}/${p.subclass}`]
         if (STATION_SOORT.has(`${p.class}/${p.subclass}`)) {
