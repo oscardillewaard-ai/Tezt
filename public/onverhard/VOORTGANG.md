@@ -105,7 +105,10 @@ en dat is ook de standaardbranch (HEAD). Veiligste redelijke keuze:
 - **tags kunnen niet gepusht worden**: de git-proxy van deze omgeving weigert `refs/tags/*` (HTTP 403),
   branches gaan wel. De tags (`voor-ux`, `na-ux-1`, ...) staan daarom lokaal én als branch
   `terugzet/<tag>` op GitHub (bv. `terugzet/voor-ux`, `terugzet/na-ux-1`);
-- ik push **niet** zelf naar de livebranch, omdat de naam in de opdracht niet bestaat en een
+- **live gezet op verzoek** (20-11-2026): `na-snelheid` (`7c885b5`) is als fast-forward naar
+  `claude/gpx-ultrarace-trainingen-zf6zci` gepusht; GitHub Pages serveert `onverhard-v44` en een
+  rooktest op de live site (rondje 10 km vanaf Delft Centraal) gaf score 50 zonder fouten.
+  Vóór die vraag pushte ik **niet** zelf naar de livebranch, omdat de naam in de opdracht niet bestaat en een
   verkeerde gok de live site raakt. Live zetten is één commando (zie "Terugzetten en live zetten").
 
 ## Status
