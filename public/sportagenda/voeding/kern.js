@@ -49,6 +49,51 @@ export function somMacros(lijst) {
   return out
 }
 
+// ---------- Doelen ----------
+
+/** kcal per gram: eiwit en koolhydraten 4, vet 9 (de gangbare vuistregel). */
+export const KCAL_PER_G = { eiwit: 4, kh: 4, vet: 9 }
+
+/** Hoeveel kcal de macrodoelen samen zijn. */
+export function macroKcal(d = {}) {
+  return ['eiwit', 'kh', 'vet'].reduce((s, k) => s + (num(d[k]) || 0) * KCAL_PER_G[k], 0)
+}
+
+/**
+ * Controle van de dagdoelen: de macro's mogen samen niet meer kcal geven dan het kcal-doel
+ * (5 kcal speling voor afronding). Geeft null als het klopt, anders een uitleg.
+ */
+export function controleerDoelen(d) {
+  const kcal = num(d?.kcal)
+  if (kcal === null) return null
+  const m = Math.round(macroKcal(d))
+  if (m <= kcal + 5) return null
+  return `Je macro's zijn samen ${m.toLocaleString('nl-NL')} kcal, meer dan je doel van ${kcal.toLocaleString('nl-NL')} kcal. Haal ${(m - kcal).toLocaleString('nl-NL')} kcal weg bij eiwit, koolhydraten of vet.`
+}
+
+/** Verdeling in procenten (samen 100) naar grammen, naar beneden afgerond: zo komt het nooit boven het kcal-doel. */
+export function gramVanProcent(kcal, pct) {
+  const k = num(kcal)
+  const g = (key) => (k === null || num(pct?.[key]) === null ? null : Math.floor((k * num(pct[key])) / 100 / KCAL_PER_G[key] + 1e-9))
+  return { kcal: k, eiwit: g('eiwit'), kh: g('kh'), vet: g('vet') }
+}
+
+/** Grammen naar procenten van het kcal-doel (voor oudere instellingen zonder procenten). */
+export function procentVanGram(d) {
+  const k = num(d?.kcal)
+  const p = (key) => (!k || num(d[key]) === null ? null : Math.round(((num(d[key]) * KCAL_PER_G[key]) / k) * 100))
+  return { eiwit: p('eiwit'), kh: p('kh'), vet: p('vet') }
+}
+
+/** De procenten moeten samen 100 zijn. Geeft null als het klopt, anders een uitleg. */
+export function controleerProcenten(pct) {
+  const vals = ['eiwit', 'kh', 'vet'].map((k) => num(pct?.[k]))
+  if (vals.some((v) => v === null)) return 'Vul voor eiwit, koolhydraten en vet een percentage in.'
+  const som = Math.round(vals.reduce((a, b) => a + b, 0) * 10) / 10
+  if (Math.abs(som - 100) > 0.5) return `Samen is het ${som.toLocaleString('nl-NL')}%; dat moet 100% zijn (${som > 100 ? `${(som - 100).toLocaleString('nl-NL')}% te veel` : `nog ${(100 - som).toLocaleString('nl-NL')}%`}).`
+  return null
+}
+
 // ---------- Recepten ----------
 
 /**

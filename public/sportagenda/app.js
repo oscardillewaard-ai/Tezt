@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '38' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '39' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -452,6 +452,13 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 39,
+    items: [
+      '🎯 Dagdoelen in procenten: kies je kcal en de verdeling eiwit, koolhydraten en vet (samen 100%), Tarapp rekent de grammen uit',
+      '↺ Bij elke maaltijd: "Zoals gisteren" zet dezelfde maaltijd van de vorige dag er met één tik in 💛',
+    ],
+  },
   {
     v: 38,
     items: [

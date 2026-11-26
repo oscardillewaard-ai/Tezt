@@ -4,7 +4,7 @@
 // - localStorage alleen onder sleutels met het voorvoegsel "voeding.". Bestaande
 //   Tarapp-sleutels (sportagenda.v1) worden nooit gelezen of aangepast.
 
-import { SCHEMA_VERSIE, PERSONEN } from './kern.js'
+import { SCHEMA_VERSIE, PERSONEN, procentVanGram } from './kern.js'
 
 export const DB_NAAM = 'tarapp-voeding'
 export const LS = {
@@ -139,7 +139,9 @@ export function standaardInstellingen() {
     schema: SCHEMA_VERSIE,
     persoon: null, // 'oscar' | 'tara'; gevraagd bij de eerste keer openen
     doorsturen: null, // null = volgt de persoon (Oscar aan, Tara uit)
-    doelen: { kcal: 2000, eiwit: 120, kh: 230, vet: 70 },
+    // 25% eiwit, 45% koolhydraten, 30% vet van 2000 kcal (4/4/9).
+    doelen: { kcal: 2000, eiwit: 125, kh: 225, vet: 66 },
+    doelenPct: { eiwit: 25, kh: 45, vet: 30 },
     vasteItems: [], // [{ productId, naam, grams, meal }]
     favorieten: [], // product-id's
   }
@@ -153,6 +155,14 @@ export function migreerInstellingen(s) {
   if (!PERSONEN.includes(out.persoon)) out.persoon = null
   if (!Array.isArray(out.vasteItems)) out.vasteItems = []
   if (!Array.isArray(out.favorieten)) out.favorieten = []
+  // De eerste standaarddoelen kwamen samen boven 2000 kcal uit: nooit aangepast = de nieuwe standaard.
+  const o = out.doelen
+  if (o.kcal === 2000 && o.eiwit === 120 && [220, 230].includes(o.kh) && o.vet === 70) {
+    out.doelen = { ...d.doelen }
+    out.doelenPct = { ...d.doelenPct }
+  }
+  // Doelen van vóór de procenten: verdeling afleiden uit de grammen.
+  if (!s.doelenPct || typeof s.doelenPct !== 'object') out.doelenPct = procentVanGram(out.doelen)
   // (schema 1 is de eerste versie; volgende versies krijgen hier hun eigen stap)
   out.schema = SCHEMA_VERSIE
   return out

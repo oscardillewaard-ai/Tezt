@@ -8,7 +8,8 @@ import { NEVO, NEVO_BRON } from './nevo.js'
 import {
   MEALS,
   MEAL_NL,
-  MACRO_KEYS,
+  controleerProcenten,
+  gramVanProcent,
   kjNaarKcal,
   macrosVoor,
   normaliseerBarcode,
@@ -185,6 +186,7 @@ export async function mount(el, context) {
   root.addEventListener('click', onClick)
   root.addEventListener('submit', onSubmit)
   root.addEventListener('change', onChange)
+  root.addEventListener('input', onInput)
   if (!geladen) {
     teken()
     laadPromise ||= (async () => {
@@ -193,9 +195,16 @@ export async function mount(el, context) {
       } catch (err) {
         foutMelding = err?.message || 'onbekende fout'
       }
+      // Na een sync: alleen opnieuw tekenen als er nieuwe regels zijn én je op de dagpagina staat.
+      // Anders alleen de statusregel bijwerken, zodat wat je net intypt (bijv. bij Doelen) blijft staan.
       opWijziging(async (changed) => {
         if (changed) await laadRegels()
-        if (root?.isConnected) teken()
+        if (!root?.isConnected) return
+        if (changed && pagina === 'dag' && !ctx.sheet.open) return teken()
+        const el = root.querySelector('#v-sync')
+        if (el) el.textContent = syncTekst()
+        const lbl = root.querySelector('[data-page="instellingen"] .pref-value')
+        if (lbl) lbl.textContent = syncLabel()
       })
       addEventListener('online', () => inst?.persoon && syncNu(inst))
       if (inst?.persoon) syncNu(inst)
@@ -292,7 +301,10 @@ function tekenDag() {
           </button>`,
           )
           .join('')}
-        <button type="button" class="linkbtn v-add" data-v="toevoegen" data-meal="${meal}">+ Toevoegen</button>
+        <div class="v-meal-acties">
+          <button type="button" class="linkbtn v-add" data-v="toevoegen" data-meal="${meal}">+ Toevoegen</button>
+          ${vorigeMaaltijd(meal).length ? `<button type="button" class="linkbtn v-gisteren" data-v="gisteren" data-meal="${meal}">↺ Zoals ${esc(dagLabel(verschuif(dag, -1)).toLowerCase())}</button>` : ''}
+        </div>
       </section>`
   }).join('')
   return `
@@ -363,6 +375,7 @@ function terug() {
 
 function tekenInstellingen() {
   const d = inst.doelen
+  const pct = inst.doelenPct || {}
   const fwd = db.doorsturenAan(inst)
   const naam = inst.persoon === 'oscar' ? 'Oscar' : 'Tara'
   return `
@@ -377,12 +390,14 @@ function tekenInstellingen() {
     <section class="card">
       <h2>Dagdoelen</h2>
       <form id="v-doelen">
-        <div class="row">
-          <label class="field">kcal<input name="kcal" inputmode="numeric" value="${d.kcal ?? ''}" /></label>
-          <label class="field">Eiwit (g)<input name="eiwit" inputmode="decimal" value="${d.eiwit ?? ''}" /></label>
-          <label class="field">Koolhydraten (g)<input name="kh" inputmode="decimal" value="${d.kh ?? ''}" /></label>
-          <label class="field">Vet (g)<input name="vet" inputmode="decimal" value="${d.vet ?? ''}" /></label>
+        <label class="field">kcal per dag<input name="kcal" inputmode="numeric" value="${d.kcal ?? ''}" /></label>
+        <p class="muted">Verdeling over de macro's, samen 100%:</p>
+        <div class="v-pct">
+          <label class="field">Eiwit<span class="v-pct-in"><input name="eiwit" inputmode="decimal" value="${pct.eiwit ?? ''}" />%</span></label>
+          <label class="field">Koolhydraten<span class="v-pct-in"><input name="kh" inputmode="decimal" value="${pct.kh ?? ''}" />%</span></label>
+          <label class="field">Vet<span class="v-pct-in"><input name="vet" inputmode="decimal" value="${pct.vet ?? ''}" />%</span></label>
         </div>
+        <p class="v-macrokcal" id="v-macrokcal">${doelenTekst(d.kcal, pct)}</p>
         <button type="submit" class="btn primary block">Doelen opslaan</button>
       </form>
     </section>
@@ -472,6 +487,7 @@ async function onClick(e) {
       return
     }
     if (v === 'vaste') return openVasteItems()
+    if (v === 'gisteren') return kopieerMaaltijd(el.dataset.meal)
     if (v === 'kopieer') return openKopieer()
     if (v === 'koppel-hb') return koppel()
     if (v === 'sync') {
@@ -488,11 +504,40 @@ async function onClick(e) {
   }
 }
 
+/** Live onder de doelen: de grammen die bij de verdeling horen, of wat er niet klopt. */
+function doelenTekst(kcal, pct) {
+  const fout = controleerProcenten(pct)
+  if (fout) return `<span class="v-fout">⚠️ ${esc(fout)}</span>`
+  if (num(kcal) === null) return 'Vul je kcal per dag in.'
+  const g = gramVanProcent(kcal, pct)
+  return `Samen 100% ✓ Dat is per dag: <strong>eiwit ${fmt(g.eiwit)} g</strong> · <strong>koolhydraten ${fmt(g.kh)} g</strong> · <strong>vet ${fmt(g.vet)} g</strong>.<br /><small>Eiwit en koolhydraten 4 kcal per gram, vet 9.</small>`
+}
+
+function leesDoelen(form) {
+  const fd = new FormData(form)
+  return { kcal: num(fd.get('kcal')), pct: { eiwit: num(fd.get('eiwit')), kh: num(fd.get('kh')), vet: num(fd.get('vet')) } }
+}
+
+function onInput(e) {
+  const form = e.target.closest('#v-doelen')
+  if (!form) return
+  const { kcal, pct } = leesDoelen(form)
+  const el = form.querySelector('#v-macrokcal')
+  if (el) el.innerHTML = doelenTekst(kcal, pct)
+}
+
 function onSubmit(e) {
   if (e.target.id !== 'v-doelen') return
   e.preventDefault()
-  const fd = new FormData(e.target)
-  for (const k of MACRO_KEYS) inst.doelen[k] = num(fd.get(k))
+  const { kcal, pct } = leesDoelen(e.target)
+  const fout = kcal === null ? 'Vul je kcal per dag in.' : controleerProcenten(pct)
+  if (fout) {
+    ctx.showToast(fout)
+    return
+  }
+  const nieuw = gramVanProcent(kcal, pct)
+  inst.doelenPct = pct
+  inst.doelen = nieuw
   bewaarInst()
   ctx.showToast('Doelen opgeslagen 🎯')
   pagina = 'dag'
@@ -1010,6 +1055,32 @@ function openRecept(recept) {
     if (live) live.innerHTML = `<strong>${fmt(w.perPortie.kcal)} kcal per portie</strong><span>E ${fmt(w.perPortie.eiwit, 1)} g</span><span>K ${fmt(w.perPortie.kh, 1)} g</span><span>V ${fmt(w.perPortie.vet, 1)} g</span><span class="muted">portie ${fmt(w.portieGram)} g</span>`
   })
   tekenIngr()
+}
+
+// ---------- Maaltijd van de vorige dag ----------
+
+function vorigeMaaltijd(meal) {
+  const prev = verschuif(dag, -1)
+  return alleRegels.filter((r) => r.date === prev && r.meal === meal && !r.deleted)
+}
+
+async function kopieerMaaltijd(meal) {
+  const bron = vorigeMaaltijd(meal)
+  if (!bron.length) return
+  const nu = Date.now()
+  const tijd = isVandaag() ? tijdAmsterdam() : MEAL_TIJD[meal]
+  const nieuw = bron.map((r, i) => ({ ...r, id: uid(), date: dag, time: tijd, updatedAt: nu + i, dirty: 1 }))
+  await db.zetVeel('dagboek', nieuw)
+  await laadRegels()
+  teken()
+  syncStraks(inst)
+  ctx.showToast(`${MEAL_NL[meal]} van ${dagLabel(verschuif(dag, -1)).toLowerCase()} overgenomen (${nieuw.length}) ↺`, async () => {
+    const t = Date.now()
+    await db.zetVeel('dagboek', nieuw.map((r, i) => ({ id: r.id, date: r.date, updatedAt: t + i, deleted: true, dirty: 1 })))
+    await laadRegels()
+    teken()
+    syncStraks(inst)
+  })
 }
 
 // ---------- Vaste items en dag kopiëren ----------

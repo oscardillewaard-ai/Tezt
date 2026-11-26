@@ -148,9 +148,40 @@ test('back-up: oudere/rommelige gegevens worden netjes omgezet, nieuwere geweige
   const m = migreerBackup({ schema: 1, instellingen: { persoon: 'x', doelen: { kcal: 1800 } }, producten: [{ id: 'eigen:1', naam: 'A' }, { naam: 'zonder id' }], dagboek: [{ id: 'abcdef12', date: '2026-11-26', grams: 10, updatedAt: 1, name: 'A', dirty: 1 }, { id: 'x' }] })
   assert.equal(m.instellingen.persoon, null)
   assert.equal(m.instellingen.doelen.kcal, 1800)
-  assert.equal(m.instellingen.doelen.eiwit, 120)
+  assert.equal(m.instellingen.doelen.eiwit, 125)
   assert.equal(m.producten.length, 1)
   assert.equal(m.dagboek.length, 1)
   assert.equal(m.dagboek[0].dirty, undefined)
   assert.throws(() => migreerBackup({ schema: 99 }), /nieuwere/)
+})
+
+test('doelen in procenten: grammen, 100%-controle, en nooit boven het kcal-doel', async () => {
+  const { gramVanProcent, procentVanGram, controleerProcenten, controleerDoelen, macroKcal } = await import('../../public/sportagenda/voeding/kern.js')
+  assert.deepEqual(gramVanProcent(2000, { eiwit: 25, kh: 45, vet: 30 }), { kcal: 2000, eiwit: 125, kh: 225, vet: 66 })
+  assert.deepEqual(gramVanProcent('1800', { eiwit: '30', kh: '40', vet: '30' }), { kcal: 1800, eiwit: 135, kh: 180, vet: 60 })
+  assert.equal(controleerProcenten({ eiwit: 25, kh: 45, vet: 30 }), null)
+  assert.equal(controleerProcenten({ eiwit: '33,4', kh: 33.3, vet: 33.3 }), null)
+  assert.match(controleerProcenten({ eiwit: 30, kh: 50, vet: 30 }), /110%.*10% te veel/)
+  assert.match(controleerProcenten({ eiwit: 20, kh: 40, vet: 30 }), /nog 10%/)
+  assert.match(controleerProcenten({ eiwit: 20, kh: null, vet: 30 }), /Vul/)
+  // Elke geldige verdeling blijft (op afronding na) binnen het kcal-doel
+  for (const kcal of [1200, 1650, 2000, 2750, 3333])
+    for (const [e, k, v] of [[25, 45, 30], [40, 30, 30], [10, 60, 30], [33.4, 33.3, 33.3], [20, 20, 60]]) {
+      const g = gramVanProcent(kcal, { eiwit: e, kh: k, vet: v })
+      assert.ok(macroKcal(g) <= kcal, `${kcal} ${e}/${k}/${v}: ${macroKcal(g)}`)
+      assert.equal(controleerDoelen(g), null)
+    }
+  // Te veel macro's voor het kcal-doel wordt herkend (oude grammen-doelen)
+  assert.match(controleerDoelen({ kcal: 2000, eiwit: 120, kh: 230, vet: 70 }), /2\.030 kcal/)
+  assert.deepEqual(procentVanGram({ kcal: 2000, eiwit: 125, kh: 225, vet: 66 }), { eiwit: 25, kh: 45, vet: 30 })
+})
+
+test('instellingen: de oude standaarddoelen (boven 2000 kcal) worden bijgewerkt, eigen doelen niet', async () => {
+  const { migreerInstellingen } = await import('../../public/sportagenda/voeding/opslag.js')
+  const oud = migreerInstellingen({ persoon: 'oscar', doelen: { kcal: 2000, eiwit: 120, kh: 230, vet: 70 } })
+  assert.deepEqual(oud.doelen, { kcal: 2000, eiwit: 125, kh: 225, vet: 66 })
+  assert.deepEqual(oud.doelenPct, { eiwit: 25, kh: 45, vet: 30 })
+  const eigen = migreerInstellingen({ persoon: 'oscar', doelen: { kcal: 2500, eiwit: 180, kh: 250, vet: 80 } })
+  assert.deepEqual(eigen.doelen, { kcal: 2500, eiwit: 180, kh: 250, vet: 80 })
+  assert.deepEqual(eigen.doelenPct, { eiwit: 29, kh: 40, vet: 29 })
 })
