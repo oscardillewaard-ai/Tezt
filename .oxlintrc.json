@@ -16,6 +16,7 @@
   },
   "ignorePatterns": [
     "public/parken/vendor/**",
-    "public/onverhard/vendor/**"
+    "public/onverhard/vendor/**",
+    "public/sportagenda/voeding/vendor/**"
   ]
 }

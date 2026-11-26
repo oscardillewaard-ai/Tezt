@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v36'
+const CACHE = 'sportagenda-v37'
 const SHELL = [
   './',
   'index.html',
@@ -14,6 +14,31 @@ const SHELL = [
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
 ]
+
+// Voeding (en de scanner met zijn .wasm) wordt pas opgehaald als iemand Voeding
+// opent; dan vraagt de pagina om deze bestanden ook voor offline te bewaren.
+const VOEDING = [
+  'voeding/ui.js',
+  'voeding/kern.js',
+  'voeding/opslag.js',
+  'voeding/sync.js',
+  'voeding/basis.js',
+  'voeding/backup.js',
+  'voeding/scanner.js',
+  'voeding/voeding.css',
+  'voeding/vendor/barcode-detector.js',
+  'voeding/vendor/zxing_reader.wasm',
+]
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'voeding-precache') return
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => Promise.all(VOEDING.map((u) => c.match(u).then((hit) => hit || c.add(new Request(u, { cache: 'reload' }))))))
+      .catch(() => {}),
+  )
+})
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

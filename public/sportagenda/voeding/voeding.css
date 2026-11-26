@@ -1,0 +1,308 @@
+/* Voeding: alleen eigen klassen (v-…), gebouwd op de variabelen en bouwstenen
+   van Tarapp (card, btn, pref-row, segmented, field). Zo volgen de thema's vanzelf. */
+
+.v-daynav .v-daylabel {
+  display: grid;
+  justify-items: center;
+  color: var(--text);
+  font-weight: 400;
+}
+
+.v-daynav .v-daylabel small {
+  font-weight: 400;
+}
+
+.v-sum-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.v-big {
+  font-size: 1.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.v-left {
+  color: var(--muted);
+}
+
+.v-left strong {
+  color: var(--text);
+}
+
+.v-macro {
+  margin-top: 8px;
+}
+
+.v-macro-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.v-macro-top strong {
+  color: var(--text);
+}
+
+.v-bar {
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.v-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.v-bar.over i {
+  background: var(--danger) !important;
+}
+
+.v-meal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.v-meal-head h3 {
+  margin: 0 0 4px;
+}
+
+.v-row,
+.v-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.v-row:active,
+.v-result:active {
+  background: var(--accent-soft);
+}
+
+.v-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.v-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v-name small {
+  color: var(--muted);
+}
+
+.v-kcal {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.v-kcal small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.v-add {
+  margin-top: 4px;
+}
+
+.v-dagacties {
+  margin: 0 0 12px;
+}
+
+.v-links {
+  margin-bottom: 12px !important;
+}
+
+.v-emoji {
+  background: var(--accent-soft);
+  font-size: 1.05rem;
+}
+
+.v-bron {
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.v-pad {
+  margin: 8px 6px 0;
+}
+
+.v-sheet .v-search {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px; /* geen inzoomen op iOS */
+}
+
+.v-scanrow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.v-tabs {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.v-tabs[hidden] {
+  display: none;
+}
+
+.v-results {
+  max-height: 46dvh;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.v-offzoek {
+  margin-top: 10px;
+}
+
+.v-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 12px;
+}
+
+.v-chips .btn {
+  padding: 7px 12px;
+  font-size: 0.85rem;
+}
+
+.v-live {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.v-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.v-check input {
+  width: 20px;
+  height: 20px;
+}
+
+.v-vast {
+  padding: 6px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.v-vast .grow {
+  flex: 1;
+}
+
+.v-video {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  margin-bottom: 10px;
+}
+
+.v-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.v-aim {
+  position: absolute;
+  inset: 32% 12%;
+  border: 3px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 0 0 999px rgb(0 0 0 / 0.25);
+}
+
+.v-ingr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.v-ingr .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.v-ingr input {
+  width: 76px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  text-align: right;
+}
+
+.v-hblink {
+  display: block;
+  margin-bottom: 12px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.v-details {
+  margin-bottom: 12px;
+}
+
+.v-details summary {
+  cursor: pointer;
+  color: var(--accent-text);
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+.v-welkom .actions .btn {
+  font-size: 1.05rem;
+}

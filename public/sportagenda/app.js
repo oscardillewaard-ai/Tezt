@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '36' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '37' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -319,6 +319,7 @@ function render() {
   const scrolling = ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()
   const anchor = scrolling ? scrollAnchor() : null
   view.innerHTML = renderers[ui.tab]()
+  if (ui.tab === 'meer' && ui.morePage === 'voeding') mountVoeding()
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
   fitAgenda()
@@ -448,6 +449,13 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 37,
+    items: [
+      '🍎 Nieuw: Voeding (Meer → Voeding). Houd bij wat je eet, met kcal, eiwit, koolhydraten en vet: zoeken, barcode scannen, favorieten, eigen producten, recepten en dagdoelen 💛',
+      'Liever niet? Zet Voeding uit onder Meer; je gegevens blijven bewaard',
+    ],
+  },
   { v: 36, items: ['De prullenbak verschijnt bij het slepen nu bovenin, dus je kunt een training ook gewoon naar zondag slepen 💛'] },
   {
     v: 35,
@@ -1575,9 +1583,41 @@ const MORE_PAGES = {
   gegevens: { title: 'Je gegevens', render: () => renderDataCard() },
   installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
   herinneringen: { title: 'Herinneringen', render: () => renderRemindersCard() },
+  voeding: { title: 'Voeding', render: () => '<div id="voeding-root"><p class="muted">Voeding laden…</p></div>' },
+}
+
+// ---------- Voeding (eigen module in voeding/, pas geladen als je hem opent) ----------
+// Hier alleen de ingang, de aan/uit-schakelaar en de back-up. Uit = geen ingang en
+// niets geladen; de gegevens (IndexedDB "tarapp-voeding") blijven gewoon staan.
+const voedingTonen = () => {
+  try {
+    return localStorage.getItem('voeding.tonen') !== '0'
+  } catch {
+    return true
+  }
+}
+
+function mountVoeding() {
+  const el = document.getElementById('voeding-root')
+  if (!el) return
+  import('./voeding/ui.js')
+    .then((m) =>
+      m.mount(el, {
+        esc,
+        sheet,
+        openSheet,
+        closeSheet,
+        showToast,
+        setTitle: (t) => (title.textContent = t),
+      }),
+    )
+    .catch(() => {
+      el.innerHTML = '<section class="card"><h2>Voeding kan nu niet laden</h2><p class="muted">Controleer je internet en probeer het opnieuw. De rest van Tarapp werkt gewoon.</p></section>'
+    })
 }
 
 function renderMore() {
+  if (ui.morePage === 'voeding' && !voedingTonen()) ui.morePage = null
   const page = MORE_PAGES[ui.morePage]
   if (page) {
     title.textContent = page.title
@@ -1615,6 +1655,15 @@ function renderMore() {
         <span class="pref-ico" style="background:#8b5cf6">${svgIcon('stem')}</span>
         <span class="pref-label">Gesproken aanwijzingen<small>Bij intervaltraining</small></span>
         <input type="checkbox" class="switch" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} aria-label="Gesproken aanwijzingen bij intervaltraining" />
+      </label>
+    </div>
+    <h3 class="pref-head">Voeding</h3>
+    <div class="pref-list card">
+      ${voedingTonen() ? row({ page: 'voeding', icon: 'voeding', color: '#22c55e', label: 'Voeding', sub: 'Wat je eet: kcal, eiwit, koolhydraten, vet' }) : ''}
+      <label class="pref-row">
+        <span class="pref-ico" style="background:#16a34a">${svgIcon('voeding')}</span>
+        <span class="pref-label">Voeding tonen<small>Uit: verborgen, je gegevens blijven bewaard</small></span>
+        <input type="checkbox" class="switch" data-voeding-tonen ${voedingTonen() ? 'checked' : ''} aria-label="Voeding tonen" />
       </label>
     </div>
     <h3 class="pref-head">Je gegevens</h3>
@@ -4937,6 +4986,16 @@ view.addEventListener('submit', (e) => {
 })
 
 view.addEventListener('change', (e) => {
+  if (!('voedingTonen' in e.target.dataset)) return
+  try {
+    localStorage.setItem('voeding.tonen', e.target.checked ? '1' : '0')
+  } catch {
+    // Opslag geblokkeerd: dan blijft het zoals het was.
+  }
+  render()
+})
+
+view.addEventListener('change', (e) => {
   if (e.target.dataset.icu === 'auto' && icu) {
     icu.auto = e.target.checked
     icuSave()
@@ -4961,10 +5020,20 @@ view.addEventListener('change', async (e) => {
     if (isBlockJson(parsed)) return openBlockImportSheet(parsed)
     if (!isValidState(parsed)) throw new Error('ongeldig')
     if (!confirm('Huidige gegevens vervangen door deze back-up?')) return
+    const voeding = parsed.voeding
+    delete parsed.voeding
     state = normalize(parsed)
     save()
+    let voedingFout = false
+    if (voeding) {
+      try {
+        await (await import('./voeding/backup.js')).importeer(voeding)
+      } catch {
+        voedingFout = true
+      }
+    }
     render()
-    alert('Back-up teruggezet.')
+    alert(voedingFout ? 'Back-up teruggezet, maar Voeding kon niet worden teruggezet.' : 'Back-up teruggezet.')
   } catch {
     alert('Dit bestand is geen geldige Tarapp-back-up.')
   }
@@ -5072,7 +5141,14 @@ function renderRemindersCard() {
 }
 
 async function exportData() {
-  const json = JSON.stringify(state, null, 2)
+  // Voeding staat in een eigen opslag (IndexedDB); die gaat er als los blok bij.
+  let voeding = null
+  try {
+    voeding = await (await import('./voeding/backup.js')).exporteer()
+  } catch {
+    // Geen IndexedDB of module niet te laden: de back-up van de rest gaat gewoon door.
+  }
+  const json = JSON.stringify(voeding ? { ...state, voeding } : state, null, 2)
   const name = `tarapp-backup-${todayKey()}.json`
   const file = new File([json], name, { type: 'application/json' })
   // Op iPhone werkt het deelmenu beter dan een download ("Bewaar in Bestanden").
@@ -5122,6 +5198,12 @@ const unfinished = state.sessions.find((s) => s.log && !s.log.endedAt && Date.no
 if (unfinished) ui.active = unfinished.id
 const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt && Date.now() - s.runLog.startedAt < 3 * 3600e3)
 if (unfinishedRun) ui.run = unfinishedRun.id
+
+// Koppel-link voor een tweede apparaat van Voeding: meteen naar Voeding.
+if (/[#&]voeding=/.test(location.hash) && voedingTonen()) {
+  ui.tab = 'meer'
+  ui.morePage = 'voeding'
+}
 
 // Icoontjes in de vaste HTML (tabbalk).
 renderTabIcons()
