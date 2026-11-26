@@ -1,0 +1,85 @@
+name: voeding-worker
+
+# Test de Voeding-code van Tarapp en zet de Cloudflare Worker (proxy/voeding/) neer.
+# Deploy gebeurt alleen op de hoofdbranch en alleen als het repo-secret
+# CLOUDFLARE_API_TOKEN bestaat (zie docs/voeding-stappen-voor-oscar.md).
+# De KV-opslag "tarapp-voeding" wordt bij de eerste keer automatisch aangemaakt.
+
+on:
+  push:
+    paths:
+      - 'proxy/voeding/**'
+      - 'public/sportagenda/voeding/**'
+      - 'tests/voeding/**'
+      - '.github/workflows/voeding-worker.yml'
+  pull_request:
+    paths:
+      - 'proxy/voeding/**'
+      - 'public/sportagenda/voeding/**'
+      - 'tests/voeding/**'
+      - '.github/workflows/voeding-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voeding-worker-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Voeding-tests
+        run: node --test tests/voeding/*.test.mjs
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/claude/gpx-ultrarace-trainingen-zf6zci'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: proxy/voeding
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Is er een Cloudflare-token?
+        id: token
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::Geen CLOUDFLARE_API_TOKEN als repo-secret: de Worker wordt niet neergezet. Zie docs/voeding-stappen-voor-oscar.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: KV-opslag zoeken of aanmaken
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          find_id() { npx --yes wrangler@4 kv namespace list 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s.slice(s.indexOf("[")));const n=a.find(x=>x.title==="tarapp-voeding");process.stdout.write(n?n.id:"")})'; }
+          ID=$(find_id)
+          if [ -z "$ID" ]; then
+            npx --yes wrangler@4 kv namespace create tarapp-voeding
+            ID=$(find_id)
+          fi
+          if [ -z "$ID" ]; then echo "::error::KV-opslag tarapp-voeding niet gevonden of aangemaakt"; exit 1; fi
+          sed -i "s/__VOEDING_KV_ID__/$ID/" wrangler.toml
+          echo "KV-opslag: $ID"
+      - name: Worker neerzetten
+        if: steps.token.outputs.ok == 'true'
+        run: npx --yes wrangler@4 deploy
+      - name: Controle (statuspagina)
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          sleep 5
+          curl -fsS https://tarapp-voeding.oscar-dillewaard.workers.dev/ || echo "::warning::De statuspagina reageert (nog) niet op tarapp-voeding.oscar-dillewaard.workers.dev. Kijk in de uitvoer van 'Worker neerzetten' welk adres Cloudflare gaf; wijkt het af, zie docs/voeding-beslissingen.md."

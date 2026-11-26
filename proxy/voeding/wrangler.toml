@@ -1,0 +1,18 @@
+# Cloudflare Worker voor Voeding in Tarapp (zie worker.js).
+# Wordt neergezet door .github/workflows/voeding-worker.yml. Die workflow maakt de
+# KV-opslag "tarapp-voeding" zelf aan als hij nog niet bestaat en vult de id hieronder in;
+# __VOEDING_KV_ID__ hoeft dus niet met de hand te worden aangepast.
+name = "tarapp-voeding"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[vars]
+APP_VERSION = "38"
+# Contact in de User-Agent voor Open Food Facts (zij vragen erom). Bewust de publieke
+# repo-pagina en geen persoonlijk e-mailadres.
+OFF_CONTACT = "https://github.com/oscardillewaard-ai/Tezt"
+
+[[kv_namespaces]]
+binding = "VOEDING"
+id = "__VOEDING_KV_ID__"

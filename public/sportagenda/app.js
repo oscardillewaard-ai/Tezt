@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '36' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '38' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -185,7 +185,7 @@ const typeIcon = (t, cls = '') =>
 const ICON_EMOJI = {
   agenda: '📅', overzicht: '📊', schemas: '🏋️', meer: '⚙️', gym: '🏋️', slot: '🔒',
   hardlopen: '🏃', klimmen: '⛰️', vink: '✅', herhaal: '🔁', horloge: '⌚',
-  druppel: '🩸', weegschaal: '⚖️',
+  druppel: '🩸', weegschaal: '⚖️', voeding: '🍎',
 }
 const iconOrEmoji = (name, cls = '') =>
   useEmoji() && ICON_EMOJI[name] ? `<span class="emo-ico ${cls}">${ICON_EMOJI[name]}</span>` : svgIcon(name, cls)
@@ -315,10 +315,14 @@ function render() {
   // De agenda heeft per dag een +; de zwevende knop alleen bij schema's.
   fab.hidden = ui.tab !== 'schemas'
   topActions.innerHTML = ui.tab === 'week' ? calToggle() : ''
-  const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore }
+  if (ui.tab === 'voeding' && !voedingTonen()) ui.tab = 'overzicht'
+  if (ui.tab === 'overzicht' && voedingTonen()) ui.tab = 'meer'
+  renderTabbar()
+  const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore, voeding: renderVoedingTab }
   const scrolling = ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()
   const anchor = scrolling ? scrollAnchor() : null
   view.innerHTML = renderers[ui.tab]()
+  if (ui.tab === 'voeding') mountVoeding()
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
   fitAgenda()
@@ -448,6 +452,21 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 38,
+    items: [
+      '⚖️ Je ziet nu meteen of je je gewicht hebt ingevuld: in de agenda staat het onder de datum (en een blauw stipje in de maand)',
+      'Je gewicht en het verloop staan nu bij Voeding; bij Overzicht staat je cyclus 💛',
+    ],
+  },
+  {
+    v: 37,
+    items: [
+      '🍎 Nieuw: Voeding, onderin naast de Agenda. Houd bij wat je eet, met kcal, eiwit, koolhydraten en vet: zoeken, barcode scannen, favorieten, eigen producten, recepten en dagdoelen 💛',
+      '📊 Overzicht staat nu onder Meer',
+      'Liever niet? Zet Voeding uit onder Meer; dan staat Overzicht weer onderin en blijven je voedingsgegevens bewaard',
+    ],
+  },
   { v: 36, items: ['De prullenbak verschijnt bij het slepen nu bovenin, dus je kunt een training ook gewoon naar zondag slepen 💛'] },
   {
     v: 35,
@@ -688,9 +707,10 @@ function weekDaysHtml(ws, list) {
     const d = addDays(ws, i)
     const k = toKey(d)
     const daySessions = sortSessions(list.filter((s) => s.date === k))
+    const kg = bodyData().weights[k]
     days += `
       <div class="wday ${k === tKey ? 'today' : ''}" data-drop-date="${k}">
-        <button type="button" class="wday-label" data-action="day-sheet" data-date="${k}" aria-label="${DAYS[i]} ${d.getDate()} ${MONTHS[d.getMonth()]}: gewicht of ongesteld invullen${isPeriod(k) ? ' (ongesteld)' : ''}"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}${isPeriod(k) ? `<i class="period-dot" aria-hidden="true">${iconOrEmoji('druppel')}</i>` : ''}</strong></button>
+        <button type="button" class="wday-label" data-action="day-sheet" data-date="${k}" aria-label="${DAYS[i]} ${d.getDate()} ${MONTHS[d.getMonth()]}: ${kg != null ? `gewicht ${fmtKg(kg)} kg ingevuld` : 'gewicht of ongesteld invullen'}${isPeriod(k) ? ' (ongesteld)' : ''}"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}${isPeriod(k) ? `<i class="period-dot" aria-hidden="true">${iconOrEmoji('druppel')}</i>` : ''}</strong>${kg != null ? `<em class="wt-badge" aria-hidden="true">${fmtKg(kg)}</em>` : ''}</button>
         <div class="wday-items">
           ${daySessions.length ? daySessions.map(sessionRow).join('') : '<span class="rest">rust</span>'}
         </div>
@@ -977,7 +997,7 @@ function renderMonth() {
       .join('')
     cells += `
       <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
-        <span class="cal-num">${d.getDate()}${isPeriod(k) ? '<i class="cal-period" aria-label="ongesteld"></i>' : ''}</span>
+        <span class="cal-num">${d.getDate()}${isPeriod(k) ? '<i class="cal-period" aria-label="ongesteld"></i>' : ''}${bodyData().weights[k] != null ? '<i class="cal-wt" aria-label="gewicht ingevuld"></i>' : ''}</span>
         <span class="cal-marks">${marks}</span>
       </button>`
   }
@@ -1240,21 +1260,31 @@ function wireWeightChart() {
   svg.addEventListener('pointercancel', hide)
 }
 
-function renderBodyCard() {
-  const today = todayKey()
+// Gewicht als eigen kaart: bij Voeding (als die aan staat), anders in de Lichaam-kaart van Overzicht.
+function weightTile(k = todayKey()) {
   const ws = weightEntries()
   const last = ws[ws.length - 1]
   let delta = ''
   if (last) {
-    // Verschil met de meting van ongeveer een maand eerder (minstens 25 dagen).
-    const ref = ws.filter(([k]) => daysBetween(k, last[0]) >= 25).pop()
+    const ref = ws.filter(([x]) => daysBetween(x, last[0]) >= 25).pop()
     if (ref) {
       const dv = Math.round((last[1] - ref[1]) * 10) / 10
       delta = `${dv > 0 ? '+' : dv < 0 ? '−' : '±'}${fmtKg(Math.abs(dv))} kg sinds ${shortDate(fromKey(ref[0]))}`
     }
   }
-  const cyc = cycleInfo(today)
-  const onToday = isPeriod(today)
+  const that = bodyData().weights[k]
+  const label = k === todayKey() ? 'vandaag' : shortDate(fromKey(k))
+  return `
+        <button type="button" class="body-tile" data-action="day-sheet" data-date="${k}">
+          <span class="body-label">${iconOrEmoji('weegschaal')} Gewicht</span>
+          <strong>${last ? `${fmtKg(last[1])} kg` : '–'}</strong>
+          <span class="muted">${last ? delta || `gemeten op ${shortDate(fromKey(last[0]))}` : 'Tik om in te vullen'}</span>
+          <span class="wt-status ${that != null ? 'on' : ''}">${that != null ? `✓ ${label} ingevuld: ${fmtKg(that)} kg` : `${label} nog niet ingevuld · tik hier`}</span>
+        </button>`
+}
+
+function weightHistory() {
+  const ws = weightEntries()
   const list = ws
     .slice()
     .reverse()
@@ -1265,14 +1295,29 @@ function renderBodyCard() {
     })
     .join('')
   return `
+      ${ws.length >= 2 ? weightChart(ws) : ''}
+      ${ws.length ? `<details class="wt-list"><summary>Alle metingen (${ws.length})</summary>${list}</details>` : ''}`
+}
+
+function renderWeightCard(k = todayKey()) {
+  return `
+    <section class="card body-card">
+      <h2>Gewicht</h2>
+      ${weightTile(k)}
+      ${weightHistory()}
+      <p class="muted body-note">Ook in de agenda: tik op een datum. Een ingevuld gewicht zie je daar onder de datum. Dit staat alleen op je telefoon.</p>
+    </section>`
+}
+
+function renderBodyCard({ gewicht = true } = {}) {
+  const today = todayKey()
+  const cyc = cycleInfo(today)
+  const onToday = isPeriod(today)
+  return `
     <section class="card body-card">
       <h2>Lichaam</h2>
-      <div class="body-grid">
-        <button type="button" class="body-tile" data-action="day-sheet" data-date="${today}">
-          <span class="body-label">${iconOrEmoji('weegschaal')} Gewicht</span>
-          <strong>${last ? `${fmtKg(last[1])} kg` : '–'}</strong>
-          <span class="muted">${last ? delta || `gemeten op ${shortDate(fromKey(last[0]))}` : 'Tik om in te vullen'}</span>
-        </button>
+      <div class="body-grid ${gewicht ? '' : 'single'}">
+        ${gewicht ? weightTile(today) : ''}
         <div class="body-tile cycle">
           <span class="body-label">${iconOrEmoji('druppel')} Cyclus</span>
           <strong>${cyc && cyc.day <= 60 ? `Dag ${cyc.day}` : '–'}</strong>
@@ -1283,9 +1328,8 @@ function renderBodyCard() {
         <span class="body-label">${iconOrEmoji('druppel')} Vandaag ongesteld</span>
         <input type="checkbox" class="switch period-switch" data-action="period-today" ${onToday ? 'checked' : ''} aria-label="Vandaag ongesteld" />
       </label>
-      ${ws.length >= 2 ? weightChart(ws) : ''}
-      ${ws.length ? `<details class="wt-list"><summary>Alle metingen (${ws.length})</summary>${list}</details>` : ''}
-      <p class="muted body-note">Tik in de agenda op een datum om je gewicht in te vullen of aan te geven dat je ongesteld bent. Dit staat alleen op je telefoon.</p>
+      ${gewicht ? weightHistory() : ''}
+      <p class="muted body-note">${gewicht ? 'Tik in de agenda op een datum om je gewicht in te vullen of aan te geven dat je ongesteld bent.' : 'Tik in de agenda op een datum om aan te geven dat je ongesteld bent. Je gewicht staat bij Voeding.'} Dit staat alleen op je telefoon.</p>
     </section>`
 }
 
@@ -1479,7 +1523,7 @@ function renderOverview() {
 
   return `
     ${renderTotals()}
-    ${renderBodyCard()}
+    ${renderBodyCard({ gewicht: !voedingTonen() })}
     <section class="card">
       <div class="stat-grid">
         <div><strong>${streak}</strong><span class="muted">weken op rij</span></div>
@@ -1575,9 +1619,62 @@ const MORE_PAGES = {
   gegevens: { title: 'Je gegevens', render: () => renderDataCard() },
   installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
   herinneringen: { title: 'Herinneringen', render: () => renderRemindersCard() },
+  overzicht: { title: 'Overzicht', render: () => renderOverview() },
+}
+
+// ---------- Voeding (eigen module in voeding/, pas geladen als je hem opent) ----------
+// Hier alleen de ingang, de aan/uit-schakelaar en de back-up. Uit = geen ingang en
+// niets geladen; de gegevens (IndexedDB "tarapp-voeding") blijven gewoon staan.
+// Met Voeding aan staat Voeding als tweede tab onderin en verhuist Overzicht naar Meer;
+// met Voeding uit is alles zoals vroeger.
+function renderTabbar() {
+  const btn = document.querySelector('.tabbar button:nth-child(2)')
+  if (!btn) return
+  const id = voedingTonen() ? 'voeding' : 'overzicht'
+  if (btn.dataset.tab !== id) {
+    btn.dataset.tab = id
+    btn.innerHTML = `<span data-icon="${id}">${iconOrEmoji(id)}</span>${id === 'voeding' ? 'Voeding' : 'Overzicht'}`
+  }
+  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === ui.tab))
+}
+
+const renderVoedingTab = () => {
+  title.textContent = 'Voeding'
+  return '<div id="voeding-root"><p class="muted">Voeding laden…</p></div>'
+}
+
+const voedingTonen = () => {
+  try {
+    return localStorage.getItem('voeding.tonen') !== '0'
+  } catch {
+    return true
+  }
+}
+
+function mountVoeding() {
+  const el = document.getElementById('voeding-root')
+  if (!el) return
+  import('./voeding/ui.js')
+    .then((m) =>
+      m.mount(el, {
+        esc,
+        sheet,
+        openSheet,
+        closeSheet,
+        showToast,
+        setTitle: (t) => (title.textContent = t),
+        // Gewicht staat in de gegevens van Tarapp zelf; Voeding toont de kaart en de grafiek.
+        gewichtKaart: (k) => renderWeightCard(k),
+        naTekenen: () => wireWeightChart(),
+      }),
+    )
+    .catch(() => {
+      el.innerHTML = '<section class="card"><h2>Voeding kan nu niet laden</h2><p class="muted">Controleer je internet en probeer het opnieuw. De rest van Tarapp werkt gewoon.</p></section>'
+    })
 }
 
 function renderMore() {
+  if (ui.morePage === 'overzicht' && !voedingTonen()) ui.morePage = null
   const page = MORE_PAGES[ui.morePage]
   if (page) {
     title.textContent = page.title
@@ -1608,6 +1705,7 @@ function renderMore() {
     </div>
     <h3 class="pref-head">Trainen</h3>
     <div class="pref-list card">
+      ${voedingTonen() ? row({ page: 'overzicht', icon: 'overzicht', color: '#7c3aed', label: 'Overzicht', sub: 'Je weken, minuten per activiteit, scheenpijn' }) : ''}
       ${row({ page: 'activiteiten', icon: 'hardlopen', color: '#ea580c', label: 'Activiteiten', value: String(nTypes) })}
       ${row({ page: 'horloge', icon: 'horloge', color: '#10b981', label: 'Horloge (Zepp)', value: icu ? 'Gekoppeld' : 'Niet gekoppeld' })}
       ${row({ page: 'herinneringen', icon: 'bel', color: '#ef4444', label: 'Herinneringen', sub: 'Via de Agenda-app van je iPhone', value: state.settings?.reminderLast ? 'Aan' : '' })}
@@ -1615,6 +1713,14 @@ function renderMore() {
         <span class="pref-ico" style="background:#8b5cf6">${svgIcon('stem')}</span>
         <span class="pref-label">Gesproken aanwijzingen<small>Bij intervaltraining</small></span>
         <input type="checkbox" class="switch" data-setting="voice" ${state.settings?.voice === false ? '' : 'checked'} aria-label="Gesproken aanwijzingen bij intervaltraining" />
+      </label>
+    </div>
+    <h3 class="pref-head">Voeding</h3>
+    <div class="pref-list card">
+      <label class="pref-row">
+        <span class="pref-ico" style="background:#16a34a">${svgIcon('voeding')}</span>
+        <span class="pref-label">Voeding tonen<small>Als tab onderin; Overzicht staat dan hier onder Meer</small></span>
+        <input type="checkbox" class="switch" data-voeding-tonen ${voedingTonen() ? 'checked' : ''} aria-label="Voeding tonen" />
       </label>
     </div>
     <h3 class="pref-head">Je gegevens</h3>
@@ -4842,6 +4948,7 @@ const actions = {
     ui.morePage = el.dataset.page
     render()
     window.scrollTo(0, 0)
+    if (ui.morePage === 'overzicht') countUp(view)
   },
   'more-back': () => {
     ui.morePage = null
@@ -4937,6 +5044,16 @@ view.addEventListener('submit', (e) => {
 })
 
 view.addEventListener('change', (e) => {
+  if (!('voedingTonen' in e.target.dataset)) return
+  try {
+    localStorage.setItem('voeding.tonen', e.target.checked ? '1' : '0')
+  } catch {
+    // Opslag geblokkeerd: dan blijft het zoals het was.
+  }
+  render()
+})
+
+view.addEventListener('change', (e) => {
   if (e.target.dataset.icu === 'auto' && icu) {
     icu.auto = e.target.checked
     icuSave()
@@ -4961,10 +5078,20 @@ view.addEventListener('change', async (e) => {
     if (isBlockJson(parsed)) return openBlockImportSheet(parsed)
     if (!isValidState(parsed)) throw new Error('ongeldig')
     if (!confirm('Huidige gegevens vervangen door deze back-up?')) return
+    const voeding = parsed.voeding
+    delete parsed.voeding
     state = normalize(parsed)
     save()
+    let voedingFout = false
+    if (voeding) {
+      try {
+        await (await import('./voeding/backup.js')).importeer(voeding)
+      } catch {
+        voedingFout = true
+      }
+    }
     render()
-    alert('Back-up teruggezet.')
+    alert(voedingFout ? 'Back-up teruggezet, maar Voeding kon niet worden teruggezet.' : 'Back-up teruggezet.')
   } catch {
     alert('Dit bestand is geen geldige Tarapp-back-up.')
   }
@@ -5072,7 +5199,14 @@ function renderRemindersCard() {
 }
 
 async function exportData() {
-  const json = JSON.stringify(state, null, 2)
+  // Voeding staat in een eigen opslag (IndexedDB); die gaat er als los blok bij.
+  let voeding = null
+  try {
+    voeding = await (await import('./voeding/backup.js')).exporteer()
+  } catch {
+    // Geen IndexedDB of module niet te laden: de back-up van de rest gaat gewoon door.
+  }
+  const json = JSON.stringify(voeding ? { ...state, voeding } : state, null, 2)
   const name = `tarapp-backup-${todayKey()}.json`
   const file = new File([json], name, { type: 'application/json' })
   // Op iPhone werkt het deelmenu beter dan een download ("Bewaar in Bestanden").
@@ -5123,7 +5257,11 @@ if (unfinished) ui.active = unfinished.id
 const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt && Date.now() - s.runLog.startedAt < 3 * 3600e3)
 if (unfinishedRun) ui.run = unfinishedRun.id
 
-// Icoontjes in de vaste HTML (tabbalk).
+// Koppel-link voor een tweede apparaat van Voeding: meteen naar Voeding.
+if (/[#&]voeding=/.test(location.hash) && voedingTonen()) ui.tab = 'voeding'
+
+// Icoontjes in de vaste HTML (tabbalk), en Voeding of Overzicht als tweede tab.
+renderTabbar()
 renderTabIcons()
 applyTheme()
 

@@ -3448,3 +3448,50 @@ body.is-dragging .toast {
   opacity: 0.25;
   pointer-events: none;
 }
+
+/* Gewicht ingevuld: klein label onder de datum in de agenda, stipje in de maand */
+.wt-badge {
+  display: block;
+  margin-top: 2px;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cal-wt {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #3b82f6;
+  vertical-align: 2px;
+}
+
+.wt-status {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.wt-status.on {
+  color: #3b82f6;
+}
+
+.body-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.body-card > .body-tile {
+  width: 100%;
+  margin-bottom: 8px;
+}

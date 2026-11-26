@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "audit": "node scripts/audit.mjs",
-    "gen:races": "node scripts/gen-famous-races.mjs"
+    "gen:races": "node scripts/gen-famous-races.mjs",
+    "test:voeding": "node --test tests/voeding/*.test.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

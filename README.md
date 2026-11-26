@@ -108,6 +108,27 @@ worden neergezet en als tussenstation worden ingevuld.
 
 Iconen opnieuw genereren: `node scripts/gen-sportagenda-icons.mjs`.
 
+### Voeding (in Tarapp)
+
+Een voedingsdagboek in MyFitnessPal-stijl met alleen kcal, eiwit, koolhydraten en vet: per maaltijd, met zoeken,
+barcode scannen, recent, favorieten, eigen producten, recepten, vaste items, dag kopiëren en dagdoelen. Het staat als
+tab **Voeding** onderin (Overzicht staat dan onder Meer); met **Meer → Voeding tonen** uit is alles zoals vroeger.
+
+- Code in `public/sportagenda/voeding/`, pas geladen als je Voeding opent (dynamic `import()`); de scanner en zijn
+  `.wasm` pas bij scannen. In `app.js` staat alleen de ingang, de schakelaar, de back-up en de changelog.
+- Opslag: IndexedDB `tarapp-voeding` (schemaversie met migratiecode in `opslag.js`) en `localStorage` alleen onder
+  `voeding.*`. Voeding gaat als blok `voeding` mee in de gewone back-up.
+- Productdata: merkproducten en barcodes via Open Food Facts (ODbL), altijd via de Worker; ~220 basisproducten uit
+  USDA FoodData Central (publiek domein, met FDC-id) in `voeding/basis.js`, gemaakt met `scripts/gen-voeding-basis.mjs`.
+  Optioneel de Nederlandse NEVO-tabel (RIVM) in `voeding/nevo.js`, ongewijzigd en met bron en versie, gemaakt met
+  `scripts/gen-voeding-nevo.mjs` uit het NEVO-databestand (zie de voorwaarden in `docs/voeding-beslissingen.md`).
+- Scannen: de Barcode Detection API van de browser, op iOS de meegeleverde polyfill (`voeding/vendor/`, zelf gehost).
+- Sync en Healthbridge: via de Cloudflare Worker `proxy/voeding/worker.js` (automatisch neergezet door
+  `.github/workflows/voeding-worker.yml`). Oscars dagboek gaat met een apart lees-token naar de HealthBridge-app, die het
+  in de privé-repo `healthbridge-data` zet voor de coach. "Koppel met Healthbridge" doet dat met één tik.
+- Tests: `npm run test:voeding`. Keuzes: `docs/voeding-beslissingen.md`; eenmalige stappen:
+  `docs/voeding-stappen-voor-oscar.md`.
+
 ## Parkenjacht (losse app)
 
 In `public/parken/` staat Parkenjacht, een derde losstaande PWA zonder
