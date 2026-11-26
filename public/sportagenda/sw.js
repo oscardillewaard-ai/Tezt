@@ -23,6 +23,7 @@ const VOEDING = [
   'voeding/opslag.js',
   'voeding/sync.js',
   'voeding/basis.js',
+  'voeding/nevo.js',
   'voeding/backup.js',
   'voeding/scanner.js',
   'voeding/voeding.css',

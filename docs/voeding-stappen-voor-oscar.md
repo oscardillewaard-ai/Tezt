@@ -1,6 +1,6 @@
 # Voeding: wat Oscar nog moet doen
 
-Vier stappen, één keer. Daarna gaat alles vanzelf.
+Vijf stappen, één keer. Daarna gaat alles vanzelf.
 
 ## 1. Cloudflare-token als repo-secret (eenmalig, ±3 minuten)
 
@@ -45,6 +45,19 @@ workflow**.)
 
 Optioneel: in HealthBridge, **Instellingen**, **Tarapp testen**. Vanaf de volgende run staat je voeding met gram per
 product in `days/` (`"source": "tarapp"`).
+
+## 5. NEVO-bestand downloaden (eenmalig, ±1 minuut)
+
+Hiermee krijgt Voeding de Nederlandse NEVO-tabel (ruim 2300 producten). Het akkoord op de voorwaarden van RIVM moet
+jij zelf geven; dat mocht ik niet namens jou doen.
+
+1. Open **https://www.rivm.nl/form/nevo-online-gegevensbestand-2**, vink **Akkoord** aan en tik **Versturen**.
+2. Download het **CSV-bestand** (NEVO-online 2025/9.0).
+3. Stuur het mij in een Claude Code-sessie met beide repo's en zeg "maak NEVO". Ik draai dan
+   `node scripts/gen-voeding-nevo.mjs <bestand>`, controleer het en zet het in een PR.
+   (Zelf doen kan ook: dat commando in de map Tezt, daarna `npm run test:voeding`, committen en pushen.)
+
+Voeding werkt ook zonder deze stap, met de USDA-basisproducten.
 
 ---
 

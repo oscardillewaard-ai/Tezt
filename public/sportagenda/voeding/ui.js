@@ -4,6 +4,7 @@
 // hulpjes mee (venster, melding, titel); verder staat alles hier.
 
 import { BASIS, BASIS_BRON } from './basis.js'
+import { NEVO, NEVO_BRON } from './nevo.js'
 import {
   MEALS,
   MEAL_NL,
@@ -47,6 +48,18 @@ const BASIS_PRODUCTEN = BASIS.map((b) => ({
   portie: b.portie || null,
   bron: 'usda',
   fdc: b.fdc,
+}))
+
+// NEVO (RIVM): ongewijzigd overgenomen, met bron en versie. Leeg zolang nevo.js de plaatshouder is.
+const NEVO_PRODUCTEN = NEVO.map((n) => ({
+  id: `nevo:${n.code}`,
+  naam: n.naam,
+  merk: null,
+  per100: { kcal: n.kcal, eiwit: n.eiwit, kh: n.kh, vet: n.vet },
+  eenheid: n.eenheid === 'ml' ? 'ml' : 'g',
+  portie: null,
+  bron: 'nevo',
+  nevo: n.code,
 }))
 
 const MEAL_TIJD = { breakfast: '08:00', lunch: '12:30', dinner: '18:30', snack: '15:30' }
@@ -96,7 +109,7 @@ const gramTekst = (g, unit) => `${fmt(g, 1)} ${unit === 'ml' ? 'ml' : 'g'}`
 const isVandaag = () => dag === vandaagKey()
 
 function productVanId(id) {
-  return BASIS_PRODUCTEN.find((p) => p.id === id) || producten.find((p) => p.id === id) || null
+  return NEVO_PRODUCTEN.find((p) => p.id === id) || BASIS_PRODUCTEN.find((p) => p.id === id) || producten.find((p) => p.id === id) || null
 }
 
 /** Een recept als product: per 100 g en een portie. */
@@ -106,7 +119,8 @@ function receptAlsProduct(r) {
 }
 
 function alleProducten() {
-  return [...producten.map((p) => (p.bron === 'recept' ? receptAlsProduct(p) : p)), ...BASIS_PRODUCTEN]
+  // Volgorde telt bij gelijke zoekscore: eigen producten, dan NEVO, dan USDA (aanvulling).
+  return [...producten.map((p) => (p.bron === 'recept' ? receptAlsProduct(p) : p)), ...NEVO_PRODUCTEN, ...BASIS_PRODUCTEN]
 }
 
 function recentProducten(max = 25) {
@@ -303,7 +317,15 @@ function tekenDag() {
       ${prefRij('producten', '🥫', 'Mijn producten en recepten', String(producten.filter((p) => p.bron === 'eigen' || p.bron === 'recept').length))}
       ${prefRij('instellingen', '⚙️', 'Doelen en instellingen', syncLabel())}
     </div>
-    <p class="muted v-bron">Productgegevens: Open Food Facts (ODbL) · Basisproducten: ${esc(BASIS_BRON)}</p>`
+    <p class="muted v-bron">${bronRegel()}</p>`
+}
+
+function bronRegel() {
+  const delen = []
+  if (NEVO_BRON) delen.push(`Gebaseerd op gegevens van ${esc(NEVO_BRON)} en andere gegevens`)
+  delen.push('Productgegevens: Open Food Facts (ODbL)')
+  delen.push(`${NEVO_BRON ? 'Aanvulling' : 'Basisproducten'}: ${esc(BASIS_BRON)}`)
+  return delen.join(' · ')
 }
 
 function prefRij(page, emoji, label, value = '') {
@@ -391,7 +413,7 @@ function tekenInstellingen() {
       <p class="muted">Voeding gaat mee in de gewone back-up van Tarapp (Meer → Back-up en herstellen).</p>
       <button type="button" class="btn danger block" data-v="wis">Voedingsgegevens van deze telefoon wissen</button>
     </section>
-    <p class="muted v-bron">Productgegevens: Open Food Facts (ODbL), via de eigen sync-server. Basisproducten: ${esc(BASIS_BRON)}; per product staat de FDC-id erbij.</p>`
+    <p class="muted v-bron">${bronRegel()}. Open Food Facts loopt via de eigen sync-server; USDA-producten hebben een FDC-id.</p>`
 }
 
 function tekenProducten() {
@@ -665,7 +687,8 @@ function openToevoegen(meal) {
 }
 
 function bronLabel(p) {
-  if (p.bron === 'usda') return 'Basisproduct'
+  if (p.bron === 'nevo') return 'NEVO'
+  if (p.bron === 'usda') return NEVO_PRODUCTEN.length ? 'Basisproduct (USDA, aanvulling op NEVO)' : 'Basisproduct'
   if (p.bron === 'off') return 'Open Food Facts'
   if (p.bron === 'recept') return `Recept${p.portie ? ` · portie ${fmt(p.portie.g)} g` : ''}`
   if (p.bron === 'eigen') return 'Eigen product'
@@ -706,7 +729,7 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
         ${regel ? '<button type="button" class="btn danger" data-h="wis">Verwijderen</button>' : ''}
         <button type="submit" class="btn primary">${regel ? 'Opslaan' : 'Toevoegen'}</button>
       </div>
-      ${product.bron === 'off' ? '<p class="muted v-bron">Productgegevens: Open Food Facts (ODbL)</p>' : ''}
+      ${product.bron === 'off' ? '<p class="muted v-bron">Productgegevens: Open Food Facts (ODbL)</p>' : product.bron === 'nevo' && NEVO_BRON ? `<p class="muted v-bron">${esc(NEVO_BRON)}</p>` : ''}
     </form>`,
     (fd) => {
       const g = num(fd.get('gram'))

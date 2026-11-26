@@ -51,8 +51,8 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     de exacte USDA-omschrijving. Gegenereerd door `scripts/gen-voeding-basis.mjs` uit de officiële CSV-download
     (reproduceerbaar). SR Legacy omdat die veel meer gewone producten dekt dan "Foundation Foods". Dranken staan per
     100 ml ≈ 100 g.
-16. **`source: "usda"` voor basisproducten.** Het exportformaat noemt `off|nevo|eigen|recept`; er is geen NEVO-data,
-    dus "nevo" zou onjuist zijn. `usda` is erbij gekomen; `nevo` blijft gereserveerd. Healthbridge neemt de Tarapp-bron
+16. **`source: "usda"` voor USDA-basisproducten, `"nevo"` voor NEVO.** Het exportformaat noemde `off|nevo|eigen|recept`;
+    `usda` is erbij gekomen zodat een USDA-product niet als NEVO wordt aangemerkt. Healthbridge neemt de Tarapp-bron
     niet over in de dagbestanden (daar is `source` altijd `"tarapp"`), dus de coach merkt hier niets van.
 17. **Vijf bewuste uitzonderingen op de 4/4/9-test**: bier en wijn (alcohol, 7 kcal/g), cacaopoeder en citroen (veel
     vezels/zuren). Ze staan met reden in `tests/voeding/basis.test.mjs`.
@@ -71,6 +71,26 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
 22. **UPC-E** wordt uitgeklapt naar UPC-A als de scanner dat formaat meldt.
 23. **Tijdstip:** een regel voor vandaag krijgt de huidige tijd (Europe/Amsterdam); een regel voor een andere dag een
     vaste tijd per maaltijd (08:00, 12:30, 18:30, snack 15:30).
+
+## NEVO (RIVM)
+
+31. **NEVO komt erin, op verzoek van Oscar** (de opdracht sloot het eerst uit). De voorwaarden zijn gelezen
+    (pdf "Voorwaarden voor gebruik NEVO-online versie 2025/9.0" en de pagina Copyright en disclaimer):
+    - gratis; er mogen geen kosten voor worden gerekend (de app is gratis);
+    - "alleen toegestaan in ongewijzigde vorm en met vermelding van bron en versienummer", referentie
+      **"NEVO-online versie 2025/9.0, RIVM, Bilthoven"**;
+    - aanvullen mag als het direct duidelijk is dat het geen NEVO is; wijzigen niet;
+    - bij een nieuwe versie de oude vervangen;
+    - publiceren of herverspreiden (publieke repo, publieke app) wordt niet genoemd: niet verboden en niet expliciet
+      toegestaan. Oscar heeft gekozen het te doen zonder RIVM eerst te mailen.
+32. **Zo houden we ons eraan:** `scripts/gen-voeding-nevo.mjs` neemt naam en waarden ongewijzigd over (geen afronding;
+    alleen een komma wordt een punt) en selecteert alleen de kolommen kcal, eiwit, koolhydraten en vet. De bron en de
+    versie staan in `nevo.js`, onder elk NEVO-product in de app en onderaan Voeding ("Gebaseerd op gegevens van
+    NEVO-online versie …, RIVM, Bilthoven en andere gegevens"). De USDA-producten blijven als aanvulling en heten in de app
+    "Basisproduct (USDA, aanvulling op NEVO)". In zoekresultaten komt NEVO vóór USDA.
+33. **Het akkoord op de voorwaarden is niet automatisch gegeven.** Het downloadformulier namens Oscar versturen werd
+    door de beveiliging van de sessie geweigerd (een juridisch akkoord). Oscar downloadt het bestand dus zelf, één
+    keer (zie de stappen). Tot die tijd is `nevo.js` een lege plaatshouder en werkt Voeding met USDA, zonder fouten.
 
 ## Healthbridge
 

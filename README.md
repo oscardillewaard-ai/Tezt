@@ -120,6 +120,8 @@ tab **Voeding** onderin (Overzicht staat dan onder Meer); met **Meer → Voeding
   `voeding.*`. Voeding gaat als blok `voeding` mee in de gewone back-up.
 - Productdata: merkproducten en barcodes via Open Food Facts (ODbL), altijd via de Worker; ~220 basisproducten uit
   USDA FoodData Central (publiek domein, met FDC-id) in `voeding/basis.js`, gemaakt met `scripts/gen-voeding-basis.mjs`.
+  Optioneel de Nederlandse NEVO-tabel (RIVM) in `voeding/nevo.js`, ongewijzigd en met bron en versie, gemaakt met
+  `scripts/gen-voeding-nevo.mjs` uit het NEVO-databestand (zie de voorwaarden in `docs/voeding-beslissingen.md`).
 - Scannen: de Barcode Detection API van de browser, op iOS de meegeleverde polyfill (`voeding/vendor/`, zelf gehost).
 - Sync en Healthbridge: via de Cloudflare Worker `proxy/voeding/worker.js` (automatisch neergezet door
   `.github/workflows/voeding-worker.yml`). Oscars dagboek gaat met een apart lees-token naar de HealthBridge-app, die het
