@@ -244,6 +244,7 @@ function teken() {
     return
   }
   root.innerHTML = pagina === 'instellingen' ? tekenInstellingen() : pagina === 'producten' ? tekenProducten() : tekenDag()
+  ctx.naTekenen?.()
 }
 
 function tekenWelkom() {
@@ -309,6 +310,7 @@ function tekenDag() {
       ${['eiwit', 'kh', 'vet'].map((k) => voortgang(k, tot[k], doel[k])).join('')}
     </section>
     ${meals}
+    ${ctx.gewichtKaart ? ctx.gewichtKaart(dag) : ''}
     <div class="actions v-dagacties">
       <button type="button" class="btn" data-v="vaste">⭐ Vaste items</button>
       <button type="button" class="btn" data-v="kopieer">📋 Dag kopiëren</button>

@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '37' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '38' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -453,6 +453,13 @@ function afterTick(s, big = false) {
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
   {
+    v: 38,
+    items: [
+      '⚖️ Je ziet nu meteen of je je gewicht hebt ingevuld: in de agenda staat het onder de datum (en een blauw stipje in de maand)',
+      'Je gewicht en het verloop staan nu bij Voeding; bij Overzicht staat je cyclus 💛',
+    ],
+  },
+  {
     v: 37,
     items: [
       '🍎 Nieuw: Voeding, onderin naast de Agenda. Houd bij wat je eet, met kcal, eiwit, koolhydraten en vet: zoeken, barcode scannen, favorieten, eigen producten, recepten en dagdoelen 💛',
@@ -700,9 +707,10 @@ function weekDaysHtml(ws, list) {
     const d = addDays(ws, i)
     const k = toKey(d)
     const daySessions = sortSessions(list.filter((s) => s.date === k))
+    const kg = bodyData().weights[k]
     days += `
       <div class="wday ${k === tKey ? 'today' : ''}" data-drop-date="${k}">
-        <button type="button" class="wday-label" data-action="day-sheet" data-date="${k}" aria-label="${DAYS[i]} ${d.getDate()} ${MONTHS[d.getMonth()]}: gewicht of ongesteld invullen${isPeriod(k) ? ' (ongesteld)' : ''}"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}${isPeriod(k) ? `<i class="period-dot" aria-hidden="true">${iconOrEmoji('druppel')}</i>` : ''}</strong></button>
+        <button type="button" class="wday-label" data-action="day-sheet" data-date="${k}" aria-label="${DAYS[i]} ${d.getDate()} ${MONTHS[d.getMonth()]}: ${kg != null ? `gewicht ${fmtKg(kg)} kg ingevuld` : 'gewicht of ongesteld invullen'}${isPeriod(k) ? ' (ongesteld)' : ''}"><span>${DAYS_SHORT[i]}</span><strong>${d.getDate()}${isPeriod(k) ? `<i class="period-dot" aria-hidden="true">${iconOrEmoji('druppel')}</i>` : ''}</strong>${kg != null ? `<em class="wt-badge" aria-hidden="true">${fmtKg(kg)}</em>` : ''}</button>
         <div class="wday-items">
           ${daySessions.length ? daySessions.map(sessionRow).join('') : '<span class="rest">rust</span>'}
         </div>
@@ -989,7 +997,7 @@ function renderMonth() {
       .join('')
     cells += `
       <button class="cal-day ${inMonth ? '' : 'out'} ${k === tKey ? 'today' : ''}" data-action="cal-day" data-date="${k}">
-        <span class="cal-num">${d.getDate()}${isPeriod(k) ? '<i class="cal-period" aria-label="ongesteld"></i>' : ''}</span>
+        <span class="cal-num">${d.getDate()}${isPeriod(k) ? '<i class="cal-period" aria-label="ongesteld"></i>' : ''}${bodyData().weights[k] != null ? '<i class="cal-wt" aria-label="gewicht ingevuld"></i>' : ''}</span>
         <span class="cal-marks">${marks}</span>
       </button>`
   }
@@ -1252,21 +1260,31 @@ function wireWeightChart() {
   svg.addEventListener('pointercancel', hide)
 }
 
-function renderBodyCard() {
-  const today = todayKey()
+// Gewicht als eigen kaart: bij Voeding (als die aan staat), anders in de Lichaam-kaart van Overzicht.
+function weightTile(k = todayKey()) {
   const ws = weightEntries()
   const last = ws[ws.length - 1]
   let delta = ''
   if (last) {
-    // Verschil met de meting van ongeveer een maand eerder (minstens 25 dagen).
-    const ref = ws.filter(([k]) => daysBetween(k, last[0]) >= 25).pop()
+    const ref = ws.filter(([x]) => daysBetween(x, last[0]) >= 25).pop()
     if (ref) {
       const dv = Math.round((last[1] - ref[1]) * 10) / 10
       delta = `${dv > 0 ? '+' : dv < 0 ? '−' : '±'}${fmtKg(Math.abs(dv))} kg sinds ${shortDate(fromKey(ref[0]))}`
     }
   }
-  const cyc = cycleInfo(today)
-  const onToday = isPeriod(today)
+  const that = bodyData().weights[k]
+  const label = k === todayKey() ? 'vandaag' : shortDate(fromKey(k))
+  return `
+        <button type="button" class="body-tile" data-action="day-sheet" data-date="${k}">
+          <span class="body-label">${iconOrEmoji('weegschaal')} Gewicht</span>
+          <strong>${last ? `${fmtKg(last[1])} kg` : '–'}</strong>
+          <span class="muted">${last ? delta || `gemeten op ${shortDate(fromKey(last[0]))}` : 'Tik om in te vullen'}</span>
+          <span class="wt-status ${that != null ? 'on' : ''}">${that != null ? `✓ ${label} ingevuld: ${fmtKg(that)} kg` : `${label} nog niet ingevuld · tik hier`}</span>
+        </button>`
+}
+
+function weightHistory() {
+  const ws = weightEntries()
   const list = ws
     .slice()
     .reverse()
@@ -1277,14 +1295,29 @@ function renderBodyCard() {
     })
     .join('')
   return `
+      ${ws.length >= 2 ? weightChart(ws) : ''}
+      ${ws.length ? `<details class="wt-list"><summary>Alle metingen (${ws.length})</summary>${list}</details>` : ''}`
+}
+
+function renderWeightCard(k = todayKey()) {
+  return `
+    <section class="card body-card">
+      <h2>Gewicht</h2>
+      ${weightTile(k)}
+      ${weightHistory()}
+      <p class="muted body-note">Ook in de agenda: tik op een datum. Een ingevuld gewicht zie je daar onder de datum. Dit staat alleen op je telefoon.</p>
+    </section>`
+}
+
+function renderBodyCard({ gewicht = true } = {}) {
+  const today = todayKey()
+  const cyc = cycleInfo(today)
+  const onToday = isPeriod(today)
+  return `
     <section class="card body-card">
       <h2>Lichaam</h2>
-      <div class="body-grid">
-        <button type="button" class="body-tile" data-action="day-sheet" data-date="${today}">
-          <span class="body-label">${iconOrEmoji('weegschaal')} Gewicht</span>
-          <strong>${last ? `${fmtKg(last[1])} kg` : '–'}</strong>
-          <span class="muted">${last ? delta || `gemeten op ${shortDate(fromKey(last[0]))}` : 'Tik om in te vullen'}</span>
-        </button>
+      <div class="body-grid ${gewicht ? '' : 'single'}">
+        ${gewicht ? weightTile(today) : ''}
         <div class="body-tile cycle">
           <span class="body-label">${iconOrEmoji('druppel')} Cyclus</span>
           <strong>${cyc && cyc.day <= 60 ? `Dag ${cyc.day}` : '–'}</strong>
@@ -1295,9 +1328,8 @@ function renderBodyCard() {
         <span class="body-label">${iconOrEmoji('druppel')} Vandaag ongesteld</span>
         <input type="checkbox" class="switch period-switch" data-action="period-today" ${onToday ? 'checked' : ''} aria-label="Vandaag ongesteld" />
       </label>
-      ${ws.length >= 2 ? weightChart(ws) : ''}
-      ${ws.length ? `<details class="wt-list"><summary>Alle metingen (${ws.length})</summary>${list}</details>` : ''}
-      <p class="muted body-note">Tik in de agenda op een datum om je gewicht in te vullen of aan te geven dat je ongesteld bent. Dit staat alleen op je telefoon.</p>
+      ${gewicht ? weightHistory() : ''}
+      <p class="muted body-note">${gewicht ? 'Tik in de agenda op een datum om je gewicht in te vullen of aan te geven dat je ongesteld bent.' : 'Tik in de agenda op een datum om aan te geven dat je ongesteld bent. Je gewicht staat bij Voeding.'} Dit staat alleen op je telefoon.</p>
     </section>`
 }
 
@@ -1491,7 +1523,7 @@ function renderOverview() {
 
   return `
     ${renderTotals()}
-    ${renderBodyCard()}
+    ${renderBodyCard({ gewicht: !voedingTonen() })}
     <section class="card">
       <div class="stat-grid">
         <div><strong>${streak}</strong><span class="muted">weken op rij</span></div>
@@ -1631,6 +1663,9 @@ function mountVoeding() {
         closeSheet,
         showToast,
         setTitle: (t) => (title.textContent = t),
+        // Gewicht staat in de gegevens van Tarapp zelf; Voeding toont de kaart en de grafiek.
+        gewichtKaart: (k) => renderWeightCard(k),
+        naTekenen: () => wireWeightChart(),
       }),
     )
     .catch(() => {
