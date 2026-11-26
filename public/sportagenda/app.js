@@ -185,7 +185,7 @@ const typeIcon = (t, cls = '') =>
 const ICON_EMOJI = {
   agenda: '📅', overzicht: '📊', schemas: '🏋️', meer: '⚙️', gym: '🏋️', slot: '🔒',
   hardlopen: '🏃', klimmen: '⛰️', vink: '✅', herhaal: '🔁', horloge: '⌚',
-  druppel: '🩸', weegschaal: '⚖️',
+  druppel: '🩸', weegschaal: '⚖️', voeding: '🍎',
 }
 const iconOrEmoji = (name, cls = '') =>
   useEmoji() && ICON_EMOJI[name] ? `<span class="emo-ico ${cls}">${ICON_EMOJI[name]}</span>` : svgIcon(name, cls)
@@ -315,11 +315,14 @@ function render() {
   // De agenda heeft per dag een +; de zwevende knop alleen bij schema's.
   fab.hidden = ui.tab !== 'schemas'
   topActions.innerHTML = ui.tab === 'week' ? calToggle() : ''
-  const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore }
+  if (ui.tab === 'voeding' && !voedingTonen()) ui.tab = 'overzicht'
+  if (ui.tab === 'overzicht' && voedingTonen()) ui.tab = 'meer'
+  renderTabbar()
+  const renderers = { week: renderWeek, overzicht: renderOverview, schemas: renderSchemas, meer: renderMore, voeding: renderVoedingTab }
   const scrolling = ui.tab === 'week' && ui.calMode === 'week' && agendaScrolls()
   const anchor = scrolling ? scrollAnchor() : null
   view.innerHTML = renderers[ui.tab]()
-  if (ui.tab === 'meer' && ui.morePage === 'voeding') mountVoeding()
+  if (ui.tab === 'voeding') mountVoeding()
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
   fitAgenda()
@@ -452,8 +455,9 @@ const CHANGELOG = [
   {
     v: 37,
     items: [
-      '🍎 Nieuw: Voeding (Meer → Voeding). Houd bij wat je eet, met kcal, eiwit, koolhydraten en vet: zoeken, barcode scannen, favorieten, eigen producten, recepten en dagdoelen 💛',
-      'Liever niet? Zet Voeding uit onder Meer; je gegevens blijven bewaard',
+      '🍎 Nieuw: Voeding, onderin naast de Agenda. Houd bij wat je eet, met kcal, eiwit, koolhydraten en vet: zoeken, barcode scannen, favorieten, eigen producten, recepten en dagdoelen 💛',
+      '📊 Overzicht staat nu onder Meer',
+      'Liever niet? Zet Voeding uit onder Meer; dan staat Overzicht weer onderin en blijven je voedingsgegevens bewaard',
     ],
   },
   { v: 36, items: ['De prullenbak verschijnt bij het slepen nu bovenin, dus je kunt een training ook gewoon naar zondag slepen 💛'] },
@@ -1583,12 +1587,30 @@ const MORE_PAGES = {
   gegevens: { title: 'Je gegevens', render: () => renderDataCard() },
   installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
   herinneringen: { title: 'Herinneringen', render: () => renderRemindersCard() },
-  voeding: { title: 'Voeding', render: () => '<div id="voeding-root"><p class="muted">Voeding laden…</p></div>' },
+  overzicht: { title: 'Overzicht', render: () => renderOverview() },
 }
 
 // ---------- Voeding (eigen module in voeding/, pas geladen als je hem opent) ----------
 // Hier alleen de ingang, de aan/uit-schakelaar en de back-up. Uit = geen ingang en
 // niets geladen; de gegevens (IndexedDB "tarapp-voeding") blijven gewoon staan.
+// Met Voeding aan staat Voeding als tweede tab onderin en verhuist Overzicht naar Meer;
+// met Voeding uit is alles zoals vroeger.
+function renderTabbar() {
+  const btn = document.querySelector('.tabbar button:nth-child(2)')
+  if (!btn) return
+  const id = voedingTonen() ? 'voeding' : 'overzicht'
+  if (btn.dataset.tab !== id) {
+    btn.dataset.tab = id
+    btn.innerHTML = `<span data-icon="${id}">${iconOrEmoji(id)}</span>${id === 'voeding' ? 'Voeding' : 'Overzicht'}`
+  }
+  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === ui.tab))
+}
+
+const renderVoedingTab = () => {
+  title.textContent = 'Voeding'
+  return '<div id="voeding-root"><p class="muted">Voeding laden…</p></div>'
+}
+
 const voedingTonen = () => {
   try {
     return localStorage.getItem('voeding.tonen') !== '0'
@@ -1617,7 +1639,7 @@ function mountVoeding() {
 }
 
 function renderMore() {
-  if (ui.morePage === 'voeding' && !voedingTonen()) ui.morePage = null
+  if (ui.morePage === 'overzicht' && !voedingTonen()) ui.morePage = null
   const page = MORE_PAGES[ui.morePage]
   if (page) {
     title.textContent = page.title
@@ -1648,6 +1670,7 @@ function renderMore() {
     </div>
     <h3 class="pref-head">Trainen</h3>
     <div class="pref-list card">
+      ${voedingTonen() ? row({ page: 'overzicht', icon: 'overzicht', color: '#7c3aed', label: 'Overzicht', sub: 'Je weken, minuten per activiteit, scheenpijn' }) : ''}
       ${row({ page: 'activiteiten', icon: 'hardlopen', color: '#ea580c', label: 'Activiteiten', value: String(nTypes) })}
       ${row({ page: 'horloge', icon: 'horloge', color: '#10b981', label: 'Horloge (Zepp)', value: icu ? 'Gekoppeld' : 'Niet gekoppeld' })}
       ${row({ page: 'herinneringen', icon: 'bel', color: '#ef4444', label: 'Herinneringen', sub: 'Via de Agenda-app van je iPhone', value: state.settings?.reminderLast ? 'Aan' : '' })}
@@ -1659,10 +1682,9 @@ function renderMore() {
     </div>
     <h3 class="pref-head">Voeding</h3>
     <div class="pref-list card">
-      ${voedingTonen() ? row({ page: 'voeding', icon: 'voeding', color: '#22c55e', label: 'Voeding', sub: 'Wat je eet: kcal, eiwit, koolhydraten, vet' }) : ''}
       <label class="pref-row">
         <span class="pref-ico" style="background:#16a34a">${svgIcon('voeding')}</span>
-        <span class="pref-label">Voeding tonen<small>Uit: verborgen, je gegevens blijven bewaard</small></span>
+        <span class="pref-label">Voeding tonen<small>Als tab onderin; Overzicht staat dan hier onder Meer</small></span>
         <input type="checkbox" class="switch" data-voeding-tonen ${voedingTonen() ? 'checked' : ''} aria-label="Voeding tonen" />
       </label>
     </div>
@@ -4891,6 +4913,7 @@ const actions = {
     ui.morePage = el.dataset.page
     render()
     window.scrollTo(0, 0)
+    if (ui.morePage === 'overzicht') countUp(view)
   },
   'more-back': () => {
     ui.morePage = null
@@ -5200,12 +5223,10 @@ const unfinishedRun = state.sessions.find((s) => s.runLog && !s.runLog.endedAt &
 if (unfinishedRun) ui.run = unfinishedRun.id
 
 // Koppel-link voor een tweede apparaat van Voeding: meteen naar Voeding.
-if (/[#&]voeding=/.test(location.hash) && voedingTonen()) {
-  ui.tab = 'meer'
-  ui.morePage = 'voeding'
-}
+if (/[#&]voeding=/.test(location.hash) && voedingTonen()) ui.tab = 'voeding'
 
-// Icoontjes in de vaste HTML (tabbalk).
+// Icoontjes in de vaste HTML (tabbalk), en Voeding of Overzicht als tweede tab.
+renderTabbar()
 renderTabIcons()
 applyTheme()
 
