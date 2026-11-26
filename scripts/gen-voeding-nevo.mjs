@@ -42,12 +42,18 @@ export function leesNevo(text) {
       } else cur += c
     }
     out.push(cur)
-    return out.map((s) => s.trim())
+    // Niet trimmen: namen gaan letterlijk mee (ook een spatie aan het eind); getallen en codes worden hieronder apart gelezen.
+    return out
   }
-  const cols = split(head).map((h) => h.toLowerCase())
+  const cols = split(head).map((h) => h.trim().toLowerCase())
   const find = (...names) => {
     for (const n of names) {
       const i = cols.findIndex((c) => c === n.toLowerCase())
+      if (i >= 0) return i
+    }
+    // NEVO-componentcode vóór de eenheid, bijv. "PROT (g)" -> "prot" (niet "PROTPL (g)").
+    for (const n of names) {
+      const i = cols.findIndex((c) => c.split(/\s+/)[0] === n.toLowerCase())
       if (i >= 0) return i
     }
     for (const n of names) {
@@ -81,12 +87,12 @@ export function leesNevo(text) {
     const raw = String(c[idx.code] ?? '').trim()
     const code = /^\d+$/.test(raw) ? Number(raw) : NaN
     const naam = c[idx.naam]
-    if (!(code > 0) || !naam) continue
+    if (!(code > 0) || !naam || !naam.trim()) continue
     const h = idx.hoeveelheid >= 0 ? String(c[idx.hoeveelheid]).toLowerCase() : ''
     out.push({
       code,
       naam,
-      groep: idx.groep >= 0 ? c[idx.groep] || null : null,
+      groep: idx.groep >= 0 ? c[idx.groep].trim() || null : null,
       eenheid: h.includes('ml') ? 'ml' : 'g',
       kcal: getal(c[idx.kcal]),
       eiwit: getal(c[idx.eiwit]),

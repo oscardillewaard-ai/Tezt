@@ -90,7 +90,9 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     "Basisproduct (USDA, aanvulling op NEVO)". In zoekresultaten komt NEVO vóór USDA.
 33. **Het akkoord op de voorwaarden is niet automatisch gegeven.** Het downloadformulier namens Oscar versturen werd
     door de beveiliging van de sessie geweigerd (een juridisch akkoord). Oscar downloadt het bestand dus zelf, één
-    keer (zie de stappen). Tot die tijd is `nevo.js` een lege plaatshouder en werkt Voeding met USDA, zonder fouten.
+    keer (zie de stappen). Dat heeft hij gedaan: `nevo.js` bevat alle 2328 producten van NEVO-online 2025/9.0. Een
+    aparte controle (Python-csv tegen `nevo.js`) gaf 0 verschillen in naam, kcal, eiwit, koolhydraten en vet, ook spaties
+    in namen gaan letterlijk mee. Het ruwe NEVO-bestand zelf staat niet in de repo, alleen deze vier kolommen.
 
 ## Healthbridge
 

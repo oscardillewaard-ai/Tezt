@@ -1,6 +1,6 @@
 # Voeding: wat Oscar nog moet doen
 
-Vijf stappen, één keer. Daarna gaat alles vanzelf.
+Vier stappen, één keer. Daarna gaat alles vanzelf. (Stap 5, NEVO, is al gedaan: NEVO-online 2025/9.0 zit erin.)
 
 ## 1. Cloudflare-token als repo-secret (eenmalig, ±3 minuten)
 
@@ -46,7 +46,7 @@ workflow**.)
 Optioneel: in HealthBridge, **Instellingen**, **Tarapp testen**. Vanaf de volgende run staat je voeding met gram per
 product in `days/` (`"source": "tarapp"`).
 
-## 5. NEVO-bestand downloaden (eenmalig, ±1 minuut)
+## 5. NEVO bijwerken (✅ 2025/9.0 is gedaan; alleen weer nodig bij een nieuwe NEVO-versie)
 
 Hiermee krijgt Voeding de Nederlandse NEVO-tabel (ruim 2300 producten). Het akkoord op de voorwaarden van RIVM moet
 jij zelf geven; dat mocht ik niet namens jou doen.
