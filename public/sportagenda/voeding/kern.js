@@ -532,7 +532,7 @@ export function leesKoppelLink(link, verwachteHost) {
 
 // ---------- Zoeken ----------
 
-const fold = (s) =>
+export const fold = (s) =>
   String(s || '')
     .toLowerCase()
     .normalize('NFD')
@@ -544,11 +544,12 @@ export function zoek(producten, query, max = 40) {
   if (!words.length) return []
   const scored = []
   for (const p of producten) {
-    const hay = fold(`${p.naam} ${p.merk || ''}`)
+    // _hay: vooraf genormaliseerde naam+merk (voor grote lijsten zoals off-nl.json)
+    const hay = p._hay ?? fold(`${p.naam} ${p.merk || ''}`)
     if (!words.every((w) => hay.includes(w))) continue
     let score = 0
     if (hay.startsWith(words[0])) score += 10
-    if (fold(p.naam) === words.join(' ')) score += 20
+    if ((p._naam ?? fold(p.naam)) === words.join(' ')) score += 20
     score -= hay.length / 100
     scored.push([score, p])
   }

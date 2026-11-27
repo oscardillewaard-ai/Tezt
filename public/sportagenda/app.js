@@ -461,7 +461,7 @@ const CHANGELOG = [
       '🍽️ Eetmomenten zelf kiezen: hernoemen, toevoegen (bijv. "Na de training") en de volgorde aanpassen',
       '🌾 Vezels: zie per product en per dag hoeveel vezels je binnenkrijgt',
       'De terugknop van je telefoon sluit nu eerst het venster, en het toetsenbord springt niet meer vanzelf open',
-      '🔎 Bij zoeken komen nu vanzelf ook merkproducten uit Open Food Facts mee (zoals Jumbo, AH en Lidl)',
+      '🔎 Ruim 62.000 Nederlandse merkproducten uit Open Food Facts (Jumbo, AH, Lidl, Plus…) zitten nu in Tarapp: zoeken en scannen werkt ook zonder internet',
     ],
   },
   {

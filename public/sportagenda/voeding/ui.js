@@ -13,6 +13,7 @@ import {
   kjNaarKcal,
   macrosVoor,
   normaliseerBarcode,
+  fold,
   num,
   per100,
   receptWaarden,
@@ -718,7 +719,9 @@ function openToevoegen(meal) {
     if (q) {
       const lokaal = zoek(alleProducten(), q)
       const key = offKey(q)
-      const off = (offCache.get(key) || []).filter((o) => !producten.some((p) => p.id === o.id) && !lokaal.some((p) => p.id === o.id))
+      const uitLijst = offNl && key.length >= 3 ? zoek(offNl, q, 30) : []
+      const gezien = new Set([...producten.map((p) => p.id), ...lokaal.map((p) => p.id)])
+      const off = [...uitLijst, ...(offCache.get(key) || [])].filter((o) => !gezien.has(o.id) && gezien.add(o.id))
       zichtbaar = [...lokaal, ...off]
       // Eerst de beste 5, zodat de merkproducten van Open Food Facts niet onder de rand verdwijnen.
       const kort = key.length >= 3 && !alleLokaal && lokaal.length > 6
@@ -745,6 +748,9 @@ function openToevoegen(meal) {
     const q = input.value.trim()
     const key = offKey(q)
     if (key.length < 3 || offCache.has(key)) return toon()
+    // Staat het al genoeg in de Nederlandse lijst, dan niet ook nog live zoeken.
+    await laadOffNl()
+    if (!handmatig && offNl.length && zoek(offNl, q, 5).length >= 5) return toon()
     if (!handmatig && !offMag()) {
       offStatus = { key, status: 'limiet' }
       return toon()
@@ -763,6 +769,7 @@ function openToevoegen(meal) {
   }
   input.addEventListener('input', () => {
     alleLokaal = false
+    if (!offNl) laadOffNl().then(() => sheet.open && toon())
     toon()
     clearTimeout(wacht)
     wacht = setTimeout(() => zoekOffNu(false), 700)
@@ -802,6 +809,47 @@ function resultaatRij(p) {
         </button>`
 }
 
+// ---------- Open Food Facts: de Nederlandse lijst (off-nl.json) ----------
+// ±63.000 producten die in Nederland verkocht worden, gemaakt met scripts/gen-voeding-off-nl.mjs.
+// Pas geladen bij de eerste zoekopdracht of scan; daarna werkt zoeken en scannen ook offline.
+
+let offNl = null // [product] zodra geladen; [] als er (nog) geen lijst is
+let offNlBarcode = new Map()
+let offNlPromise = null
+
+function laadOffNl() {
+  offNlPromise ||= (async () => {
+    try {
+      const res = await fetch(new URL('./off-nl.json', import.meta.url))
+      if (!res.ok) throw new Error(String(res.status))
+      const data = await res.json()
+      const k = Object.fromEntries(data.kolommen.map((c, i) => [c, i]))
+      offNl = data.producten.map((r) => {
+        const eenheid = r[k.ml] ? 'ml' : 'g'
+        const naam = r[k.naam]
+        const merk = r[k.merk] || null
+        return {
+          id: `off:${r[k.barcode]}`,
+          naam,
+          merk,
+          per100: { kcal: r[k.kcal], eiwit: r[k.eiwit], kh: r[k.kh], vet: r[k.vet], vezel: r[k.vezel] },
+          eenheid,
+          portie: r[k.portie] ? { g: r[k.portie], naam: `1 portie (${fmt(r[k.portie])} ${eenheid})` } : null,
+          bron: 'off',
+          barcode: r[k.barcode],
+          _hay: fold(`${naam} ${merk || ''}`),
+          _naam: fold(naam),
+        }
+      })
+      offNlBarcode = new Map(offNl.map((p) => [p.barcode, p]))
+    } catch {
+      offNl = [] // geen lijst of offline zonder cache: dan alleen live zoeken
+    }
+    return offNl
+  })()
+  return offNlPromise
+}
+
 // Zoekresultaten van Open Food Facts: per zoekterm onthouden (zolang de app open is) en met een rem
 // op het aantal automatische zoekopdrachten (Open Food Facts staat er 10 per minuut toe).
 const offCache = new Map()
@@ -817,12 +865,15 @@ function offMag(now = Date.now()) {
 
 function offBlok(q, key, off) {
   if (key.length < 3) return ''
-  const st = offStatus.key === key ? offStatus.status : offCache.has(key) ? 'ok' : 'wacht'
   const kop = '<h3 class="v-offkop">Uit Open Food Facts <small class="muted">(merkproducten)</small></h3>'
-  if (st === 'busy' || st === 'wacht') return `${kop}<p class="muted v-offstatus">Zoeken in Open Food Facts…</p>`
-  if (st === 'ok') return off.length ? kop + off.map(resultaatRij).join('') : `${kop}<p class="muted v-offstatus">Niets gevonden in Open Food Facts voor "${esc(q)}". Scan de barcode of het etiket.</p>`
-  const uitleg = st === 'limiet' ? 'Even te veel zoekopdrachten achter elkaar.' : `${esc(offStatus.melding || 'Open Food Facts is nu niet bereikbaar')}.`
-  return `${kop}<p class="muted v-offstatus">${uitleg}</p><button type="button" class="btn block v-offzoek" data-s="off">🔎 Opnieuw zoeken in Open Food Facts</button>`
+  if (off.length) return kop + off.map(resultaatRij).join('')
+  const st = offStatus.key === key ? offStatus.status : ''
+  if (!offNl || st === 'busy') return `${kop}<p class="muted v-offstatus">Zoeken in Open Food Facts…</p>`
+  if (st === 'fout' || st === 'limiet') {
+    const uitleg = st === 'limiet' ? 'Even te veel zoekopdrachten achter elkaar.' : `${esc(offStatus.melding || 'Open Food Facts is nu niet bereikbaar')}.`
+    return `${kop}<p class="muted v-offstatus">${uitleg}</p><button type="button" class="btn block v-offzoek" data-s="off">🔎 Opnieuw zoeken in Open Food Facts</button>`
+  }
+  return `${kop}<p class="muted v-offstatus">Niets gevonden in Open Food Facts voor "${esc(q)}". Scan de barcode of het etiket.</p>`
 }
 
 function bronLabel(p) {
@@ -837,6 +888,8 @@ function bronLabel(p) {
 async function bewaarProduct(p) {
   const rec = { ...p, updatedAt: Date.now() }
   delete rec.laatsteGram
+  delete rec._hay
+  delete rec._naam
   await db.zet('producten', rec)
   producten = await db.alle('producten')
 }
@@ -974,6 +1027,13 @@ async function vindBarcode(raw, meal, format) {
   }
   const lokaal = await db.productOpBarcode(code)
   if (lokaal) return openHoeveelheid(lokaal.bron === 'recept' ? receptAlsProduct(lokaal) : lokaal, { meal })
+  // Dan de Nederlandse Open Food Facts-lijst (werkt ook offline).
+  await laadOffNl()
+  const uitLijst = offNlBarcode.get(code)
+  if (uitLijst) {
+    await bewaarProduct(uitLijst)
+    return openHoeveelheid(uitLijst, { meal })
+  }
   try {
     ctx.showToast('Product opzoeken…')
     const r = await zoekBarcode(inst, code)

@@ -131,3 +131,20 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     opnieuw opgehaald (Terms of Use 1.5); langer bewaren is een Premier-functie ("Custom Caching and Data
     Storage Permissions"). Een dagboek en Healthbridge bewaren producten juist voor altijd. Bronvermelding is
     verplicht overal waar de gegevens te zien zijn.
+
+## Open Food Facts in de app (route B)
+
+37. **De Nederlandse producten uit Open Food Facts zitten als lijst in de app** (`voeding/off-nl.json`):
+    62.245 producten (export van 23-11-2026) met naam en kcal, eiwit, koolhydraten en vet, 4,8 MB en 1,7 MB
+    gecomprimeerd over het netwerk. Pas geladen bij de eerste zoekopdracht of scan; daarna zoeken (±70 ms) en
+    barcodes opzoeken zonder internet. Gemeten: 116.660 producten met Nederland als land, waarvan 63.031 met de
+    vier waarden; weggelaten zijn ook foute barcodes en onmogelijke waarden.
+38. **Licentie:** afgeleide database onder de ODbL (`voeding/OFF-NL-LICENTIE.md`), met bronvermelding in de app.
+39. **Live meezoeken blijft** (route A), maar alleen als de lijst minder dan 5 treffers geeft, en via de Worker
+    (gecachet, alleen Nederland). Barcodes: eigen product → lijst → Worker.
+40. **Verversen gaat (nog) niet automatisch.** Een maandelijkse GitHub Action die de lijst rechtstreeks op de
+    hoofdbranch zet en de site opnieuw neerzet, werd in deze sessie tegengehouden (automatisch pushen naar de
+    live branch zonder controle). Verversen kan met de hand:
+    `curl -sL https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz | node scripts/gen-voeding-off-nl.mjs -`
+    (of in GitHub Actions zonder `-`, daar werkt de download direct). Alternatief voor later: een maandelijkse
+    Action die een pull request opent, die Oscar met één tik merget.
