@@ -433,3 +433,73 @@
 .v-offstatus {
   margin: 6px 0 8px;
 }
+
+.v-meal-head {
+  align-items: center;
+  gap: 8px;
+}
+
+.v-meal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.v-meal-toggle h3 {
+  margin: 0;
+}
+
+.v-pijl {
+  width: 14px;
+  color: var(--muted);
+}
+
+.v-meal-kcal {
+  flex: none;
+}
+
+.v-macroknop {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.v-macroknop.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.v-meal-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 6px 0 2px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.v-meal-macros strong {
+  color: var(--text);
+}
+
+.v-meal.dicht {
+  padding-bottom: 8px;
+}

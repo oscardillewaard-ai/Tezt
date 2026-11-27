@@ -8,7 +8,7 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [vars]
-APP_VERSION = "41"
+APP_VERSION = "42"
 # Contact in de User-Agent voor Open Food Facts (zij vragen erom). Bewust de publieke
 # repo-pagina en geen persoonlijk e-mailadres.
 OFF_CONTACT = "https://github.com/oscardillewaard-ai/Tezt"

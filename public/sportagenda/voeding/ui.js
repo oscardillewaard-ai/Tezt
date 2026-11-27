@@ -331,22 +331,34 @@ function tekenDag() {
   const meals = momenten().map(({ id: meal, naam }) => {
     const list = items.filter((x) => momentVan(x.r) === meal)
     const sum = somMacros(list.map((x) => x.m))
+    // In het overzicht hele getallen (geen komma's); de precieze waarden zie je als je op een regel tikt.
+    const dicht = inst.weergave.ingeklapt.includes(meal)
+    const macros = inst.weergave.macros.includes(meal)
     return `
-      <section class="card v-meal">
-        <div class="v-meal-head"><h3>${esc(naam)}</h3><span class="muted">${list.length ? `${fmt(sum.kcal)} kcal` : ''}</span></div>
-        ${list
-          .map(
-            ({ r, m }) => `
+      <section class="card v-meal ${dicht ? 'dicht' : ''}">
+        <div class="v-meal-head">
+          <button type="button" class="v-meal-toggle" data-v="klap" data-meal="${esc(meal)}" aria-expanded="${!dicht}"><span class="v-pijl" aria-hidden="true">${dicht ? '▸' : '▾'}</span><h3>${esc(naam)}</h3>${dicht && list.length ? `<small class="muted">${list.length}</small>` : ''}</button>
+          <span class="muted v-meal-kcal">${list.length ? `${fmt(sum.kcal)} kcal` : ''}</span>
+          ${list.length ? `<button type="button" class="v-macroknop ${macros ? 'on' : ''}" data-v="macros" data-meal="${esc(meal)}" aria-pressed="${macros}" aria-label="Macro's van ${esc(naam)} tonen">E·K·V</button>` : ''}
+        </div>
+        ${list.length && macros ? `<div class="v-meal-macros"><span>Eiwit <strong>${fmt(sum.eiwit)} g</strong></span><span>Koolh. <strong>${fmt(sum.kh)} g</strong></span><span>Vet <strong>${fmt(sum.vet)} g</strong></span>${sum.vezel === null ? '' : `<span>Vezel <strong>${fmt(sum.vezel)} g</strong></span>`}</div>` : ''}
+        ${
+          dicht
+            ? ''
+            : `${list
+                .map(
+                  ({ r, m }) => `
           <button type="button" class="v-row" data-v="bewerk" data-id="${esc(r.id)}">
-            <span class="v-row-main"><span class="v-name">${esc(r.name)}${r.brand ? ` <small>${esc(r.brand)}</small>` : ''}</span><small class="muted">${gramTekst(r.grams, r.unit)} · E ${fmt(m.eiwit, 1)} · K ${fmt(m.kh, 1)} · V ${fmt(m.vet, 1)}${m.vezel === null ? '' : ` · Vz ${fmt(m.vezel, 1)}`}</small></span>
+            <span class="v-row-main"><span class="v-name">${esc(r.name)}${r.brand ? ` <small>${esc(r.brand)}</small>` : ''}</span><small class="muted">${fmt(r.grams)} ${r.unit === 'ml' ? 'ml' : 'g'} · E ${fmt(m.eiwit)} · K ${fmt(m.kh)} · V ${fmt(m.vet)}${m.vezel === null ? '' : ` · Vz ${fmt(m.vezel)}`}</small></span>
             <span class="v-kcal">${fmt(m.kcal)}</span>
           </button>`,
-          )
-          .join('')}
+                )
+                .join('')}
         <div class="v-meal-acties">
           <button type="button" class="linkbtn v-add" data-v="toevoegen" data-meal="${meal}">+ Toevoegen</button>
           ${vorigeMaaltijd(meal).length ? `<button type="button" class="linkbtn v-gisteren" data-v="gisteren" data-meal="${meal}">↺ Zoals ${esc(dagLabel(verschuif(dag, -1)).toLowerCase())}</button>` : ''}
-        </div>
+        </div>`
+        }
       </section>`
   }).join('')
   return `
@@ -362,7 +374,7 @@ function tekenDag() {
       </div>
       ${voortgang('kcal', tot.kcal, doel.kcal)}
       ${['eiwit', 'kh', 'vet'].map((k) => voortgang(k, tot[k], doel[k])).join('')}
-      <div class="v-vezel"><span>Vezels</span><span><strong>${vezelOnbekend && tot.vezel !== null ? '≥ ' : ''}${fmt(tot.vezel ?? 0, 1)} g</strong>${vezelOnbekend ? `<small class="muted"> · bij ${vezelOnbekend} ${vezelOnbekend === 1 ? 'product' : 'producten'} onbekend</small>` : ''}</span></div>
+      <div class="v-vezel"><span>Vezels</span><span><strong>${vezelOnbekend && tot.vezel !== null ? '≥ ' : ''}${fmt(tot.vezel ?? 0)} g</strong>${vezelOnbekend ? `<small class="muted"> · bij ${vezelOnbekend} ${vezelOnbekend === 1 ? 'product' : 'producten'} onbekend</small>` : ''}</span></div>
     </section>
     ${meals}
     ${ctx.gewichtKaart ? ctx.gewichtKaart(dag) : ''}
@@ -536,6 +548,7 @@ async function onClick(e) {
     }
     if (v === 'vaste') return openVasteItems()
     if (v === 'gisteren') return kopieerMaaltijd(el.dataset.meal)
+    if (v === 'klap' || v === 'macros') return wisselWeergave(v === 'klap' ? 'ingeklapt' : 'macros', el.dataset.meal)
     if (v === 'kopieer') return openKopieer()
     if (v === 'koppel-hb') return koppel()
     if (v === 'sync') {
@@ -1321,6 +1334,14 @@ function bewaarMomenten(e) {
     ctx.showToast('Eetmomenten opgeslagen 🍽️')
     naarPagina('dag')
   })
+}
+
+/** Eetmoment in- of uitklappen, of de macro's ervan tonen; per eetmoment onthouden. */
+function wisselWeergave(soort, meal) {
+  const lijst = inst.weergave[soort]
+  inst.weergave[soort] = lijst.includes(meal) ? lijst.filter((x) => x !== meal) : [...lijst, meal]
+  bewaarInst()
+  teken()
 }
 
 // ---------- Maaltijd van de vorige dag ----------
