@@ -223,15 +223,20 @@ function herstelGetallen(t) {
     .replace(/(?<=\d)[lI|](?=[\d,.])|(?<=[\s:(])[lI|](?=\d)/g, '1')
     .replace(/(\d)\s+([,.])\s*(\d)/g, '$1$2$3')
     .replace(/(\d)\s*,\s*(\d)/g, '$1,$2')
+    // "4%09" (echte foto: "40,0 g"): een % of ° tussen cijfers is een nul.
+    .replace(/(?<=\d)[%°](?=\d)/g, '0')
 }
 
+// Het label mag overal in de regel staan (OCR zet er vaak rommel voor), maar niet midden in een woord
+// ("melkeiwitten" telt dus niet). (?![a-z]) in plaats van \b, zodat "vet0g" ook werkt.
 const ETIKET = {
-  // (?![a-z]) in plaats van \b, zodat "vet0g" (zonder spatie, zoals OCR het soms leest) ook werkt.
-  vet: /^(totaal\s*)?(vetten|vet|fats|fat|matières grasses|fett)(?![a-z])/,
-  kh: /^(koolhydraten|koolhydraat|carbohydrates?|glucides|kohlenhydrate)(?![a-z])/,
-  eiwit: /^(eiwitten|eiwit|proteins?|protéines|eiweiß|eiweiss)(?![a-z])/,
-  vezel: /^(voedingsvezels?|vezels?|fibres?|fibers?|dietary fib(re|er)|ballaststoffe)(?![a-z])/,
+  vet: /(?<![a-z])(totaal\s*)?(vetten|vet|fats|fat|matières grasses|fett)(?![a-z])/g,
+  kh: /(?<![a-z])(koolhydraten|koolhydraat|carbohydrates?|glucides|kohlenhydrate)(?![a-z])/g,
+  eiwit: /(?<![a-z])(eiwitten|eiwit|proteins?|protéines|eiweiß|eiweiss)(?![a-z])/g,
+  vezel: /(?<![a-z])(voedingsvezels?|vezels?|fibres?|fibers?|dietary fib(re|er)|ballaststoffe)(?![a-z])/g,
 }
+// Direct na het label moet een getal komen (eventueel na : | . - of <); anders is het lopende tekst.
+const NA_LABEL = /^[\s:|.\-–]*<?\s*\d/
 const WAARVAN = /waarvan|verzadig|onverzadig|suikers?\b|sugars?\b|saturat|of which|dont|davon|polyol|zetmeel|starch/
 
 /**
@@ -271,7 +276,7 @@ function afrondStraf(c) {
 }
 
 /** Beste combinatie van kandidaten: past het best bij de kcal (4/4/9), met zo min mogelijk aannames. */
-function kiesWaarden(cands, kcal) {
+function kiesWaarden(cands, kcal, vezel = 0) {
   const keys = ['eiwit', 'kh', 'vet']
   const opties = keys.map((k) => (cands[k].length ? cands[k] : [null]))
   let best = null
@@ -280,7 +285,8 @@ function kiesWaarden(cands, kcal) {
       for (const v of opties[2]) {
         const set = [e, k, v]
         let kosten = set.reduce((s, c) => s + (c ? c.edits * 0.03 + afrondStraf(c) * 0.15 : 0), 0)
-        if (kcal && set.every(Boolean)) kosten += Math.abs(4 * e.v + 4 * k.v + 9 * v.v - kcal) / kcal
+        // Op etiketten telt vezel mee voor 2 kcal per gram.
+        if (kcal && set.every(Boolean)) kosten += Math.abs(4 * e.v + 4 * k.v + 9 * v.v + 2 * vezel - kcal) / kcal
         // Meer dan 100 g macro's in 100 g product kan niet (2 g speling voor afronding op het etiket).
         if (set.reduce((s, c) => s + (c ? c.v : 0), 0) > 102) kosten += 10
         if (!best || kosten < best.kosten - 1e-9) best = { kosten, set }
@@ -299,7 +305,8 @@ export function parseEtiket(tekst) {
   const flat = lines.join(' ')
   const out = { kcal: null, eiwit: null, kh: null, vet: null, vezel: null, eenheid: /per\s*100\s*m[l1i!|](?![a-z])/.test(flat) ? 'ml' : 'g', portie: null, controle: null }
   // Energie: eerst een getal vóór "kcal"; anders kJ omrekenen.
-  const kcal = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*ca[l1i]/)
+  // "kcal", ook zoals OCR het leest: "keal", "kcai", "k cal".
+  const kcal = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*[ce]?\s*a\s*[l1i]/)
   if (kcal) out.kcal = Number(kcal[1].replace(',', '.'))
   else {
     const kj = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*j\b/)
@@ -312,26 +319,26 @@ export function parseEtiket(tekst) {
     if (WAARVAN.test(line)) continue
     for (const [key, re] of Object.entries(ETIKET)) {
       if (gezien.has(key)) continue
-      const m = line.match(re)
-      if (m) {
+      for (const m of line.matchAll(re)) {
+        const rest = line.slice(m.index + m[0].length)
+        if (!NA_LABEL.test(rest)) continue
         gezien.add(key)
-        cands[key] = kandidaten(line.slice(m[0].length))
+        cands[key] = kandidaten(rest)
+        break
       }
     }
   }
-  Object.assign(out, kiesWaarden(cands, out.kcal))
-  // Vezel telt niet mee in de kcal-controle: de lezing met de minste aannames.
+  // Vezel: de lezing met de minste aannames (en hooguit 50 g per 100 g).
+  const vz = cands.vezel.filter((c) => c.v <= 50).sort((a, b) => a.edits + afrondStraf(a) * 5 - (b.edits + afrondStraf(b) * 5))[0]
+  Object.assign(out, kiesWaarden(cands, out.kcal, vz ? vz.v : 0))
   const macroG = (out.eiwit || 0) + (out.kh || 0) + (out.vet || 0)
-  const vz = cands.vezel
-    .filter((c) => macroG + c.v <= 102)
-    .sort((a, b) => a.edits + afrondStraf(a) * 5 - (b.edits + afrondStraf(b) * 5))[0]
-  out.vezel = vz ? vz.v : null
+  out.vezel = vz && macroG + vz.v <= 102 ? vz.v : null
   const p =
     flat.match(/(?:per\s*)?portie\s*\(?\s*(?:van\s*)?(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/) ||
     flat.match(/(?:per\s*)?(?:serving|portion)\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/)
   if (p) out.portie = Number(p[1].replace(',', '.'))
   if ([out.kcal, out.eiwit, out.kh, out.vet].every((v) => v !== null)) {
-    const schat = 4 * out.eiwit + 4 * out.kh + 9 * out.vet
+    const schat = 4 * out.eiwit + 4 * out.kh + 9 * out.vet + 2 * (out.vezel || 0)
     out.controle = Math.abs(schat - out.kcal) <= Math.max(25, 0.2 * out.kcal)
   }
   return out

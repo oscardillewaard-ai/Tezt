@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '39' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '40' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -452,6 +452,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 40, items: ['🏷️ Etiket scannen werkt nu veel beter met echte foto\'s, ook van glimmende verpakkingen 💛'] },
   {
     v: 39,
     items: [

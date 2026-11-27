@@ -122,3 +122,26 @@ ZoutOg`
   // "hoog" in gewone tekst blijft heel
   assert.equal(parseEtiket('Eiwitgehalte hoog\nEiwitten 12 g').eiwit, 12)
 })
+
+// Echte foto van een echt etiket (Lidl volkoren tarwebollen, plastic zak), echte OCR-uitvoer van Tesseract.js
+// in Tarapp (alleen het tabeldeel). Het etiket: 229 kcal, vet 1,5 g, koolhydraten 40,0 g, vezels 7,1 g, eiwitten 10,4 g.
+test('echte foto (Lidl-bollen): rommel voor het label, "keal", "4%09", "1049"; vezel onleesbaar blijft leeg', () => {
+  const t = `°Á ik k YW dg E \\di BE k GTE wi Ei VEZEL: ER | €
+jh 4 1 EE PEC y tarVfffeel. water, ersgis}, tarwe gu Ie E WY 2 5
+í A57 e=  meelverbetefgar: asch)jfnezuur adolie, Melkeiwitten, erite f EN
+4 AH È=] Gemiddelde voedingswaarde ë #9 N '/
+# Wi NE | : | 9/09] 9/50g XRT
+4 d Gog sf Energie 9690/| 48597 6% [eN AN :
+Nn DP 4 229keal| TS eat 4 ND
+a WA Zi Vetten 15g 089 1 Nd /
+AN JA (WI! hi VR À Waarvan verzadigde vetzuren 0,39 029 <% WE |
+PEI Mn AGP Koolhydraten 4%09| 2009 8% lo; Ù A Vas
+VEN N waarvan suikers 359 189 240 U,
+4 Me PEN Vezels Zg 369 IN va A4
+oM = j Eiwitten 1049 529 10% Ut Wh
+Mo AN Zout 0%09| 049 84 N # #`
+  const r = parseEtiket(t)
+  assert.deepEqual([r.kcal, r.vet, r.kh, r.eiwit], [229, 1.5, 40, 10.4])
+  assert.equal(r.vezel, null) // "Zg" is niet te lezen: leeg, niet verzonnen
+  assert.equal(r.controle, true)
+})
