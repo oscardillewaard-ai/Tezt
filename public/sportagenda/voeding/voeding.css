@@ -503,3 +503,29 @@
 .v-meal.dicht {
   padding-bottom: 8px;
 }
+
+/* Dagtotalen: gegeten of nog te gaan */
+.v-wissel {
+  display: inline-flex;
+  padding: 3px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: var(--line, #e7e5e4);
+}
+.v-wissel button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  min-height: 32px;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.v-wissel button.on {
+  background: var(--card, #fff);
+  color: var(--text, inherit);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}

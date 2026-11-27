@@ -311,12 +311,20 @@ function tekenWelkom() {
     </section>`
 }
 
-function voortgang(key, waarde, doel) {
+function voortgang(key, waarde, doel, resterend = false) {
   const pct = doel ? Math.min(100, Math.round(((waarde || 0) / doel) * 100)) : 0
   const over = doel && waarde > doel
+  const eenheid = key === 'kcal' ? '' : ' g'
+  // Nog te gaan: wat er van het doel over is (of hoeveel je erover zit). De balk blijft "gegeten".
+  const rechts =
+    resterend && doel
+      ? over
+        ? `<strong>${fmt(waarde - doel)}${eenheid}</strong> over`
+        : `nog <strong>${fmt(doel - (waarde || 0))}${eenheid}</strong>`
+      : `<strong>${fmt(waarde)}</strong> / ${fmt(doel)}${eenheid}`
   return `
     <div class="v-macro">
-      <div class="v-macro-top"><span>${MACRO_NL[key]}</span><span><strong>${fmt(waarde)}</strong> / ${fmt(doel)}${key === 'kcal' ? '' : ' g'}</span></div>
+      <div class="v-macro-top"><span>${MACRO_NL[key]}</span><span>${rechts}</span></div>
       <div class="v-bar ${over ? 'over' : ''}" role="progressbar" aria-label="${MACRO_NL[key]}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%;background:${MACRO_KLEUR[key]}"></i></div>
     </div>`
 }
@@ -328,6 +336,7 @@ function tekenDag() {
   const vezelOnbekend = items.filter((x) => x.m.vezel === null).length
   const doel = inst.doelen
   const rest = doel.kcal ? doel.kcal - (tot.kcal || 0) : null
+  const resterend = rest !== null && inst.weergave.resterend
   const meals = momenten().map(({ id: meal, naam }) => {
     const list = items.filter((x) => momentVan(x.r) === meal)
     const sum = somMacros(list.map((x) => x.m))
@@ -368,12 +377,25 @@ function tekenDag() {
       <button type="button" class="iconbtn" data-v="dag" data-n="1" aria-label="Volgende dag">›</button>
     </div>
     <section class="card v-sum">
+      ${
+        rest === null
+          ? ''
+          : `<div class="v-wissel" role="group" aria-label="Dagtotalen tonen als">
+        <button type="button" data-v="resterend" data-aan="0" aria-pressed="${!resterend}" class="${resterend ? '' : 'on'}">Gegeten</button>
+        <button type="button" data-v="resterend" data-aan="1" aria-pressed="${resterend}" class="${resterend ? 'on' : ''}">Nog te gaan</button>
+      </div>`
+      }
       <div class="v-sum-top">
-        <div><span class="v-big">${fmt(tot.kcal)}</span> <span class="muted">kcal gegeten</span></div>
-        <div class="v-left">${rest === null ? '' : rest >= 0 ? `nog <strong>${fmt(rest)}</strong>` : `<strong>${fmt(-rest)}</strong> over`}</div>
+        ${
+          resterend
+            ? `<div><span class="v-big">${fmt(Math.abs(rest))}</span> <span class="muted">${rest >= 0 ? 'kcal nog te gaan' : 'kcal over je doel'}</span></div>
+        <div class="v-left"><strong>${fmt(tot.kcal)}</strong> gegeten</div>`
+            : `<div><span class="v-big">${fmt(tot.kcal)}</span> <span class="muted">kcal gegeten</span></div>
+        <div class="v-left">${rest === null ? '' : rest >= 0 ? `nog <strong>${fmt(rest)}</strong>` : `<strong>${fmt(-rest)}</strong> over`}</div>`
+        }
       </div>
-      ${voortgang('kcal', tot.kcal, doel.kcal)}
-      ${['eiwit', 'kh', 'vet'].map((k) => voortgang(k, tot[k], doel[k])).join('')}
+      ${voortgang('kcal', tot.kcal, doel.kcal, resterend)}
+      ${['eiwit', 'kh', 'vet'].map((k) => voortgang(k, tot[k], doel[k], resterend)).join('')}
       <div class="v-vezel"><span>Vezels</span><span><strong>${vezelOnbekend && tot.vezel !== null ? '≥ ' : ''}${fmt(tot.vezel ?? 0)} g</strong>${vezelOnbekend ? `<small class="muted"> · bij ${vezelOnbekend} ${vezelOnbekend === 1 ? 'product' : 'producten'} onbekend</small>` : ''}</span></div>
     </section>
     ${meals}
@@ -548,6 +570,11 @@ async function onClick(e) {
     }
     if (v === 'vaste') return openVasteItems()
     if (v === 'gisteren') return kopieerMaaltijd(el.dataset.meal)
+    if (v === 'resterend') {
+      inst.weergave.resterend = el.dataset.aan === '1'
+      bewaarInst()
+      return teken()
+    }
     if (v === 'klap' || v === 'macros') return wisselWeergave(v === 'klap' ? 'ingeklapt' : 'macros', el.dataset.meal)
     if (v === 'kopieer') return openKopieer()
     if (v === 'koppel-hb') return koppel()

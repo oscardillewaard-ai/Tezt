@@ -172,7 +172,7 @@ export function standaardInstellingen() {
     // Eetmomenten: naam en volgorde zelf te kiezen; 'soort' is wat Healthbridge te zien krijgt.
     momenten: standaardMomenten(),
     vasteItems: [], // [{ productId, naam, grams, meal (= eetmoment-id) }]
-    weergave: { ingeklapt: [], macros: [] }, // per eetmoment: ingeklapt, en of de macro's getoond worden
+    weergave: { ingeklapt: [], macros: [], resterend: false }, // per eetmoment: ingeklapt en macro's tonen; resterend = "nog te gaan" in de dagtotalen
     favorieten: [], // product-id's
   }
 }
@@ -187,7 +187,7 @@ export function migreerInstellingen(s) {
   if (!Array.isArray(out.favorieten)) out.favorieten = []
   out.momenten = schoonMomenten(s.momenten)
   const w = s.weergave && typeof s.weergave === 'object' ? s.weergave : {}
-  out.weergave = { ingeklapt: Array.isArray(w.ingeklapt) ? w.ingeklapt.map(String) : [], macros: Array.isArray(w.macros) ? w.macros.map(String) : [] }
+  out.weergave = { ingeklapt: Array.isArray(w.ingeklapt) ? w.ingeklapt.map(String) : [], macros: Array.isArray(w.macros) ? w.macros.map(String) : [], resterend: w.resterend === true }
   // De eerste standaarddoelen kwamen samen boven 2000 kcal uit: nooit aangepast = de nieuwe standaard.
   const o = out.doelen
   if (o.kcal === 2000 && o.eiwit === 120 && [220, 230].includes(o.kh) && o.vet === 70) {
