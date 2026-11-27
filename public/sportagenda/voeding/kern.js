@@ -248,7 +248,8 @@ const WAARVAN = /waarvan|verzadig|onverzadig|suikers?\b|sugars?\b|saturat|of whi
 function kandidaten(rest) {
   const m = rest.match(/<?\s*(\d+(?:[.,]\d+)?)(\s*)(mg|g|gr|gram)?\b/)
   if (!m) return []
-  const raw = m[1]
+  // "07g" of "099": een getal met een voorloopnul is altijd "0,…" (de komma is weggevallen).
+  const raw = /^0\d+$/.test(m[1]) ? `0,${m[1].slice(1)}` : m[1]
   const vast = m[2] === '' // getal en eenheid aan elkaar, zoals OCR het leest als de komma wegvalt
   m[2] = m[3]
   const getal = (x) => Number(x.replace(',', '.'))
@@ -298,6 +299,61 @@ function kiesWaarden(cands, kcal, vezel = 0) {
   return Object.fromEntries(keys.map((key, i) => [key, best.set[i] ? best.set[i].v : null]))
 }
 
+// Vaste volgorde op EU-etiketten (vezel is optioneel; zout staat altijd onderaan).
+const VOLGORDE = [
+  ['vet', 'verz', 'kh', 'suiker', 'vezel', 'eiwit', 'zout'],
+  ['vet', 'verz', 'kh', 'suiker', 'eiwit', 'zout'],
+]
+const STOP = /referen|riferimento|apport de|intake|(^|\s)ri(\s|\(|$)/
+const ENERGIE = /k\s*[ce]?\s*a\s*[l1i]|k\s*j(?![a-z])/
+
+/**
+ * Terugval: de eerste getallen per regel (de kolom per 100 g) op volgorde toewijzen aan
+ * vet, verzadigd, koolhydraten, suikers, (vezel), eiwit, zout, en de toewijzing kiezen die het
+ * best bij de kcal past. Voor etiketten waar de naam over meerdere regels staat en de waarde
+ * daardoor naast een andere naam terechtkomt.
+ */
+function volgordeWaarden(lines, kcal) {
+  const start = lines.findIndex((l) => ENERGIE.test(l) || /energ/.test(l))
+  if (start < 0) return null
+  const reeks = []
+  for (const l of lines.slice(start)) {
+    if (STOP.test(l)) break
+    if (ENERGIE.test(l) || !/[a-z]{3}/.test(l)) continue
+    // Eerste losse getal (spatie ervoor, spatie of eenheid erna) dat geen percentage is; "/9aVon" telt niet.
+    const m = l.match(/(?:^|[\s|:])(<?\s*\d+(?:[.,]\d+)?\s*(?:mg|g|gr)?)(?=\s|$|[|)\]])(?!\s*%)/)
+    if (!m) continue
+    const c = kandidaten(m[1])
+    if (c.length) reeks.push(c)
+  }
+  let best = null
+  for (const slots of VOLGORDE)
+    for (const offset of [0, 1]) {
+      const deel = reeks.slice(offset, offset + slots.length)
+      if (deel.length < slots.indexOf('eiwit') + 1) continue
+      const opties = (naam) => (slots.indexOf(naam) >= 0 && deel[slots.indexOf(naam)]) || [null]
+      for (const vt of opties('vet'))
+        for (const vz of opties('verz'))
+          for (const k of opties('kh'))
+            for (const su of opties('suiker'))
+              for (const vez of opties('vezel'))
+                for (const e of opties('eiwit')) {
+                  if (!vt || !k || !e) continue
+                  // Alleen de waarden die we gebruiken tellen mee; verzadigd en suikers zijn vaak verminkt
+                  // en dienen alleen als zachte controle. Een goede kcal-match weegt zwaar.
+                  const set = [vt, k, vez, e].filter(Boolean)
+                  let kosten = offset * 0.1 + set.reduce((s, c) => s + c.edits * 0.03 + afrondStraf(c) * 0.15, 0)
+                  kosten += (2 * Math.abs(4 * e.v + 4 * k.v + 9 * vt.v + 2 * (vez ? vez.v : 0) - kcal)) / kcal
+                  if (vz && vz.v > vt.v + 0.05) kosten += 0.05 // verzadigd hoort niet meer te zijn dan vet
+                  if (su && su.v > k.v + 0.05) kosten += 0.05 // suikers niet meer dan koolhydraten
+                  if (e.v + k.v + vt.v + (vez ? vez.v : 0) > 102) kosten += 10
+                  if (!best || kosten < best.kosten - 1e-9) best = { kosten, vet: vt.v, kh: k.v, eiwit: e.v, vezel: vez ? vez.v : null }
+                }
+    }
+  if (!best) return null
+  return { vet: best.vet, kh: best.kh, eiwit: best.eiwit, vezel: best.vezel }
+}
+
 /**
  * Leest kcal, eiwit, koolhydraten en vet per 100 g (of 100 ml) uit de tekst van een voedingsetiket.
  * Werkt met Nederlandse (en Engelse, Franse, Duitse) etiketten. Wat niet gevonden wordt, blijft null.
@@ -310,13 +366,15 @@ export function parseEtiket(tekst) {
   const out = { kcal: null, eiwit: null, kh: null, vet: null, vezel: null, eenheid: /per\s*100\s*m[l1i!|](?![a-z])/.test(flat) ? 'ml' : 'g', portie: null, controle: null }
   // Energie: eerst een getal vóór "kcal"; anders kJ omrekenen.
   // "kcal", ook zoals OCR het leest: "keal", "kcai", "k cal".
-  const kcal = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*[ce]?\s*a\s*[l1i]/)
-  if (kcal) out.kcal = Number(kcal[1].replace(',', '.'))
-  else {
-    const kj = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*j\b/)
-    if (kj) out.kcal = round(kjNaarKcal(Number(kj[1].replace(',', '.'))), 0)
-  }
-  if (out.kcal !== null && (out.kcal < 0 || out.kcal > 950)) out.kcal = null
+  // De eerste kJ-waarde is die per 100 g; de kcal die daarbij past (± 4%) wint, zodat de
+  // portiekolom ("116 kcal") niet per ongeluk gekozen wordt. Zonder kJ: de eerste kcal.
+  const getal = (x) => Number(String(x).replace(',', '.'))
+  const kcals = [...flat.matchAll(/(\d+(?:[.,]\d+)?)\s*k\s*[ce]?\s*a\s*[l1i]/g)].map((m) => getal(m[1])).filter((v) => v >= 0 && v <= 950)
+  const kjs = [...flat.matchAll(/(\d{2,4}(?:[.,]\d+)?)\s*k\s*j(?![a-z])/g)].map((m) => getal(m[1])).filter((v) => v > 0 && v <= 4000)
+  if (kjs.length) {
+    const doel = kjNaarKcal(kjs[0])
+    out.kcal = kcals.find((v) => Math.abs(v - doel) <= Math.max(5, doel * 0.04)) ?? round(doel, 0)
+  } else if (kcals.length) out.kcal = kcals[0]
   const cands = { eiwit: [], kh: [], vet: [], vezel: [] }
   const gezien = new Set()
   for (const line of lines) {
@@ -337,6 +395,15 @@ export function parseEtiket(tekst) {
   Object.assign(out, kiesWaarden(cands, out.kcal, vz ? vz.v : 0))
   const macroG = (out.eiwit || 0) + (out.kh || 0) + (out.vet || 0)
   out.vezel = vz && macroG + vz.v <= 102 ? vz.v : null
+  // Terugval voor etiketten waar de waarden niet naast hun naam staan (namen over meerdere regels):
+  // de vaste EU-volgorde gebruiken. Alleen als de gewone lezing niet compleet is (een complete lezing
+  // die niet klopt, blijft staan met controle = false: dan kijkt de gebruiker na).
+  const compleet = ['eiwit', 'kh', 'vet'].every((k) => out[k] !== null)
+  const klopt = (o) => o.kcal && Math.abs(4 * o.eiwit + 4 * o.kh + 9 * o.vet + 2 * (o.vezel || 0) - o.kcal) <= o.kcal * 0.1
+  if (out.kcal && !compleet) {
+    const v = volgordeWaarden(lines, out.kcal)
+    if (v && klopt({ ...v, kcal: out.kcal })) Object.assign(out, v)
+  }
   const p =
     flat.match(/(?:per\s*)?portie\s*\(?\s*(?:van\s*)?(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/) ||
     flat.match(/(?:per\s*)?(?:serving|portion)\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/)

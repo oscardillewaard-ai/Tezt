@@ -452,7 +452,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
-  { v: 41, items: ['🏷️ Etiket scannen leest nu ook meertalige etiketten (Frans/Nederlands/Duits) goed 💛'] },
+  { v: 41, items: ['🏷️ Etiket scannen leest nu ook meertalige etiketten goed, en etiketten waarop de getallen niet netjes naast de woorden staan 💛'] },
   { v: 40, items: ['🏷️ Etiket scannen werkt nu veel beter met echte foto\'s, ook van glimmende verpakkingen 💛'] },
   {
     v: 39,

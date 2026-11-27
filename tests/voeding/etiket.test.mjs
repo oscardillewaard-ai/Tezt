@@ -166,3 +166,41 @@ l Sel /Zout / Salz 0,359 011g 2%`
   const r = parseEtiket(t)
   assert.deepEqual([r.kcal, r.vet, r.kh, r.vezel, r.eiwit, r.controle], [381, 3.7, 73, 11, 8.3, true])
 })
+
+// Derde echte foto (whey-eiwit, vijftalig etiket waarvan de waarden niet naast hun naam staan),
+// echte OCR-uitvoer van Tesseract.js in Tarapp. Het etiket: 385 kcal, vet 6,7 g, koolhydraten 3,9 g,
+// vezel 0,7 g, eiwit 77 g (op het etiket staat 77 g naast "Salt" en 0,7 g naast "Protein").
+test('echte foto (whey, waarden verschoven): terugval op de vaste EU-volgorde', () => {
+  const t = `| 1009 | %
+Sp Jy 489) 6
+Energy/Energie/Energa] Nij 1629KJ/ rape
+Energie/Energia 385 kcal 20g 3%
+209
+Fat/Vetten/Matières Grasses 679
+/Fett/Grassi
+of which saturates, waarva
+erzadigde vetzuren,
+t acide. Jras Saturés
+/9aVon gesättigte Fettsäurer 9%
+di cui acidi gras S/ saturi 99 099 5
+CTbohydrate/Koolhydrater
+| (B licides/Koplenhydrate ax
+Carboigratj 39g 129
+Van syik,
+dont Store _
+davon ZUCkey î EE 19%
+Fibre/Vezeig deu Zocher; 39g 129
+/Fibres Montage}
+Ballaststoffe/Fi;e
+Protein/E ton Pre 07g <o.59g
+/Eiweiss/Proteine r
+c alt/Zout/Sel/Salz/Sa|g 779 231g 46%
+RI (reference intake) Referg ET l2g 2%`
+  const r = parseEtiket(t)
+  assert.deepEqual([r.kcal, r.vet, r.kh, r.vezel, r.eiwit, r.controle], [385, 6.7, 3.9, 0.7, 77, true])
+})
+
+test('kcal: de waarde bij de eerste kJ wint van de portiekolom', () => {
+  assert.equal(parseEtiket('Energie 489 kJ / 116 kcal\nper 100 g 1629 kJ / 385 kcal').kcal, 116) // eerste kJ telt
+  assert.equal(parseEtiket('Energie 1629kJ/ 489kJ/\n116 kcal 385 kcal\nVet 6,7 g').kcal, 385) // past bij 1629 kJ
+})
