@@ -123,7 +123,12 @@ const fmt = (n, d = 0) => (n === null || n === undefined ? '–' : Number(n).toL
 const gramTekst = (g, unit) => `${fmt(g, 1)} ${unit === 'ml' ? 'ml' : 'g'}`
 const isVandaag = () => dag === vandaagKey()
 
+// Een product dat je zelf hebt verbeterd ("Waarden aanpassen") vervangt het origineel overal.
+const vervangerVan = (id) => producten.find((p) => p.vervangt === id && p.bron === 'eigen') || null
+
 function productVanId(id) {
+  const eigen = vervangerVan(id)
+  if (eigen) return eigen
   return NEVO_PRODUCTEN.find((p) => p.id === id) || BASIS_PRODUCTEN.find((p) => p.id === id) || producten.find((p) => p.id === id) || null
 }
 
@@ -135,8 +140,12 @@ function receptAlsProduct(r) {
 
 function alleProducten() {
   // Volgorde telt bij gelijke zoekscore: eigen producten, dan NEVO, dan USDA (aanvulling).
-  return [...producten.map((p) => (p.bron === 'recept' ? receptAlsProduct(p) : p)), ...NEVO_PRODUCTEN, ...BASIS_PRODUCTEN]
+  // Wat je zelf hebt verbeterd, staat er alleen als jouw versie in.
+  const weg = vervangen()
+  return [...producten.map((p) => (p.bron === 'recept' ? receptAlsProduct(p) : p)), ...NEVO_PRODUCTEN, ...BASIS_PRODUCTEN].filter((p) => !weg.has(p.id))
 }
+
+const vervangen = () => new Set(producten.filter((p) => p.bron === 'eigen' && p.vervangt).map((p) => p.vervangt))
 
 function recentProducten(max = 25) {
   const seen = new Set()
@@ -149,7 +158,7 @@ function recentProducten(max = 25) {
     const p = (r.productId && productVanId(r.productId)) || null
     out.push({
       ...(p ? (p.bron === 'recept' ? receptAlsProduct(p) : p) : {}),
-      id: r.productId || `regel:${r.id}`,
+      id: p?.id || r.productId || `regel:${r.id}`,
       naam: p?.naam || r.name,
       merk: p?.merk ?? r.brand,
       per100: p ? (p.bron === 'recept' ? receptAlsProduct(p).per100 : p.per100) : r.per100,
@@ -701,6 +710,24 @@ async function bewaarRegel(product, { grams, meal, regel }) {
   return r
 }
 
+/**
+ * Na het aanpassen van een product: alle regels in het dagboek met dat product krijgen de nieuwe
+ * waarden (de grammen blijven). Geeft het aantal bijgewerkte regels.
+ */
+async function werkRegelsBij(ids, product, regelId) {
+  const nu = Date.now()
+  const lijst = (await db.alle('dagboek')).filter((r) => !r.deleted && (ids.includes(r.productId) || r.id === regelId))
+  const nieuw = lijst
+    .filter((r) => JSON.stringify(r.per100) !== JSON.stringify(per100(product.per100)) || r.productId !== product.id || r.name !== product.naam)
+    .map((r) => ({ ...r, productId: product.id, name: product.naam, brand: product.merk || null, unit: product.eenheid === 'ml' ? 'ml' : 'g', per100: per100(product.per100), source: 'eigen', updatedAt: volgendeTijd(r.updatedAt, nu), dirty: 1 }))
+  if (!nieuw.length) return 0
+  await db.zetVeel('dagboek', nieuw)
+  await laadRegels()
+  teken()
+  syncStraks(inst)
+  return nieuw.length
+}
+
 async function verwijderRegel(r) {
   const tomb = { id: r.id, date: r.date, updatedAt: volgendeTijd(r.updatedAt), deleted: true, dirty: 1 }
   await db.zet('dagboek', tomb)
@@ -760,7 +787,7 @@ function openToevoegen(meal) {
       const lokaal = zoek(alleProducten(), q)
       const key = offKey(q)
       const uitLijst = offNl && key.length >= 3 ? zoek(offNl, q, 30) : []
-      const gezien = new Set([...producten.map((p) => p.id), ...lokaal.map((p) => p.id)])
+      const gezien = new Set([...producten.map((p) => p.id), ...lokaal.map((p) => p.id), ...vervangen()])
       const off = [...uitLijst, ...(offCache.get(key) || [])].filter((o) => !gezien.has(o.id) && gezien.add(o.id))
       zichtbaar = [...lokaal, ...off]
       // Eerst de beste 5, zodat de merkproducten van Open Food Facts niet onder de rand verdwijnen.
@@ -815,7 +842,8 @@ function openToevoegen(meal) {
     wacht = setTimeout(() => zoekOffNu(false), 700)
   })
   sheet.addEventListener('close', () => clearTimeout(wacht), { once: true })
-  sheet.addEventListener('click', async (e) => {
+  // Op het formulier, niet op het gedeelde venster: anders blijven oude handlers meeluisteren.
+  sheet.querySelector('form').addEventListener('click', async (e) => {
     const el = e.target.closest('[data-s]')
     if (!el) return
     const s = el.dataset.s
@@ -941,6 +969,7 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
   const startGram = regel?.grams ?? gram ?? product.portie?.g ?? 100
   const fav = inst.favorieten.includes(product.id)
   const kanFav = !product.id.startsWith('regel:')
+  const kanAanpassen = product.bron !== 'recept'
   const porties = [
     product.portie ? [product.portie.g, product.portie.naam] : null,
     [100, `100 ${unit}`],
@@ -961,6 +990,7 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
         ${regel ? '<button type="button" class="btn danger" data-h="wis">Verwijderen</button>' : ''}
         <button type="submit" class="btn primary">${regel ? 'Opslaan' : 'Toevoegen'}</button>
       </div>
+      ${kanAanpassen ? `<button type="button" class="linkbtn v-aanpassen" data-h="aanpassen">✏️ ${product.bron === 'eigen' ? 'Product aanpassen' : 'Waarden kloppen niet? Zelf aanpassen'}</button>` : ''}
       ${product.bron === 'off' ? '<p class="muted v-bron">Productgegevens: Open Food Facts (ODbL)</p>' : product.bron === 'nevo' && NEVO_BRON ? `<p class="muted v-bron">${esc(NEVO_BRON)}</p>` : ''}
     </form>`,
     (fd) => {
@@ -987,12 +1017,18 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
     sheet.querySelector('#v-live').innerHTML = `<strong>${fmt(m.kcal)} kcal</strong><span>Eiwit ${fmt(m.eiwit, 1)} g</span><span>Koolh. ${fmt(m.kh, 1)} g</span><span>Vet ${fmt(m.vet, 1)} g</span><span>Vezel ${fmt(m.vezel, 1)} g</span>`
   }
   input.addEventListener('input', live)
-  sheet.addEventListener('click', (e) => {
+  // Op het formulier, niet op het gedeelde venster: anders blijven oude handlers meeluisteren.
+  sheet.querySelector('form').addEventListener('click', (e) => {
     const el = e.target.closest('[data-h]')
     if (!el) return
     if (el.dataset.h === 'portie') {
       input.value = String(el.dataset.g).replace('.', ',')
       live()
+    } else if (el.dataset.h === 'aanpassen') {
+      const g = num(input.value) || startGram
+      const m = sheet.querySelector('select[name="meal"]').value
+      if (product.bron === 'eigen') openProductForm(product, { meal: m, regel, gram: g })
+      else openProductForm(null, { meal: m, regel, gram: g, verbeter: product })
     } else if (el.dataset.h === 'wis' && regel) {
       ctx.closeSheet()
       verwijderRegel(regel)
@@ -1090,12 +1126,15 @@ async function vindBarcode(raw, meal, format) {
 
 // ---------- Eigen product ----------
 
-function openProductForm(product, { meal, barcode, naam, scan = false } = {}) {
-  const p = product || { naam: naam || '', per100: per100(), eenheid: 'g', barcode: barcode || null }
+function openProductForm(product, { meal, barcode, naam, scan = false, regel, gram, verbeter } = {}) {
+  // [verbeter]: een product uit Open Food Facts, NEVO of USDA met verkeerde waarden. Je maakt er een
+  // eigen versie van met dezelfde naam en barcode; die vervangt het origineel (ook in je dagboek).
+  const p = product || (verbeter ? { naam: verbeter.naam, merk: verbeter.merk, per100: per100(verbeter.per100), eenheid: verbeter.eenheid, portie: verbeter.portie, barcode: verbeter.barcode || null } : { naam: naam || '', per100: per100(), eenheid: 'g', barcode: barcode || null })
   vSheet(
     `
     <form method="dialog" class="v-sheet">
-      <h2>${product ? 'Product aanpassen' : 'Eigen product'}</h2>
+      <h2>${verbeter ? 'Waarden aanpassen' : product ? 'Product aanpassen' : 'Eigen product'}</h2>
+      ${verbeter ? `<p class="muted">Neem de waarden <strong>per 100 ${p.eenheid === 'ml' ? 'ml' : 'g'}</strong> over van het etiket (of scan het). Jouw versie vervangt deze overal, ook in wat je al hebt ingevuld. ${verbeter.bron === 'off' ? 'Open Food Facts zelf verandert niet.' : ''}</p>` : ''}
       ${barcode && !product ? `<p class="muted">Barcode ${esc(barcode)} is nog onbekend. Scan het etiket of neem de waarden per 100 g of 100 ml over.</p>` : ''}
       <button type="button" class="btn block v-etiket" data-p="etiket">🏷️ Etiket scannen</button>
       <input type="file" accept="image/*" capture="environment" id="v-etiket-foto" hidden />
@@ -1141,15 +1180,22 @@ function openProductForm(product, { meal, barcode, naam, scan = false } = {}) {
         portie: portie ? { g: portie, naam: `1 portie (${fmt(portie)} ${eenheid})` } : null,
         bron: 'eigen',
         barcode: bc,
+        vervangt: verbeter?.id || product?.vervangt || null,
       }
-      bewaarProduct(nieuw).then(() => {
-        if (meal) openHoeveelheid(nieuw, { meal })
-        else {
-          ctx.showToast('Product opgeslagen 💛')
-          teken()
-        }
-      })
-      return !meal
+      const oudId = verbeter?.id || product?.id
+      bewaarProduct(nieuw)
+        .then(() => werkRegelsBij([oudId, nieuw.id].filter(Boolean), nieuw, regel?.id))
+        .then((n) => {
+          if (regel) {
+            ctx.closeSheet()
+            ctx.showToast(n > 1 ? `Aangepast 💛 ${n} regels in je dagboek bijgewerkt` : 'Aangepast 💛')
+          } else if (meal) openHoeveelheid(nieuw, { meal, gram })
+          else {
+            ctx.showToast(n ? `Product opgeslagen 💛 ${n} ${n === 1 ? 'regel' : 'regels'} bijgewerkt` : 'Product opgeslagen 💛')
+            teken()
+          }
+        })
+      return !meal && !regel
     },
   )
   const sheet = ctx.sheet
@@ -1158,7 +1204,8 @@ function openProductForm(product, { meal, barcode, naam, scan = false } = {}) {
     sheet.querySelector('input[name="eenheid"]').value = u
   }
   const foto = sheet.querySelector('#v-etiket-foto')
-  sheet.addEventListener('click', (e) => {
+  // Op het formulier, niet op het gedeelde venster: anders blijven oude handlers meeluisteren.
+  sheet.querySelector('form').addEventListener('click', (e) => {
     const el = e.target.closest('[data-p]')
     if (!el) return
     if (el.dataset.p === 'eenheid') zetEenheid(el.dataset.u)
@@ -1282,7 +1329,8 @@ function openRecept(recept) {
     )
     res.innerHTML = gevonden.map((p) => `<button type="button" class="v-result" data-r="plus" data-id="${esc(p.id)}"><span>${esc(p.naam)}${p.merk ? ` <small class="muted">${esc(p.merk)}</small>` : ''}</span><span class="v-kcal">+</span></button>`).join('')
   })
-  sheet.addEventListener('click', (e) => {
+  // Op het formulier, niet op het gedeelde venster: anders blijven oude handlers meeluisteren.
+  sheet.querySelector('form').addEventListener('click', (e) => {
     const el = e.target.closest('[data-r]')
     if (!el) return
     if (el.dataset.r === 'plus') {
@@ -1297,7 +1345,7 @@ function openRecept(recept) {
       tekenIngr()
     }
   })
-  sheet.addEventListener('input', (e) => {
+  sheet.querySelector('form').addEventListener('input', (e) => {
     if (e.target.dataset.i === undefined) return
     r.ingredienten[Number(e.target.dataset.i)].gram = num(e.target.value) || 0
     const w = receptWaarden(r)

@@ -31,8 +31,48 @@ async function polyfillDetector() {
   return new BarcodeDetector({ formats: FORMATS })
 }
 
+// Reserve: ZXing naast de ingebouwde scanner. Bij gebogen of kleine barcodes (deksels, blikjes)
+// leest hij vaak wat de ingebouwde niet leest.
+let reservePromise = null
+function reserveDetector() {
+  reservePromise ||= polyfillDetector().catch(() => null)
+  return reservePromise
+}
+
+// Uitsneden van het midden (rand links/rechts, boven/onder als deel van de breedte/hoogte).
+// Gemeten op een echte foto van een gebogen Lidl-deksel: het hele beeld gaf niets; met 15 % van
+// links en rechts eraf (en vergroot) werkte het bij elke hoogte. De rand van het deksel en de tekst
+// ernaast brengen de scanner in de war.
+export const UITSNEDEN = [
+  [0.15, 0.18],
+  [0.22, 0.26],
+  [0.08, 0.26],
+]
+
+/** Uitsnede [nr] van het beeld, vergroot op een canvas als hij smal is. */
+export function middenVan(bron, breedte, hoogte, canvas = document.createElement('canvas'), nr = 0) {
+  const [mx, my] = UITSNEDEN[nr % UITSNEDEN.length]
+  const sx = Math.round(breedte * mx)
+  const sy = Math.round(hoogte * my)
+  const sw = breedte - 2 * sx
+  const sh = hoogte - 2 * sy
+  const schaal = sw < 1000 ? 2 : 1
+  canvas.width = sw * schaal
+  canvas.height = sh * schaal
+  const g = canvas.getContext('2d', { willReadFrequently: true })
+  g.imageSmoothingQuality = 'high'
+  g.drawImage(bron, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+  return canvas
+}
+
 export function maakDetector() {
-  detectorPromise ||= (async () => (await nativeDetector()) || (await polyfillDetector()))()
+  detectorPromise ||= (async () => {
+    const eigen = await nativeDetector()
+    if (eigen) return eigen
+    // Geen ingebouwde scanner: ZXing is dan al de hoofdscanner, geen reserve nodig.
+    reservePromise = Promise.resolve(null)
+    return polyfillDetector()
+  })()
   detectorPromise.catch(() => (detectorPromise = null))
   return detectorPromise
 }
@@ -48,7 +88,11 @@ export async function startScanner(video, onCode) {
   if (!cameraMogelijk()) throw new Error('Deze browser kan de camera niet gebruiken. Typ de barcode in.')
   let stream
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+    // Scherp beeld: liefst Full HD (standaard is vaak 640×480, te grof voor dunne streepjes).
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    })
   } catch (err) {
     const msg =
       err?.name === 'NotAllowedError'
@@ -57,6 +101,14 @@ export async function startScanner(video, onCode) {
           ? 'Geen camera gevonden. Typ de barcode in.'
           : 'De camera start niet. Typ de barcode in.'
     throw new Error(msg)
+  }
+  // Doorlopend scherpstellen, als de camera dat kan (vooral Android).
+  try {
+    const track = stream.getVideoTracks()[0]
+    const kan = track.getCapabilities?.() || {}
+    if (kan.focusMode?.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+  } catch {
+    // niet elke camera kent dit
   }
   video.srcObject = stream
   video.setAttribute('playsinline', '')
@@ -71,6 +123,19 @@ export async function startScanner(video, onCode) {
   }
   let stopped = false
   let busy = false
+  let ronde = 0
+  const canvas = document.createElement('canvas')
+  // Om de beurt: het hele beeld, dan de uitsneden van het midden; vanaf ±1 s ook met ZXing erbij.
+  const probeer = async () => {
+    const stap = ronde++
+    const fase = stap % (UITSNEDEN.length + 1)
+    if (fase === 0) return detector.detect(video)
+    const midden = middenVan(video, video.videoWidth, video.videoHeight, canvas, fase - 1)
+    const codes = await detector.detect(midden)
+    if (codes.length || stap < 8) return codes
+    const reserve = await reserveDetector()
+    return reserve ? reserve.detect(midden) : []
+  }
   const stop = () => {
     stopped = true
     stream.getTracks().forEach((t) => t.stop())
@@ -81,7 +146,7 @@ export async function startScanner(video, onCode) {
     if (!busy && video.readyState >= 2) {
       busy = true
       try {
-        const codes = await detector.detect(video)
+        const codes = await probeer()
         const hit = codes.find((c) => c.rawValue)
         if (hit && !stopped) {
           try {
@@ -98,7 +163,7 @@ export async function startScanner(video, onCode) {
       }
       busy = false
     }
-    setTimeout(tick, 180)
+    setTimeout(tick, 120)
   }
   tick()
   return stop

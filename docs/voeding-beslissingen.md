@@ -187,3 +187,15 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     wissen (alleen Tarapp-sleutels; andere apps op hetzelfde github.io-adres blijven staan); dat kan alleen
     als de laatste sync gelukt is. Eerlijk: de app-code zelf blijft openbaar op GitHub Pages; je gegevens
     niet. Ook de code afschermen kan later met Cloudflare Pages + Access.
+48. **Zelf waarden aanpassen** (versie 46): bij elk product uit Open Food Facts, NEVO of USDA staat
+    "Waarden kloppen niet? Zelf aanpassen". Dat maakt een eigen product met dezelfde naam en barcode
+    (`vervangt: <oud id>`). Die eigen versie vervangt het origineel in zoeken, recent, favorieten en bij
+    het scannen, en alle regels in het dagboek met het oude product krijgen de nieuwe waarden (grammen
+    blijven). Ook een eigen product aanpassen werkt de regels nu bij. Open Food Facts zelf passen we niet
+    aan (daarvoor is een OFF-account nodig); aanleiding: Lidl Luxe volkoren bollen stond er ×1,67 te hoog in.
+    Daarbij een oude fout opgelost: klikhandlers van eerdere vensters bleven op het gedeelde venster
+    hangen en reageerden mee; ze zitten nu op het formulier van het venster zelf.
+49. **Barcodescanner** (versie 46): Full HD-camerabeeld met doorlopend scherpstellen; om de beurt het
+    hele beeld en drie uitsneden van het midden (vergroot); na ±1 s ook ZXing als reserve naast de
+    ingebouwde scanner van Android. Gemeten met een echte foto van een gebogen Lidl-deksel: het hele beeld
+    gaf niets, de uitsnede zonder de rand wel. In een test met nepcamera: oud niets na 12 s, nieuw 1,9 s.
