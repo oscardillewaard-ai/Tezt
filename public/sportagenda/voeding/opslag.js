@@ -72,8 +72,14 @@ export async function haal(name, id) {
   return done((await store(name)).get(id))
 }
 
+// Producten en instellingen gaan mee met het account (account/account.js): laat weten dat er iets veranderde.
+// Het dagboek niet: dat synchroniseert al zelf via de Worker.
+const meld = (name) => name !== 'dagboek' && globalThis.dispatchEvent?.(new Event('tarapp:opgeslagen'))
+
 export async function zet(name, value) {
-  return done((await store(name, 'readwrite')).put(value))
+  const r = await done((await store(name, 'readwrite')).put(value))
+  meld(name)
+  return r
 }
 
 export async function zetVeel(name, values) {
@@ -83,14 +89,19 @@ export async function zetVeel(name, values) {
   const s = tx.objectStore(name)
   for (const v of values) s.put(v)
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve()
+    tx.oncomplete = () => {
+      meld(name)
+      resolve()
+    }
     tx.onerror = () => reject(tx.error)
     tx.onabort = () => reject(tx.error)
   })
 }
 
 export async function wis(name, id) {
-  return done((await store(name, 'readwrite')).delete(id))
+  const r = await done((await store(name, 'readwrite')).delete(id))
+  meld(name)
+  return r
 }
 
 export async function wisAlles() {
@@ -191,7 +202,10 @@ export function migreerInstellingen(s) {
 }
 
 export const leesInstellingen = () => migreerInstellingen(lsGet(LS.instellingen, null))
-export const bewaarInstellingen = (s) => lsSet(LS.instellingen, s)
+export const bewaarInstellingen = (s) => {
+  lsSet(LS.instellingen, s)
+  meld('instellingen')
+}
 export const leesSync = () => lsGet(LS.sync, null)
 export const bewaarSync = (s) => lsSet(LS.sync, s)
 export const doorsturenAan = (s) => (s.doorsturen === null ? s.persoon === 'oscar' : !!s.doorsturen)

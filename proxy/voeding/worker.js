@@ -15,11 +15,14 @@
 //   GET  /voeding/off/:barcode               Open Food Facts-product   (Bearer <schrijf-token>)
 //   GET  /voeding/off-zoek?q=…               Open Food Facts zoeken    (Bearer <schrijf-token>)
 //   GET  /voeding/export?person=oscar&from=YYYY-MM-DD&to=YYYY-MM-DD   (Bearer <lees-token>)
+//   /account/config, /account/login, /account/logout, /account/sync: inloggen met Google en alles
+//                                                                synchroniseren (zie account.js)
 //
 // Tokens staan alleen als SHA-256-hash in KV. Een dagboek ("book") is van één
 // persoon op één of meer van zijn/haar apparaten. Het lees-token geeft alleen
 // toegang tot de export, en alleen als "Doorsturen naar Healthbridge" aan staat.
 
+import { accountRoute } from './account.js'
 import { OFF_FIELDS, BOOK_RE, TOKEN_RE, PERSONEN, bouwExport, datumsTussen, maandVan, parseOff, normaliseerBarcode, schoonRegel, voegSamen } from '../../public/sportagenda/voeding/kern.js'
 
 const ALLOWED_ORIGINS = ['https://oscardillewaard-ai.github.io', 'http://localhost:5173', 'http://localhost:4173']
@@ -306,6 +309,7 @@ export default {
     if (path === '/' && request.method === 'GET') return statusPage(kv)
     if (!kv) return json({ error: 'Geen opslag gekoppeld aan de sync-server' }, 500, headers)
     try {
+      if (path.startsWith('/account/')) return await accountRoute(path, request, env, kv, headers)
       if (path === '/voeding/register' && request.method === 'POST') return await register(kv, request, headers)
       if (path === '/voeding/export' && request.method === 'GET') return await exportDays(kv, request, headers, url)
       if (path === '/voeding/off-zoek' && request.method === 'GET') return await offSearch(kv, request, headers, url, env)

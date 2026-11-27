@@ -4,18 +4,23 @@ name: voeding-worker
 # Deploy gebeurt alleen op de hoofdbranch en alleen als het repo-secret
 # CLOUDFLARE_API_TOKEN bestaat (zie docs/voeding-stappen-voor-oscar.md).
 # De KV-opslag "tarapp-voeding" wordt bij de eerste keer automatisch aangemaakt.
+# Account (inloggen met Google): de repo-secrets TARAPP_GOOGLE_CLIENT_ID en TARAPP_ADMIN_EMAILS
+# gaan als Worker-secrets mee; de versleutelsleutel DATA_KEY wordt één keer gemaakt en daarna
+# nooit meer aangeraakt (zie docs/account-stappen-voor-oscar.md).
 
 on:
   push:
     paths:
       - 'proxy/voeding/**'
       - 'public/sportagenda/voeding/**'
+      - 'public/sportagenda/account/**'
       - 'tests/voeding/**'
       - '.github/workflows/voeding-worker.yml'
   pull_request:
     paths:
       - 'proxy/voeding/**'
       - 'public/sportagenda/voeding/**'
+      - 'public/sportagenda/account/**'
       - 'tests/voeding/**'
       - '.github/workflows/voeding-worker.yml'
   workflow_dispatch:
@@ -45,6 +50,8 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TARAPP_GOOGLE_CLIENT_ID: ${{ secrets.TARAPP_GOOGLE_CLIENT_ID }}
+      TARAPP_ADMIN_EMAILS: ${{ secrets.TARAPP_ADMIN_EMAILS }}
     defaults:
       run:
         working-directory: proxy/voeding
@@ -78,6 +85,24 @@ jobs:
       - name: Worker neerzetten
         if: steps.token.outputs.ok == 'true'
         run: npx --yes wrangler@4 deploy
+      - name: Account-secrets op de Worker zetten
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          if [ -n "$TARAPP_GOOGLE_CLIENT_ID" ]; then printf '%s' "$TARAPP_GOOGLE_CLIENT_ID" | npx --yes wrangler@4 secret put GOOGLE_CLIENT_ID; else echo "::notice::Geen TARAPP_GOOGLE_CLIENT_ID: inloggen met Google staat uit."; fi
+          if [ -n "$TARAPP_ADMIN_EMAILS" ]; then printf '%s' "$TARAPP_ADMIN_EMAILS" | npx --yes wrangler@4 secret put ADMIN_EMAILS; else echo "::notice::Geen TARAPP_ADMIN_EMAILS: inloggen met Google staat uit."; fi
+          # DATA_KEY alleen maken als hij er nog niet is. Lukt het opvragen niet, dan niets doen:
+          # een nieuwe sleutel zou alle opgeslagen accountgegevens onleesbaar maken.
+          LIJST=$(npx --yes wrangler@4 secret list --format json)
+          STAAT=$(printf '%s' "$LIJST" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const a=JSON.parse(s);if(!Array.isArray(a))throw 0;console.log(a.some(x=>x.name==="DATA_KEY")?"er":"weg")}catch{console.log("onbekend")}})')
+          if [ "$STAAT" = "weg" ]; then
+            openssl rand -base64 32 | tr -d '\n' | npx --yes wrangler@4 secret put DATA_KEY
+            echo "DATA_KEY aangemaakt."
+          elif [ "$STAAT" = "er" ]; then
+            echo "DATA_KEY bestaat al (blijft ongewijzigd)."
+          else
+            echo "::warning::Kon niet nagaan of DATA_KEY bestaat; niets veranderd."
+          fi
       - name: Controle (statuspagina)
         if: steps.token.outputs.ok == 'true'
         run: |
