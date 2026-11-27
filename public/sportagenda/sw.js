@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v42'
+const CACHE = 'sportagenda-v43'
 const SHELL = [
   './',
   'index.html',
@@ -18,6 +18,8 @@ const SHELL = [
 // Voeding (en de scanner met zijn .wasm) wordt pas opgehaald als iemand Voeding
 // opent; dan vraagt de pagina om deze bestanden ook voor offline te bewaren.
 const VOEDING = [
+  'account/account.js',
+  'account/kern.js',
   'voeding/ui.js',
   'voeding/kern.js',
   'voeding/opslag.js',

@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '42' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '43' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -124,9 +124,11 @@ function load() {
 
 let state = load()
 
-function save() {
+function save({ stil = false } = {}) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state))
+    // Ingelogd: het account-onderdeel synchroniseert even later (account/account.js).
+    if (!stil) dispatchEvent(new Event('tarapp:opgeslagen'))
   } catch {
     alert('Opslaan is mislukt (opslag vol of geblokkeerd). Maak een back-up via "Meer".')
   }
@@ -323,6 +325,7 @@ function render() {
   const anchor = scrolling ? scrollAnchor() : null
   view.innerHTML = renderers[ui.tab]()
   if (ui.tab === 'voeding') mountVoeding()
+  if (ui.tab === 'meer' && ui.morePage === 'account') mountAccount()
   if (anchor) restoreScrollAnchor(anchor)
   watchMoreWeeks(scrolling)
   fitAgenda()
@@ -452,6 +455,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 43, items: ['🔐 Inloggen met Google (Meer → Account): je trainingen, gewicht en voeding op je telefoon én laptop, versleuteld bewaard. Je huidige gegevens zet je meteen over 💛', '🛡️ Tarapp blijft privé: een nieuw account kan pas in na goedkeuring van Oscar'] },
   { v: 42, items: ['🍽️ Voeding overzichtelijker: hele getallen in je dagboek, eetmomenten inklappen en met E·K·V de macro\'s per eetmoment zien 💛'] },
   { v: 41, items: ['🏷️ Etiket scannen leest nu ook meertalige etiketten goed, en etiketten waarop de getallen niet netjes naast de woorden staan 💛'] },
   { v: 40, items: ['🏷️ Etiket scannen werkt nu veel beter met echte foto\'s, ook van glimmende verpakkingen 💛'] },
@@ -1635,6 +1639,7 @@ const MORE_PAGES = {
   installeren: { title: 'Op je beginscherm', render: () => renderInstallCard() },
   herinneringen: { title: 'Herinneringen', render: () => renderRemindersCard() },
   overzicht: { title: 'Overzicht', render: () => renderOverview() },
+  account: { title: 'Account', render: () => '<div id="account-root"><p class="muted">Laden…</p></div>' },
 }
 
 // ---------- Voeding (eigen module in voeding/, pas geladen als je hem opent) ----------
@@ -1688,6 +1693,60 @@ function mountVoeding() {
     })
 }
 
+// ---------- Account (eigen module in account/, alleen geladen als je ingelogd bent of de pagina opent) ----------
+const accountIngelogd = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem('tarapp.account'))
+    return !!(s?.sessie && s.exp > Date.now())
+  } catch {
+    return false
+  }
+}
+
+const accountWachtend = () => {
+  try {
+    return accountIngelogd() ? Number(JSON.parse(localStorage.getItem('tarapp.account')).wachtend) || 0 : 0
+  } catch {
+    return 0
+  }
+}
+const accountWaarde = () => {
+  const n = accountWachtend()
+  return n ? `${n} ${n === 1 ? 'aanvraag' : 'aanvragen'}` : accountIngelogd() ? 'Ingelogd' : ''
+}
+
+const accountCtx = () => ({
+  esc,
+  sheet,
+  openSheet,
+  closeSheet,
+  showToast,
+  getState: () => state,
+  zetState: (s) => {
+    state = normalize({ ...defaultState(), ...s })
+    save({ stil: true })
+  },
+  // Er kwam iets binnen van een ander apparaat: opnieuw tekenen (niet midden in een venster of training).
+  naExtern: () => {
+    if (!sheet.open && !runSession() && !ui.active) render()
+  },
+})
+
+function mountAccount() {
+  const el = document.getElementById('account-root')
+  if (!el) return
+  import('./account/account.js')
+    .then((m) => {
+      m.mount(el, accountCtx())
+      m.start(accountCtx())
+    })
+    .catch(() => {
+      el.innerHTML = '<section class="card"><h2>Account kan nu niet laden</h2><p class="muted">Controleer je internet en probeer het opnieuw.</p></section>'
+    })
+}
+
+if (accountIngelogd()) import('./account/account.js').then((m) => m.start(accountCtx())).catch(() => {})
+
 function renderMore() {
   if (ui.morePage === 'overzicht' && !voedingTonen()) ui.morePage = null
   const page = MORE_PAGES[ui.morePage]
@@ -1740,7 +1799,8 @@ function renderMore() {
     </div>
     <h3 class="pref-head">Je gegevens</h3>
     <div class="pref-list card">
-      ${row({ page: 'gegevens', icon: 'doos', color: '#3b82f6', label: 'Back-up en herstellen', sub: 'Alles staat alleen op deze telefoon', value: ui.persisted === false ? 'Maak er een' : '', warn: ui.persisted === false })}
+      ${row({ page: 'account', icon: 'telefoon', color: '#4285f4', label: 'Account', sub: 'Inloggen met Google · op al je apparaten', value: accountWaarde(), warn: accountWachtend() > 0 })}
+      ${row({ page: 'gegevens', icon: 'doos', color: '#3b82f6', label: 'Back-up en herstellen', sub: accountIngelogd() ? 'Een extra kopie als bestand' : 'Alles staat alleen op deze telefoon', value: ui.persisted === false ? 'Maak er een' : '', warn: ui.persisted === false })}
     </div>
     <h3 class="pref-head">App</h3>
     <div class="pref-list card">

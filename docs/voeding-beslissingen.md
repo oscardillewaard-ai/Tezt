@@ -152,3 +152,31 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     `curl -sL https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz | node scripts/gen-voeding-off-nl.mjs -`
     (of in GitHub Actions zonder `-`, daar werkt de download direct). Alternatief voor later: een maandelijkse
     Action die een pull request opent, die Oscar met één tik merget.
+
+## Account (inloggen met Google)
+
+41. **Inloggen met Google via Google Identity Services**, gecontroleerd in de Worker
+    (`proxy/voeding/account.js`): handtekening (RS256, openbare sleutels van Google), `aud`, `iss`, `exp`
+    en een bevestigd e-mailadres. Geen wachtwoorden; daarna een eigen sessiecode van 256 bit, in KV alleen
+    als SHA-256-hash, 180 dagen geldig.
+42. **Privé: alleen na goedkeuring.** De beheerder (`ADMIN_EMAILS`, een Worker-secret) mag altijd in.
+    Iedereen anders wordt bij de eerste poging een aanvraag die de beheerder in de app goed- of afkeurt.
+    Intrekken stopt ook lopende sessies (bij elk verzoek wordt de toegang opnieuw gecontroleerd).
+    Maximaal 25 openstaande aanvragen, zodat niemand de lijst kan volspammen. De site zelf (GitHub
+    Pages) blijft openbaar; zonder goedkeuring zie je alleen een lege app zonder gegevens van anderen.
+43. **Versleuteld op de server** (keuze A): per account AES-256-GCM met de Worker-secret `DATA_KEY`,
+    nieuwe IV per opslag, account-id als extra controle. De workflow maakt `DATA_KEY` één keer aan en
+    raakt hem daarna nooit meer aan (ook niet als het opvragen mislukt).
+44. **Synchroniseren per record, nieuwste wint** (`public/sportagenda/account/kern.js`): trainingen,
+    schema's, activiteiten, series, plannen, blokken, gewicht per dag, instellingen, eigen producten en
+    recepten, Voeding-instellingen en de dagboek-koppeling. Het Voeding-dagboek zelf liep al via de
+    Worker; een nieuw apparaat neemt de dagboek-koppeling over en stuurt zijn eigen regels erheen. Niet
+    mee: de Zepp-sleutel en per-apparaat-dingen (laatst geziene versie, herinneringen).
+45. **Overzetten bij de eerste keer inloggen**: altijd eerst een back-up van het apparaat (te downloaden
+    bij Meer → Account). Account leeg → alles erin. Apparaat leeg → alles eruit. Allebei gevuld → kiezen:
+    **Samenvoegen** (bij hetzelfde item wint het account) of **Account gebruiken**. Pas ingelogd na die
+    keuze: sluit je het venster, dan verandert er niets.
+46. **Bekende beperkingen**: "nieuwste wint" kijkt naar de klok van het apparaat; staat die flink
+    verkeerd, dan kan een oudere wijziging winnen. Twee apparaten die tegelijk hetzelfde item aanpassen:
+    de laatste wint (geen samenvoegen binnen één training). Het Voeding-dagboek haalt op een nieuw
+    apparaat deze en vorige maand op, oudere maanden niet.

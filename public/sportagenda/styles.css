@@ -3495,3 +3495,12 @@ body.is-dragging .toast {
   width: 100%;
   margin-bottom: 8px;
 }
+
+/* Account (account/account.js) */
+.account-toegang { flex-direction: column; align-items: stretch; gap: 8px; }
+.account-toegang .actions { margin: 0; }
+.account-aanvraag { background: var(--accent-soft, #fef3c7); padding: 10px 12px; border-radius: 12px; }
+.account-google { min-height: 44px; margin: 12px 0; }
+.account-privacy { margin-top: 12px; }
+.account-privacy ul { padding-left: 18px; margin: 8px 0 0; }
+.account-privacy li { margin: 4px 0; color: var(--muted, #666); }
