@@ -145,3 +145,62 @@ Mo AN Zout 0%09| 049 84 N # #`
   assert.equal(r.vezel, null) // "Zg" is niet te lezen: leeg, niet verzonnen
   assert.equal(r.controle, true)
 })
+
+// Tweede echte foto (Choco-Caramel Crisp, drietalig etiket), echte OCR-uitvoer van Tesseract.js in Tarapp.
+// Het etiket: 381 kcal, vet 3,7 g, koolhydraten 73,0 g, vezels 11,0 g, eiwitten 8,3 g.
+test('echte foto (drietalig): "EiweiB 839", "73,09" en "11,09" worden goed gelezen', () => {
+  const t = `Valeurs nutritionnelles moyennes / Gemiddelde :
+voedingswaarde / Durchschnittliche Nährwerte 7
+Pour/Per/ 1 portion /portie/ % >
+Jel00g Porton (B09)** (309)*
+Energie/Energie/Energie _ 1607KW/381kal 482W/14kal 6%
+Matières grasses / Vetten / Fett 3,79 tlg 2%
+- dont addes gras saturés / waarvan verzadigde
+| vetzuren / davon gesättigte Fettsäuren 0,99 039 1%
+# Glucides / Koolhydraten / Kohlenhydrate 73,09 2199 8% |
+3 - dont sucres / waarvan suikers / |
+davon Zucker 23,09 69g 8% %&
+Fibres alimentaires / Vezels /Ballaststoffe 11,09 339 ë
+Â Protéines / Eiwitten / EiweiB 839 250 0
+l Sel /Zout / Salz 0,359 011g 2%`
+  const r = parseEtiket(t)
+  assert.deepEqual([r.kcal, r.vet, r.kh, r.vezel, r.eiwit, r.controle], [381, 3.7, 73, 11, 8.3, true])
+})
+
+// Derde echte foto (whey-eiwit, vijftalig etiket waarvan de waarden niet naast hun naam staan),
+// echte OCR-uitvoer van Tesseract.js in Tarapp. Het etiket: 385 kcal, vet 6,7 g, koolhydraten 3,9 g,
+// vezel 0,7 g, eiwit 77 g (op het etiket staat 77 g naast "Salt" en 0,7 g naast "Protein").
+test('echte foto (whey, waarden verschoven): terugval op de vaste EU-volgorde', () => {
+  const t = `| 1009 | %
+Sp Jy 489) 6
+Energy/Energie/Energa] Nij 1629KJ/ rape
+Energie/Energia 385 kcal 20g 3%
+209
+Fat/Vetten/Matières Grasses 679
+/Fett/Grassi
+of which saturates, waarva
+erzadigde vetzuren,
+t acide. Jras Saturés
+/9aVon gesättigte Fettsäurer 9%
+di cui acidi gras S/ saturi 99 099 5
+CTbohydrate/Koolhydrater
+| (B licides/Koplenhydrate ax
+Carboigratj 39g 129
+Van syik,
+dont Store _
+davon ZUCkey î EE 19%
+Fibre/Vezeig deu Zocher; 39g 129
+/Fibres Montage}
+Ballaststoffe/Fi;e
+Protein/E ton Pre 07g <o.59g
+/Eiweiss/Proteine r
+c alt/Zout/Sel/Salz/Sa|g 779 231g 46%
+RI (reference intake) Referg ET l2g 2%`
+  const r = parseEtiket(t)
+  assert.deepEqual([r.kcal, r.vet, r.kh, r.vezel, r.eiwit, r.controle], [385, 6.7, 3.9, 0.7, 77, true])
+})
+
+test('kcal: de waarde bij de eerste kJ wint van de portiekolom', () => {
+  assert.equal(parseEtiket('Energie 489 kJ / 116 kcal\nper 100 g 1629 kJ / 385 kcal').kcal, 116) // eerste kJ telt
+  assert.equal(parseEtiket('Energie 1629kJ/ 489kJ/\n116 kcal 385 kcal\nVet 6,7 g').kcal, 385) // past bij 1629 kJ
+})
