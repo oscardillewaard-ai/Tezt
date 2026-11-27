@@ -4,7 +4,7 @@
 // - localStorage alleen onder sleutels met het voorvoegsel "voeding.". Bestaande
 //   Tarapp-sleutels (sportagenda.v1) worden nooit gelezen of aangepast.
 
-import { SCHEMA_VERSIE, PERSONEN, procentVanGram } from './kern.js'
+import { MEALS, SCHEMA_VERSIE, PERSONEN, procentVanGram } from './kern.js'
 
 export const DB_NAAM = 'tarapp-voeding'
 export const LS = {
@@ -134,6 +134,22 @@ function lsSet(key, value) {
   }
 }
 
+export const standaardMomenten = () => [
+  { id: 'breakfast', naam: 'Ontbijt', soort: 'breakfast' },
+  { id: 'lunch', naam: 'Lunch', soort: 'lunch' },
+  { id: 'dinner', naam: 'Diner', soort: 'dinner' },
+  { id: 'snack', naam: 'Snack', soort: 'snack' },
+]
+
+/** Eetmomenten opschonen: geldige id, naam en soort; minstens één. */
+export function schoonMomenten(lijst) {
+  const ids = new Set()
+  const out = (Array.isArray(lijst) ? lijst : [])
+    .map((m) => ({ id: String(m?.id || ''), naam: String(m?.naam || '').trim().slice(0, 40), soort: MEALS.includes(m?.soort) ? m.soort : 'snack' }))
+    .filter((m) => /^[A-Za-z0-9_-]{1,40}$/.test(m.id) && m.naam && !ids.has(m.id) && ids.add(m.id))
+  return out.length ? out : standaardMomenten()
+}
+
 export function standaardInstellingen() {
   return {
     schema: SCHEMA_VERSIE,
@@ -142,7 +158,9 @@ export function standaardInstellingen() {
     // 25% eiwit, 45% koolhydraten, 30% vet van 2000 kcal (4/4/9).
     doelen: { kcal: 2000, eiwit: 125, kh: 225, vet: 66 },
     doelenPct: { eiwit: 25, kh: 45, vet: 30 },
-    vasteItems: [], // [{ productId, naam, grams, meal }]
+    // Eetmomenten: naam en volgorde zelf te kiezen; 'soort' is wat Healthbridge te zien krijgt.
+    momenten: standaardMomenten(),
+    vasteItems: [], // [{ productId, naam, grams, meal (= eetmoment-id) }]
     favorieten: [], // product-id's
   }
 }
@@ -155,6 +173,7 @@ export function migreerInstellingen(s) {
   if (!PERSONEN.includes(out.persoon)) out.persoon = null
   if (!Array.isArray(out.vasteItems)) out.vasteItems = []
   if (!Array.isArray(out.favorieten)) out.favorieten = []
+  out.momenten = schoonMomenten(s.momenten)
   // De eerste standaarddoelen kwamen samen boven 2000 kcal uit: nooit aangepast = de nieuwe standaard.
   const o = out.doelen
   if (o.kcal === 2000 && o.eiwit === 120 && [220, 230].includes(o.kh) && o.vet === 70) {

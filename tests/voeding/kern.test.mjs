@@ -27,7 +27,8 @@ test('gram naar macro\'s: evenredig met het gewicht', () => {
   close(m.eiwit, 1.308)
   close(m.kh, 27.408)
   close(m.vet, 0.396)
-  assert.deepEqual(macrosVoor(banaan, 0), { kcal: 0, eiwit: 0, kh: 0, vet: 0 })
+  assert.deepEqual(macrosVoor(banaan, 0), { kcal: 0, eiwit: 0, kh: 0, vet: 0, vezel: null })
+  assert.equal(macrosVoor({ vezel: 2.6 }, 120).vezel, 3.12)
 })
 
 test('onbekende waarde blijft null, nooit 0', () => {
@@ -81,7 +82,7 @@ test('kJ naar kcal', () => {
 
 test('OFF-parser: Nutella (echte respons)', () => {
   const p = parseOff(fixture('off-nutella'), '3017620422003')
-  assert.deepEqual(p.per100, { kcal: 539, eiwit: 6.3, kh: 57.5, vet: 30.9 })
+  assert.deepEqual(p.per100, { kcal: 539, eiwit: 6.3, kh: 57.5, vet: 30.9, vezel: 0 })
   assert.equal(p.naam, 'Nutella')
   assert.equal(p.merk, 'Ferrero')
   assert.equal(p.bron, 'off')
@@ -131,7 +132,7 @@ test('regel opschonen: onbekende velden weg, tombstone blijft klein', () => {
   assert.equal(r.unit, 'g')
   assert.equal(r.source, 'eigen')
   assert.equal(r.hack, undefined)
-  assert.deepEqual(r.per100, { kcal: 10, eiwit: null, kh: null, vet: null })
+  assert.deepEqual(r.per100, { kcal: 10, eiwit: null, kh: null, vet: null, vezel: null })
   assert.deepEqual(schoonRegel({ id: 'abcdef12', date: '2026-11-26', updatedAt: 9, deleted: true, name: 'weg' }), { id: 'abcdef12', date: '2026-11-26', updatedAt: 9, deleted: true })
   assert.equal(schoonRegel({ id: 'abcdef12', date: '2026-11-26', updatedAt: 1, grams: 0 }), null)
 })

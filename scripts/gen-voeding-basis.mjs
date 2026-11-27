@@ -10,7 +10,7 @@
 //   2. Pak hem uit en draai: node scripts/gen-voeding-basis.mjs <map-met-csv-bestanden>
 //
 // Nutriënt-id's: 1008 energie (kcal), 1003 eiwit, 1005 koolhydraten (by difference),
-// 1004 vet. Ontbreekt een waarde in de dataset, dan stopt het script (we verzinnen niets).
+// 1004 vet, 1079 vezel (Fiber, total dietary; mag ontbreken, dan null). Ontbreekt een waarde in de dataset, dan stopt het script (we verzinnen niets).
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -292,7 +292,7 @@ if (!dir) {
 
 const foods = readCsv(join(dir, 'food.csv'))
 const byDesc = new Map(foods.map((f) => [f.description, f.fdc_id]))
-const wanted = new Set(['1003', '1004', '1005', '1008'])
+const wanted = new Set(['1003', '1004', '1005', '1008', '1079'])
 const nutr = new Map()
 for (const r of readCsv(join(dir, 'food_nutrient.csv'))) {
   if (!wanted.has(r.nutrient_id)) continue
@@ -318,7 +318,8 @@ for (const [naam, desc, cat, portie, portieNaam] of LIJST) {
     continue
   }
   const [kcal, eiwit, kh, vet] = vals
-  const rec = { naam, fdc: Number(fdc), usda: desc, cat, kcal, eiwit, kh, vet }
+  const vezel = Number.isFinite(n['1079']) ? n['1079'] : null
+  const rec = { naam, fdc: Number(fdc), usda: desc, cat, kcal, eiwit, kh, vet, vezel }
   if (portie) rec.portie = { g: portie, naam: portieNaam }
   out.push(rec)
 }

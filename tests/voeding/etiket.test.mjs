@@ -13,7 +13,7 @@ waarvan suikers 20 g
 Voedingsvezel 3 g
 Eiwitten 30 g
 Zout 0,5 g`
-  assert.deepEqual(parseEtiket(t), { kcal: 400, eiwit: 30, kh: 50, vet: 18, eenheid: 'g', portie: null, controle: false })
+  assert.deepEqual(parseEtiket(t), { kcal: 400, eiwit: 30, kh: 50, vet: 18, vezel: 3, eenheid: 'g', portie: null, controle: false })
 })
 
 test('controle klopt bij een realistisch etiket', () => {
@@ -58,7 +58,7 @@ test('Engels etiket', () => {
 })
 
 test('niets herkend: alles null (niets verzonnen)', () => {
-  assert.deepEqual(parseEtiket('Ingrediënten: tarwebloem, water, zout.'), { kcal: null, eiwit: null, kh: null, vet: null, eenheid: 'g', portie: null, controle: null })
+  assert.deepEqual(parseEtiket('Ingrediënten: tarwebloem, water, zout.'), { kcal: null, eiwit: null, kh: null, vet: null, vezel: null, eenheid: 'g', portie: null, controle: null })
   assert.equal(parseEtiket('').kcal, null)
 })
 
@@ -77,6 +77,7 @@ Eiwitten 139 529
 Zout 0,029 0,01g`
   const r = parseEtiket(t)
   assert.deepEqual([r.kcal, r.vet, r.kh, r.eiwit, r.portie, r.controle], [375, 7, 58, 13, 40, true])
+  assert.equal(r.vezel, 9.4) // OCR las "94g": samen met de macro's zou dat meer dan 100 g zijn
 })
 
 test('echte OCR-uitvoer, wazige foto: ook zonder komma ("709") en "(40 9)"', () => {

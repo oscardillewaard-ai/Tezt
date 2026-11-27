@@ -8,7 +8,7 @@
 // Voorwaarden van RIVM (NEVO-online 2025/9.0) waar dit script zich aan houdt:
 // - Alleen in ongewijzigde vorm: naam en waarden worden overgenomen zoals ze in het bestand
 //   staan (geen afronding, geen eigen correcties). Er wordt alleen een selectie van kolommen
-//   gemaakt: kcal, eiwit, koolhydraten en vet.
+//   gemaakt: kcal, eiwit, koolhydraten, vet en vezel (FIBT).
 // - Altijd met bron en versienummer: "NEVO-online versie <versie>, RIVM, Bilthoven" (staat in het
 //   bestand en in de app).
 // - Aanvullingen (onze USDA-basisproducten) staan apart en zijn in de app als zodanig herkenbaar.
@@ -71,8 +71,9 @@ export function leesNevo(text) {
     eiwit: find('prot', 'eiwit'),
     kh: find('cho', 'koolhydraten'),
     vet: find('fat', 'vet'),
+    vezel: find('fibt', 'voedingsvezel', 'vezel'),
   }
-  const missing = Object.entries(idx).filter(([k, v]) => v < 0 && k !== 'groep' && k !== 'hoeveelheid').map(([k]) => k)
+  const missing = Object.entries(idx).filter(([k, v]) => v < 0 && !['groep', 'hoeveelheid', 'vezel'].includes(k)).map(([k]) => k)
   if (missing.length) throw new Error(`Kolommen niet gevonden: ${missing.join(', ')}. Kopregel: ${head.slice(0, 300)}`)
   // Waarden ongewijzigd overnemen; alleen de schrijfwijze (komma als decimaalteken) wordt een getal.
   const getal = (s) => {
@@ -98,6 +99,7 @@ export function leesNevo(text) {
       eiwit: getal(c[idx.eiwit]),
       kh: getal(c[idx.kh]),
       vet: getal(c[idx.vet]),
+      vezel: idx.vezel >= 0 ? getal(c[idx.vezel]) : null,
     })
   }
   return out
@@ -118,7 +120,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const body = `// Gegenereerd door scripts/gen-voeding-nevo.mjs, niet met de hand aanpassen.
 // ${bron}.
 // Ongewijzigd overgenomen uit het NEVO-online databestand (alleen de kolommen kcal, eiwit,
-// koolhydraten en vet). Waarden per 100 g (of 100 ml, zie eenheid).
+// koolhydraten, vet en vezel). Waarden per 100 g (of 100 ml, zie eenheid).
 export const NEVO_VERSIE = ${JSON.stringify(versie)}
 export const NEVO_BRON = ${JSON.stringify(bron)}
 export const NEVO = [

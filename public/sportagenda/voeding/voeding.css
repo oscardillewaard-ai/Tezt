@@ -383,3 +383,44 @@
   border-color: var(--done);
   box-shadow: 0 0 0 1px var(--done);
 }
+
+.v-vezel {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.v-vezel strong {
+  color: var(--text);
+}
+
+.v-moment {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.v-moment input,
+.v-moment select {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.v-moment .btn {
+  padding: 8px 11px;
+}
+
+.v-sheet h2:focus {
+  outline: none;
+}

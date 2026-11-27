@@ -19,6 +19,7 @@
         "protein_g": 7.9,
         "carbs_g": 40.6,
         "fat_g": 3.9,
+        "fiber_g": null,
         "source": "usda"
       },
       {
@@ -33,6 +34,7 @@
         "protein_g": 6.6,
         "carbs_g": 9.6,
         "fat_g": 4,
+        "fiber_g": null,
         "source": "usda"
       },
       {
@@ -48,6 +50,7 @@
         "protein_g": 0.9,
         "carbs_g": 8.6,
         "fat_g": 4.6,
+        "fiber_g": null,
         "source": "off",
         "barcode": "3017620422003"
       },
@@ -63,6 +66,7 @@
         "protein_g": null,
         "carbs_g": 20,
         "fat_g": 7.2,
+        "fiber_g": null,
         "source": "eigen"
       }
     ],
@@ -79,6 +83,7 @@
         "protein_g": 31.5,
         "carbs_g": 49,
         "fat_g": 26.3,
+        "fiber_g": null,
         "source": "recept"
       }
     ]

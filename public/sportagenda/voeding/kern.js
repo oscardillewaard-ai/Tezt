@@ -10,7 +10,8 @@ export const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 export const MEAL_NL = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack' }
 export const PERSONEN = ['oscar', 'tara']
 export const BRONNEN = ['off', 'usda', 'eigen', 'recept', 'nevo']
-export const MACRO_KEYS = ['kcal', 'eiwit', 'kh', 'vet']
+// Vezel wordt bijgehouden en getoond, maar heeft geen dagdoel.
+export const MACRO_KEYS = ['kcal', 'eiwit', 'kh', 'vet', 'vezel']
 
 const KJ_PER_KCAL = 4.184
 
@@ -27,9 +28,9 @@ export const round = (v, d = 1) => (v === null || v === undefined ? null : Math.
 
 export const kjNaarKcal = (kj) => (num(kj) === null ? null : num(kj) / KJ_PER_KCAL)
 
-/** Per-100-waarden opschonen: altijd alle vier de sleutels, onbekend = null. */
+/** Per-100-waarden opschonen: altijd alle sleutels (kcal, eiwit, kh, vet, vezel), onbekend = null. */
 export function per100(p = {}) {
-  return { kcal: num(p.kcal), eiwit: num(p.eiwit), kh: num(p.kh), vet: num(p.vet) }
+  return { kcal: num(p.kcal), eiwit: num(p.eiwit), kh: num(p.kh), vet: num(p.vet), vezel: num(p.vezel) }
 }
 
 /** Macro's voor een hoeveelheid in gram (of ml). */
@@ -37,12 +38,12 @@ export function macrosVoor(p100, gram) {
   const g = num(gram)
   const p = per100(p100)
   const f = (v) => (v === null || g === null ? null : (v * g) / 100)
-  return { kcal: f(p.kcal), eiwit: f(p.eiwit), kh: f(p.kh), vet: f(p.vet) }
+  return { kcal: f(p.kcal), eiwit: f(p.eiwit), kh: f(p.kh), vet: f(p.vet), vezel: f(p.vezel) }
 }
 
 /** Optellen; een som is null als geen enkele regel die waarde had. */
 export function somMacros(lijst) {
-  const out = { kcal: null, eiwit: null, kh: null, vet: null }
+  const out = { kcal: null, eiwit: null, kh: null, vet: null, vezel: null }
   for (const m of lijst) {
     for (const k of MACRO_KEYS) if (m[k] !== null && m[k] !== undefined) out[k] = (out[k] || 0) + m[k]
   }
@@ -105,7 +106,7 @@ export function receptWaarden(recept) {
   const ingr = (recept?.ingredienten || []).filter((i) => num(i.gram))
   const porties = Math.max(1, num(recept?.porties) || 1)
   const totaalGram = ingr.reduce((s, i) => s + num(i.gram), 0)
-  const totaal = { kcal: 0, eiwit: 0, kh: 0, vet: 0 }
+  const totaal = { kcal: 0, eiwit: 0, kh: 0, vet: 0, vezel: 0 }
   for (const i of ingr) {
     const m = macrosVoor(i.per100, i.gram)
     for (const k of MACRO_KEYS) totaal[k] = totaal[k] === null || m[k] === null ? null : totaal[k] + m[k]
@@ -192,9 +193,9 @@ export function parseOff(json, barcode) {
     const kj = num(n['energy-kj_100g']) ?? num(n.energy_100g)
     if (kj !== null) kcal = round(kjNaarKcal(kj), 1)
   }
-  const waarden = { kcal, eiwit: num(n.proteins_100g), kh: num(n.carbohydrates_100g), vet: num(n.fat_100g) }
+  const waarden = { kcal, eiwit: num(n.proteins_100g), kh: num(n.carbohydrates_100g), vet: num(n.fat_100g), vezel: num(n.fiber_100g) }
   const naam = String(p.product_name_nl || p.product_name || '').trim()
-  if (!naam && MACRO_KEYS.every((k) => waarden[k] === null)) return null
+  if (!naam && ['kcal', 'eiwit', 'kh', 'vet'].every((k) => waarden[k] === null)) return null
   const portie = parsePortie(p.serving_size)
   const inhoud = parsePortie(p.quantity)
   const eenheid = (portie || inhoud)?.eenheid === 'ml' ? 'ml' : 'g'
@@ -229,6 +230,7 @@ const ETIKET = {
   vet: /^(totaal\s*)?(vetten|vet|fats|fat|matières grasses|fett)(?![a-z])/,
   kh: /^(koolhydraten|koolhydraat|carbohydrates?|glucides|kohlenhydrate)(?![a-z])/,
   eiwit: /^(eiwitten|eiwit|proteins?|protéines|eiweiß|eiweiss)(?![a-z])/,
+  vezel: /^(voedingsvezels?|vezels?|fibres?|fibers?|dietary fib(re|er)|ballaststoffe)(?![a-z])/,
 }
 const WAARVAN = /waarvan|verzadig|onverzadig|suikers?\b|sugars?\b|saturat|of which|dont|davon|polyol|zetmeel|starch/
 
@@ -238,13 +240,18 @@ const WAARVAN = /waarvan|verzadig|onverzadig|suikers?\b|sugars?\b|saturat|of whi
  * de varianten zonder die 9 en met de komma terug. `edits` telt hoeveel we moesten aannemen.
  */
 function kandidaten(rest) {
-  const m = rest.match(/<?\s*(\d+(?:[.,]\d+)?)\s*(mg|g|gr|gram)?\b/)
+  const m = rest.match(/<?\s*(\d+(?:[.,]\d+)?)(\s*)(mg|g|gr|gram)?\b/)
   if (!m) return []
   const raw = m[1]
+  const vast = m[2] === '' // getal en eenheid aan elkaar, zoals OCR het leest als de komma wegvalt
+  m[2] = m[3]
   const getal = (x) => Number(x.replace(',', '.'))
   if (m[2]) {
     const v = getal(raw) / (m[2] === 'mg' ? 1000 : 1)
-    return v <= 100 ? [{ v, edits: 0, raw }] : []
+    const out = v <= 100 ? [{ v, edits: 0, raw }] : []
+    // "9,4 g" kan als "94g" binnenkomen (komma weg): ook die lezing meenemen, met meer aannames.
+    if (m[2] !== 'mg' && vast && /^\d{2,3}$/.test(raw)) out.push({ v: getal(`${raw.slice(0, -1)}.${raw.slice(-1)}`), edits: 4, raw: `${raw.slice(0, -1)},${raw.slice(-1)}` })
+    return out
   }
   const out = [{ v: getal(raw), edits: 0, raw }]
   if (raw.length > 1 && raw.endsWith('9')) {
@@ -274,6 +281,8 @@ function kiesWaarden(cands, kcal) {
         const set = [e, k, v]
         let kosten = set.reduce((s, c) => s + (c ? c.edits * 0.03 + afrondStraf(c) * 0.15 : 0), 0)
         if (kcal && set.every(Boolean)) kosten += Math.abs(4 * e.v + 4 * k.v + 9 * v.v - kcal) / kcal
+        // Meer dan 100 g macro's in 100 g product kan niet (2 g speling voor afronding op het etiket).
+        if (set.reduce((s, c) => s + (c ? c.v : 0), 0) > 102) kosten += 10
         if (!best || kosten < best.kosten - 1e-9) best = { kosten, set }
       }
   return Object.fromEntries(keys.map((key, i) => [key, best.set[i] ? best.set[i].v : null]))
@@ -288,7 +297,7 @@ export function parseEtiket(tekst) {
   const t = herstelGetallen(String(tekst || '')).replace(/\r/g, '')
   const lines = t.split('\n').map((l) => l.trim().toLowerCase()).filter(Boolean)
   const flat = lines.join(' ')
-  const out = { kcal: null, eiwit: null, kh: null, vet: null, eenheid: /per\s*100\s*m[l1i!|](?![a-z])/.test(flat) ? 'ml' : 'g', portie: null, controle: null }
+  const out = { kcal: null, eiwit: null, kh: null, vet: null, vezel: null, eenheid: /per\s*100\s*m[l1i!|](?![a-z])/.test(flat) ? 'ml' : 'g', portie: null, controle: null }
   // Energie: eerst een getal vóór "kcal"; anders kJ omrekenen.
   const kcal = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*ca[l1i]/)
   if (kcal) out.kcal = Number(kcal[1].replace(',', '.'))
@@ -297,7 +306,7 @@ export function parseEtiket(tekst) {
     if (kj) out.kcal = round(kjNaarKcal(Number(kj[1].replace(',', '.'))), 0)
   }
   if (out.kcal !== null && (out.kcal < 0 || out.kcal > 950)) out.kcal = null
-  const cands = { eiwit: [], kh: [], vet: [] }
+  const cands = { eiwit: [], kh: [], vet: [], vezel: [] }
   const gezien = new Set()
   for (const line of lines) {
     if (WAARVAN.test(line)) continue
@@ -311,6 +320,12 @@ export function parseEtiket(tekst) {
     }
   }
   Object.assign(out, kiesWaarden(cands, out.kcal))
+  // Vezel telt niet mee in de kcal-controle: de lezing met de minste aannames.
+  const macroG = (out.eiwit || 0) + (out.kh || 0) + (out.vet || 0)
+  const vz = cands.vezel
+    .filter((c) => macroG + c.v <= 102)
+    .sort((a, b) => a.edits + afrondStraf(a) * 5 - (b.edits + afrondStraf(b) * 5))[0]
+  out.vezel = vz ? vz.v : null
   const p =
     flat.match(/(?:per\s*)?portie\s*\(?\s*(?:van\s*)?(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/) ||
     flat.match(/(?:per\s*)?(?:serving|portion)\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/)
@@ -355,6 +370,8 @@ export function schoonRegel(r) {
     source: BRONNEN.includes(r.source) ? r.source : 'eigen',
     barcode: r.barcode && BARCODE_RE.test(String(r.barcode)) ? String(r.barcode) : null,
     productId: clip(r.productId, 80),
+    // Eigen eetmoment (bijv. 'Na de training'); 'meal' is de soort die Healthbridge krijgt.
+    moment: /^[A-Za-z0-9_-]{1,40}$/.test(r.moment || '') ? r.moment : null,
     updatedAt,
   }
 }
@@ -447,6 +464,7 @@ export function exportRegel(r) {
     protein_g: round(m.eiwit, 1),
     carbs_g: round(m.kh, 1),
     fat_g: round(m.vet, 1),
+    fiber_g: round(m.vezel, 1),
     // USDA-basisproducten heten in de export 'usda'; 'nevo' blijft gereserveerd (geen NEVO-data in Tarapp).
     source: r.source,
   })
