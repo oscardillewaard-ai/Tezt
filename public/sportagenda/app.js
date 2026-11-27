@@ -457,6 +457,7 @@ const CHANGELOG = [
     items: [
       '🎯 Dagdoelen in procenten: kies je kcal en de verdeling eiwit, koolhydraten en vet (samen 100%), Tarapp rekent de grammen uit',
       '↺ Bij elke maaltijd: "Zoals gisteren" zet dezelfde maaltijd van de vorige dag er met één tik in 💛',
+      '🏷️ Etiket scannen: maak een foto van het voedingsetiket en Tarapp vult kcal, eiwit, koolhydraten en vet zelf in (alles op je telefoon)',
     ],
   },
   {

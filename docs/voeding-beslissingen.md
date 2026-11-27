@@ -112,3 +112,22 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     De core-tests draaiden lokaal; compileren, Lint en de app-tests doet de CI van `healthbridge-data` bij de push.
 30. **Tests in Tarapp** draaien met `node --test` (`npm run test:voeding`), zonder nieuwe dependencies, en in de nieuwe
     workflow `voeding-worker.yml`. De bestaande Pages-workflow is niet aangepast.
+
+## Etiket scannen en FatSecret
+
+34. **Etiket scannen gebeurt op de telefoon zelf** met Tesseract.js (OCR in WebAssembly, Nederlandse taaldata),
+    zelf gehost in `voeding/vendor/tesseract/` en pas geladen bij de eerste scan (±6 MB). Geen externe dienst,
+    geen API-sleutel, geen kosten, en de foto verlaat de telefoon niet. Een AI-dienst (bijv. via de Worker) zou
+    slimmer zijn bij rare etiketten, maar kost een sleutel en geld en stuurt de foto weg; dat kan later nog.
+35. **De parser (`parseEtiket` in `kern.js`) vangt bekende OCR-fouten op**: "g" gelezen als "9" ("13 g" → "139"),
+    weggevallen komma's ("7,0 g" → "709"), "O" voor "0" en "m!" voor "ml". Bij twijfel kiest hij de lezing die het
+    best past bij de kcal op het etiket (4/4/9) en bij de afrondregels op etiketten. Getest met echte
+    OCR-uitvoer van drie testetiketten (scherp, wazige foto, drank). Wat niet gevonden wordt blijft leeg; de
+    gebruiker kijkt de groen omrande waarden na voor het opslaan.
+36. **FatSecret niet ingebouwd.** De voorwaarden en prijzen op platform.fatsecret.com (gelezen op 27-11-2026):
+    de gratis versies (Basic, en Premier Free voor start-ups, non-profits en studenten) hebben **alleen de
+    Amerikaanse dataset**; Nederland (regio NL, taal nl) zit alleen in **Premier**, met een prijs op aanvraag per
+    land. Verder moet gegevens zonder het label "storable indefinitely" **binnen 24 uur** worden verwijderd of
+    opnieuw opgehaald (Terms of Use 1.5); langer bewaren is een Premier-functie ("Custom Caching and Data
+    Storage Permissions"). Een dagboek en Healthbridge bewaren producten juist voor altijd. Bronvermelding is
+    verplicht overal waar de gegevens te zien zijn.

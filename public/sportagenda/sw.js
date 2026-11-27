@@ -26,6 +26,7 @@ const VOEDING = [
   'voeding/nevo.js',
   'voeding/backup.js',
   'voeding/scanner.js',
+  'voeding/ocr.js',
   'voeding/voeding.css',
   'voeding/vendor/barcode-detector.js',
   'voeding/vendor/zxing_reader.wasm',

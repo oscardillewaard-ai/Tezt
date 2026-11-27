@@ -651,6 +651,7 @@ function openToevoegen(meal) {
       </div>
       <div class="v-results" id="v-results"></div>
       <div class="actions">
+        <button type="button" class="btn" data-s="etiket">🏷️ Etiket</button>
         <button type="button" class="btn" data-s="nieuw">+ Eigen product</button>
         <button type="submit" class="btn">Sluiten</button>
       </div>
@@ -715,6 +716,7 @@ function openToevoegen(meal) {
     } else if (s === 'scan') openScanner(meal)
     else if (s === 'intypen') openBarcodeIntypen(meal)
     else if (s === 'nieuw') openProductForm(null, { meal, naam: input.value.trim() })
+    else if (s === 'etiket') openProductForm(null, { meal, naam: input.value.trim(), scan: true })
     else if (s === 'off') {
       el.disabled = true
       el.textContent = 'Zoeken in Open Food Facts…'
@@ -897,13 +899,16 @@ async function vindBarcode(raw, meal, format) {
 
 // ---------- Eigen product ----------
 
-function openProductForm(product, { meal, barcode, naam } = {}) {
+function openProductForm(product, { meal, barcode, naam, scan = false } = {}) {
   const p = product || { naam: naam || '', per100: per100(), eenheid: 'g', barcode: barcode || null }
   ctx.openSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>${product ? 'Product aanpassen' : 'Eigen product'}</h2>
-      ${barcode && !product ? `<p class="muted">Barcode ${esc(barcode)} is nog onbekend. Neem de waarden per 100 g of 100 ml over van het etiket.</p>` : ''}
+      ${barcode && !product ? `<p class="muted">Barcode ${esc(barcode)} is nog onbekend. Scan het etiket of neem de waarden per 100 g of 100 ml over.</p>` : ''}
+      <button type="button" class="btn block v-etiket" data-p="etiket">🏷️ Etiket scannen</button>
+      <input type="file" accept="image/*" capture="environment" id="v-etiket-foto" hidden />
+      <p class="v-etiket-status" id="v-etiket-status" hidden></p>
       <label class="field">Naam<input name="naam" value="${esc(p.naam)}" required maxlength="200" /></label>
       <label class="field">Merk (optioneel)<input name="merk" value="${esc(p.merk || '')}" maxlength="100" /></label>
       <div class="segmented" role="radiogroup" aria-label="Eenheid">
@@ -955,12 +960,64 @@ function openProductForm(product, { meal, barcode, naam } = {}) {
       return !meal
     },
   )
-  ctx.sheet.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-p="eenheid"]')
+  const sheet = ctx.sheet
+  const zetEenheid = (u) => {
+    sheet.querySelectorAll('[data-p="eenheid"]').forEach((b) => b.classList.toggle('on', b.dataset.u === u))
+    sheet.querySelector('input[name="eenheid"]').value = u
+  }
+  const foto = sheet.querySelector('#v-etiket-foto')
+  sheet.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-p]')
     if (!el) return
-    ctx.sheet.querySelectorAll('[data-p="eenheid"]').forEach((b) => b.classList.toggle('on', b === el))
-    ctx.sheet.querySelector('input[name="eenheid"]').value = el.dataset.u
+    if (el.dataset.p === 'eenheid') zetEenheid(el.dataset.u)
+    if (el.dataset.p === 'etiket') foto.click()
   })
+  foto.addEventListener('change', () => {
+    const file = foto.files?.[0]
+    foto.value = ''
+    if (file) scanEtiket(file, sheet, zetEenheid)
+  })
+  // Vanuit "Toevoegen": meteen de camera openen (nog binnen dezelfde tik).
+  if (scan) foto.click()
+}
+
+/** Foto van het etiket lezen en de gevonden waarden in het formulier zetten; jij kijkt ze na. */
+async function scanEtiket(file, sheet, zetEenheid) {
+  const status = sheet.querySelector('#v-etiket-status')
+  const knop = sheet.querySelector('[data-p="etiket"]')
+  const toon = (html, cls = '') => {
+    status.hidden = false
+    status.className = `v-etiket-status ${cls}`
+    status.innerHTML = html
+  }
+  knop.disabled = true
+  toon('Etiket lezen… 0%')
+  try {
+    const { leesEtiket } = await import('./ocr.js')
+    const { waarden: w } = await leesEtiket(file, (f) => toon(`Etiket lezen… ${Math.round(f * 100)}%`))
+    if (!sheet.open) return
+    const zet = (name, v) => {
+      if (v === null || v === undefined) return false
+      const el = sheet.querySelector(`[name="${name}"]`)
+      el.value = String(v).replace('.', ',')
+      el.classList.add('v-ingevuld')
+      return true
+    }
+    sheet.querySelector('select[name="eunit"]').value = 'kcal'
+    const gevonden = [zet('energie', w.kcal) && 'kcal', zet('eiwit', w.eiwit) && 'eiwit', zet('kh', w.kh) && 'koolhydraten', zet('vet', w.vet) && 'vet'].filter(Boolean)
+    zet('portie', w.portie)
+    zetEenheid(w.eenheid)
+    if (!gevonden.length) toon('Er is niets herkend. Probeer een scherpere foto, recht van voren en met goed licht, of vul de waarden zelf in.', 'warn')
+    else {
+      const mist = ['kcal', 'eiwit', 'koolhydraten', 'vet'].filter((x) => !gevonden.includes(x))
+      const check = w.controle === false ? ' ⚠️ De kcal passen niet goed bij de macro\'s; kijk de getallen na.' : ''
+      toon(`✓ Ingevuld uit het etiket: ${gevonden.join(', ')} (per 100 ${w.eenheid}).${mist.length ? ` Niet gevonden: ${mist.join(', ')}.` : ''}${check} Controleer de waarden voor je opslaat.`, w.controle === false || mist.length ? 'warn' : 'ok')
+    }
+  } catch {
+    if (sheet.open) toon('Het etiket lezen lukte niet (scanner kon niet laden?). Vul de waarden zelf in.', 'warn')
+  } finally {
+    knop.disabled = false
+  }
 }
 
 async function wisProduct(id) {

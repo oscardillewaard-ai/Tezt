@@ -211,6 +211,117 @@ export function parseOff(json, barcode) {
   }
 }
 
+// ---------- Etiket lezen (tekst uit OCR) ----------
+
+/** Typische OCR-fouten in getallen herstellen: O/o → 0, l/I/| → 1, spaties in getallen. */
+function herstelGetallen(t) {
+  return t
+    .replace(/(?<=[\d,.])[oO](?=[\d,.\s%gG]|$)|(?<=^|[\s:(<])[oO](?=[,.]\d)/gm, '0')
+    // "Eiwitten Og", "VetOg": een losse O vlak voor de g is een nul (hoofdletter O na een woord: "VetOg").
+    .replace(/(?<=[\s:(<])[oO](?=\s*g\b)|(?<=[a-z])O(?=\s*g\b)/g, '0')
+    .replace(/(?<=\d)[lI|](?=[\d,.])|(?<=[\s:(])[lI|](?=\d)/g, '1')
+    .replace(/(\d)\s+([,.])\s*(\d)/g, '$1$2$3')
+    .replace(/(\d)\s*,\s*(\d)/g, '$1,$2')
+}
+
+const ETIKET = {
+  // (?![a-z]) in plaats van \b, zodat "vet0g" (zonder spatie, zoals OCR het soms leest) ook werkt.
+  vet: /^(totaal\s*)?(vetten|vet|fats|fat|matières grasses|fett)(?![a-z])/,
+  kh: /^(koolhydraten|koolhydraat|carbohydrates?|glucides|kohlenhydrate)(?![a-z])/,
+  eiwit: /^(eiwitten|eiwit|proteins?|protéines|eiweiß|eiweiss)(?![a-z])/,
+}
+const WAARVAN = /waarvan|verzadig|onverzadig|suikers?\b|sugars?\b|saturat|of which|dont|davon|polyol|zetmeel|starch/
+
+/**
+ * Mogelijke waarden voor het eerste getal na een label. OCR leest de "g" vaak als "9" en laat soms de
+ * komma vallen ("13 g" -> "139", "7,0 g" -> "7,09" of "709"). Zonder "g" erachter proberen we daarom ook
+ * de varianten zonder die 9 en met de komma terug. `edits` telt hoeveel we moesten aannemen.
+ */
+function kandidaten(rest) {
+  const m = rest.match(/<?\s*(\d+(?:[.,]\d+)?)\s*(mg|g|gr|gram)?\b/)
+  if (!m) return []
+  const raw = m[1]
+  const getal = (x) => Number(x.replace(',', '.'))
+  if (m[2]) {
+    const v = getal(raw) / (m[2] === 'mg' ? 1000 : 1)
+    return v <= 100 ? [{ v, edits: 0, raw }] : []
+  }
+  const out = [{ v: getal(raw), edits: 0, raw }]
+  if (raw.length > 1 && raw.endsWith('9')) {
+    const zonder = raw.slice(0, -1).replace(/[.,]$/, '')
+    if (zonder) {
+      out.push({ v: getal(zonder), edits: 1, raw: zonder })
+      if (!/[.,]/.test(zonder) && zonder.length >= 2) out.push({ v: getal(`${zonder.slice(0, -1)}.${zonder.slice(-1)}`), edits: 2, raw: `${zonder.slice(0, -1)},${zonder.slice(-1)}` })
+    }
+  }
+  return out.filter((c) => Number.isFinite(c.v) && c.v >= 0 && c.v <= 100)
+}
+
+/** Etiketten ronden af: vanaf 10 g een heel getal, daaronder hooguit één decimaal. Anders: verdacht. */
+function afrondStraf(c) {
+  const dec = (c.raw.split(/[.,]/)[1] || '').length
+  return (c.v >= 10 && dec > 0) || dec > 1 ? 1 : 0
+}
+
+/** Beste combinatie van kandidaten: past het best bij de kcal (4/4/9), met zo min mogelijk aannames. */
+function kiesWaarden(cands, kcal) {
+  const keys = ['eiwit', 'kh', 'vet']
+  const opties = keys.map((k) => (cands[k].length ? cands[k] : [null]))
+  let best = null
+  for (const e of opties[0])
+    for (const k of opties[1])
+      for (const v of opties[2]) {
+        const set = [e, k, v]
+        let kosten = set.reduce((s, c) => s + (c ? c.edits * 0.03 + afrondStraf(c) * 0.15 : 0), 0)
+        if (kcal && set.every(Boolean)) kosten += Math.abs(4 * e.v + 4 * k.v + 9 * v.v - kcal) / kcal
+        if (!best || kosten < best.kosten - 1e-9) best = { kosten, set }
+      }
+  return Object.fromEntries(keys.map((key, i) => [key, best.set[i] ? best.set[i].v : null]))
+}
+
+/**
+ * Leest kcal, eiwit, koolhydraten en vet per 100 g (of 100 ml) uit de tekst van een voedingsetiket.
+ * Werkt met Nederlandse (en Engelse, Franse, Duitse) etiketten. Wat niet gevonden wordt, blijft null.
+ * `controle` vergelijkt kcal met 4/4/9 × de macro's: false betekent "goed nakijken".
+ */
+export function parseEtiket(tekst) {
+  const t = herstelGetallen(String(tekst || '')).replace(/\r/g, '')
+  const lines = t.split('\n').map((l) => l.trim().toLowerCase()).filter(Boolean)
+  const flat = lines.join(' ')
+  const out = { kcal: null, eiwit: null, kh: null, vet: null, eenheid: /per\s*100\s*m[l1i!|](?![a-z])/.test(flat) ? 'ml' : 'g', portie: null, controle: null }
+  // Energie: eerst een getal vóór "kcal"; anders kJ omrekenen.
+  const kcal = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*ca[l1i]/)
+  if (kcal) out.kcal = Number(kcal[1].replace(',', '.'))
+  else {
+    const kj = flat.match(/(\d+(?:[.,]\d+)?)\s*k\s*j\b/)
+    if (kj) out.kcal = round(kjNaarKcal(Number(kj[1].replace(',', '.'))), 0)
+  }
+  if (out.kcal !== null && (out.kcal < 0 || out.kcal > 950)) out.kcal = null
+  const cands = { eiwit: [], kh: [], vet: [] }
+  const gezien = new Set()
+  for (const line of lines) {
+    if (WAARVAN.test(line)) continue
+    for (const [key, re] of Object.entries(ETIKET)) {
+      if (gezien.has(key)) continue
+      const m = line.match(re)
+      if (m) {
+        gezien.add(key)
+        cands[key] = kandidaten(line.slice(m[0].length))
+      }
+    }
+  }
+  Object.assign(out, kiesWaarden(cands, out.kcal))
+  const p =
+    flat.match(/(?:per\s*)?portie\s*\(?\s*(?:van\s*)?(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/) ||
+    flat.match(/(?:per\s*)?(?:serving|portion)\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml|9(?=\s*\)))/)
+  if (p) out.portie = Number(p[1].replace(',', '.'))
+  if ([out.kcal, out.eiwit, out.kh, out.vet].every((v) => v !== null)) {
+    const schat = 4 * out.eiwit + 4 * out.kh + 9 * out.vet
+    out.controle = Math.abs(schat - out.kcal) <= Math.max(25, 0.2 * out.kcal)
+  }
+  return out
+}
+
 // ---------- Dagboekregels ----------
 
 const ID_RE = /^[A-Za-z0-9_-]{6,64}$/
