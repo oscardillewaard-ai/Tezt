@@ -529,3 +529,6 @@
   color: var(--text, inherit);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
 }
+
+/* Waarden aanpassen (verkeerde gegevens in Open Food Facts, NEVO of USDA) */
+.v-aanpassen { display: block; margin: 10px auto 0; font-size: 0.9rem; }

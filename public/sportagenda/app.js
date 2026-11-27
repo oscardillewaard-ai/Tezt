@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '45' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '46' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -466,6 +466,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 46, items: ['✏️ Voeding: kloppen de waarden van een product niet? Tik erop en kies "Zelf aanpassen". Jouw versie vervangt de foute overal, ook in wat je al had ingevuld', '📷 Barcodes scannen veel beter: ook gebogen barcodes op deksels en kleine streepjes, met scherper camerabeeld'] },
   { v: 45, items: ['🔄 Voeding: wissel bovenaan tussen Gegeten en Nog te gaan, voor je kcal en al je macro\'s'] },
   { v: 44, items: ['🔒 Helemaal privé: Tarapp opent pas na inloggen met Google. Daarna werkt hij ook zonder internet, en je blijft ingelogd zolang je hem gebruikt', '🧹 Bij uitloggen kun je alles van het apparaat wissen (handig op een gedeelde computer)'] },
   { v: 43, items: ['🔐 Inloggen met Google (Meer → Account): je trainingen, gewicht en voeding op je telefoon én laptop, versleuteld bewaard. Je huidige gegevens zet je meteen over 💛', '🛡️ Tarapp blijft privé: een nieuw account kan pas in na goedkeuring van Oscar'] },
