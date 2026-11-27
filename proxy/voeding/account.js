@@ -236,8 +236,14 @@ export async function accountRoute(path, request, env, kv, headers, { fetchFn = 
     const nieuw = Object.keys(changes).length ? voegSamenOpServer(opslag, changes) : opslag
     if (nieuw.rev !== opslag.rev) await kv.put(sleutel, await versleutel(env, sessie.sub, nieuw))
     const base = Math.max(0, Number(body?.base) || 0)
+    // Wie Tarapp gebruikt, blijft ingelogd: de sessie schuift op (hooguit eens per week een schrijfactie).
+    let exp = sessie.exp
+    if (exp - Date.now() < (SESSIE_DAGEN - 7) * 86400_000) {
+      exp = Date.now() + SESSIE_DAGEN * 86400_000
+      await kv.put(`sess:${sessie.hash}`, JSON.stringify({ sub: sessie.sub, email: sessie.email, exp }), { expirationTtl: SESSIE_DAGEN * 86400 })
+    }
     const wachtend = isBeheerder(env, sessie.email) ? Object.values(await leesToegang(kv)).filter((x) => x.status === 'wacht').length : 0
-    return json({ rev: nieuw.rev, records: sinds(nieuw, base), email: sessie.email, wachtend }, 200, headers)
+    return json({ rev: nieuw.rev, records: sinds(nieuw, base), email: sessie.email, wachtend, exp }, 200, headers)
   }
 
   return json({ error: 'not found' }, 404, headers)

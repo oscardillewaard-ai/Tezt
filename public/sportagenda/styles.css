@@ -3504,3 +3504,12 @@ body.is-dragging .toast {
 .account-privacy { margin-top: 12px; }
 .account-privacy ul { padding-left: 18px; margin: 8px 0 0; }
 .account-privacy li { margin: 4px 0; color: var(--muted, #666); }
+
+/* Inlogscherm vóór de app (account/account.js → mountGate) */
+.login-screen { justify-content: center; gap: 4px; }
+.login-screen .account-google { display: flex; justify-content: center; width: 100%; margin: 20px 0 12px; color: #d6d3d1; }
+.login-screen .account-google .btn { margin-top: 8px; }
+.login-screen .account-aanvraag { color: var(--accent-ink, #1c1917); max-width: 360px; }
+.login-klein { font-size: 0.85rem; color: #a8a29e; max-width: 360px; margin: 8px 0 0; }
+.login-screen .account-privacy { text-align: left; max-width: 360px; color: #d6d3d1; font-size: 0.9rem; }
+.login-screen .account-privacy li { color: #a8a29e; }
