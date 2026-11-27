@@ -709,28 +709,23 @@ function openToevoegen(meal) {
   const sheet = ctx.sheet
   const input = sheet.querySelector('.v-search')
   const results = sheet.querySelector('#v-results')
-  const lijst = (list, leeg) =>
-    list.length
-      ? list
-          .map(
-            (p) => `
-        <button type="button" class="v-result" data-s="kies" data-id="${esc(p.id)}">
-          <span><strong>${esc(p.naam)}</strong>${p.merk ? ` <small class="muted">${esc(p.merk)}</small>` : ''}<br /><small class="muted">${bronLabel(p)}</small></span>
-          <span class="v-kcal">${fmt(p.per100?.kcal)}<small> /100${p.eenheid === 'ml' ? 'ml' : 'g'}</small></span>
-        </button>`,
-          )
-          .join('')
-      : `<p class="muted">${leeg}</p>`
+  const lijst = (list, leeg) => (list.length ? list.map(resultaatRij).join('') : `<p class="muted">${leeg}</p>`)
   let zichtbaar = []
-  let offResultaten = []
+  let alleLokaal = false
   const toon = () => {
     const q = input.value.trim()
     sheet.querySelector('.v-tabs').hidden = !!q
     if (q) {
-      zichtbaar = [...zoek(alleProducten(), q), ...offResultaten.filter((o) => !producten.some((p) => p.id === o.id))]
+      const lokaal = zoek(alleProducten(), q)
+      const key = offKey(q)
+      const off = (offCache.get(key) || []).filter((o) => !producten.some((p) => p.id === o.id) && !lokaal.some((p) => p.id === o.id))
+      zichtbaar = [...lokaal, ...off]
+      // Eerst de beste 5, zodat de merkproducten van Open Food Facts niet onder de rand verdwijnen.
+      const kort = key.length >= 3 && !alleLokaal && lokaal.length > 6
       results.innerHTML =
-        lijst(zichtbaar, `Niets gevonden voor "${esc(q)}".`) +
-        `<button type="button" class="btn block v-offzoek" data-s="off">🔎 Zoek "${esc(q)}" in Open Food Facts</button>`
+        lijst(kort ? lokaal.slice(0, 5) : lokaal, `Niets gevonden voor "${esc(q)}" in je eigen producten, NEVO en USDA.`) +
+        (kort ? `<button type="button" class="linkbtn v-meer" data-s="meer">Toon alle ${lokaal.length} uit je producten, NEVO en USDA</button>` : '') +
+        offBlok(q, key, off)
       return
     }
     if (zoekTab === 'recent') {
@@ -744,10 +739,35 @@ function openToevoegen(meal) {
       results.innerHTML = lijst(zichtbaar, 'Nog geen eigen producten of recepten.')
     }
   }
-  input.addEventListener('input', () => {
-    offResultaten = []
+  // Tijdens het typen ook Open Food Facts doorzoeken: na 0,7 s stilte en vanaf 3 letters.
+  let wacht = null
+  const zoekOffNu = async (handmatig = false) => {
+    const q = input.value.trim()
+    const key = offKey(q)
+    if (key.length < 3 || offCache.has(key)) return toon()
+    if (!handmatig && !offMag()) {
+      offStatus = { key, status: 'limiet' }
+      return toon()
+    }
+    offStatus = { key, status: 'busy' }
     toon()
+    try {
+      const r = await zoekOff(inst, q)
+      offCache.set(key, r.products || [])
+      if (offStatus.key === key) offStatus = { key, status: 'ok' }
+    } catch (err) {
+      if (offStatus.key === key) offStatus = { key, status: 'fout', melding: err?.status ? err.message : 'Open Food Facts is nu niet bereikbaar' }
+    }
+    // Alleen tekenen als je intussen niet verder hebt getypt.
+    if (sheet.open && offKey(input.value) === key) toon()
+  }
+  input.addEventListener('input', () => {
+    alleLokaal = false
+    toon()
+    clearTimeout(wacht)
+    wacht = setTimeout(() => zoekOffNu(false), 700)
   })
+  sheet.addEventListener('close', () => clearTimeout(wacht), { once: true })
   sheet.addEventListener('click', async (e) => {
     const el = e.target.closest('[data-s]')
     if (!el) return
@@ -765,22 +785,44 @@ function openToevoegen(meal) {
     else if (s === 'intypen') openBarcodeIntypen(meal)
     else if (s === 'nieuw') openProductForm(null, { meal, naam: input.value.trim() })
     else if (s === 'etiket') openProductForm(null, { meal, naam: input.value.trim(), scan: true })
-    else if (s === 'off') {
-      el.disabled = true
-      el.textContent = 'Zoeken in Open Food Facts…'
-      try {
-        const r = await zoekOff(inst, input.value.trim())
-        offResultaten = r.products || []
-        toon()
-        if (!offResultaten.length) ctx.showToast('Niets gevonden in Open Food Facts')
-      } catch (err) {
-        el.disabled = false
-        el.textContent = '🔎 Opnieuw proberen'
-        ctx.showToast(err?.status ? err.message : 'Open Food Facts is nu niet bereikbaar. Scan de barcode of maak een eigen product.')
-      }
+    else if (s === 'off') zoekOffNu(true)
+    else if (s === 'meer') {
+      alleLokaal = true
+      toon()
     }
   })
   toon()
+}
+
+function resultaatRij(p) {
+  return `
+        <button type="button" class="v-result" data-s="kies" data-id="${esc(p.id)}">
+          <span><strong>${esc(p.naam)}</strong>${p.merk ? ` <small class="muted">${esc(p.merk)}</small>` : ''}<br /><small class="muted">${bronLabel(p)}</small></span>
+          <span class="v-kcal">${fmt(p.per100?.kcal)}<small> /100${p.eenheid === 'ml' ? 'ml' : 'g'}</small></span>
+        </button>`
+}
+
+// Zoekresultaten van Open Food Facts: per zoekterm onthouden (zolang de app open is) en met een rem
+// op het aantal automatische zoekopdrachten (Open Food Facts staat er 10 per minuut toe).
+const offCache = new Map()
+let offStatus = { key: '', status: '' }
+const offTijden = []
+const offKey = (q) => String(q || '').trim().toLowerCase().replace(/\s+/g, ' ')
+function offMag(now = Date.now()) {
+  while (offTijden.length && now - offTijden[0] > 60000) offTijden.shift()
+  if (offTijden.length >= 6) return false
+  offTijden.push(now)
+  return true
+}
+
+function offBlok(q, key, off) {
+  if (key.length < 3) return ''
+  const st = offStatus.key === key ? offStatus.status : offCache.has(key) ? 'ok' : 'wacht'
+  const kop = '<h3 class="v-offkop">Uit Open Food Facts <small class="muted">(merkproducten)</small></h3>'
+  if (st === 'busy' || st === 'wacht') return `${kop}<p class="muted v-offstatus">Zoeken in Open Food Facts…</p>`
+  if (st === 'ok') return off.length ? kop + off.map(resultaatRij).join('') : `${kop}<p class="muted v-offstatus">Niets gevonden in Open Food Facts voor "${esc(q)}". Scan de barcode of het etiket.</p>`
+  const uitleg = st === 'limiet' ? 'Even te veel zoekopdrachten achter elkaar.' : `${esc(offStatus.melding || 'Open Food Facts is nu niet bereikbaar')}.`
+  return `${kop}<p class="muted v-offstatus">${uitleg}</p><button type="button" class="btn block v-offzoek" data-s="off">🔎 Opnieuw zoeken in Open Food Facts</button>`
 }
 
 function bronLabel(p) {

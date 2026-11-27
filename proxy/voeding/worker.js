@@ -239,10 +239,25 @@ async function offProduct(kv, request, headers, code, env, ctx) {
 
 async function offSearch(kv, request, headers, url, env) {
   if (!(await authByAnyBook(kv, request))) return json({ error: 'geen toegang' }, 401, headers)
-  const q = (url.searchParams.get('q') || '').trim().slice(0, 80)
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80)
   if (q.length < 2) return json({ products: [] }, 200, headers)
+  // Dezelfde zoekopdracht een dag bewaren: scheelt verzoeken bij Open Food Facts (max. 10 per minuut).
+  const cache = globalThis.caches?.default
+  const cacheKey = new Request(`https://voeding-cache.invalid/off-zoek/${encodeURIComponent(q)}`)
+  const hit = cache && (await cache.match(cacheKey))
+  if (hit) return json(await hit.json(), 200, headers, { 'X-Cache': 'HIT' })
   if (!allow('off-zoek', 8)) return json({ error: 'even te veel zoekopdrachten, probeer het zo opnieuw' }, 429, headers, { 'Retry-After': '30' })
-  const params = new URLSearchParams({ search_terms: q, search_simple: '1', json: '1', page_size: '20', fields: `code,${OFF_FIELDS}` })
+  // Alleen producten die (ook) in Nederland verkocht worden: die zijn voor Tarapp het relevantst.
+  const params = new URLSearchParams({
+    search_terms: q,
+    search_simple: '1',
+    json: '1',
+    page_size: '20',
+    tagtype_0: 'countries',
+    tag_contains_0: 'contains',
+    tag_0: 'en:netherlands',
+    fields: `code,${OFF_FIELDS}`,
+  })
   let data
   try {
     const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?${params}`, { headers: { 'User-Agent': userAgent(env), Accept: 'application/json' } })
@@ -254,7 +269,9 @@ async function offSearch(kv, request, headers, url, env) {
   const products = (data?.products || [])
     .map((p) => (normaliseerBarcode(p.code) ? parseOff({ status: 1, code: p.code, product: p }, normaliseerBarcode(p.code)) : null))
     .filter(Boolean)
-  return json({ products, attribution: 'Productgegevens: Open Food Facts (ODbL)' }, 200, headers)
+  const body = { products, attribution: 'Productgegevens: Open Food Facts (ODbL)' }
+  if (cache) await cache.put(cacheKey, new Response(JSON.stringify(body), { headers: { 'Cache-Control': 'max-age=86400' } }))
+  return json(body, 200, headers, { 'X-Cache': 'MISS' })
 }
 
 // De OFF-proxy is alleen voor geregistreerde dagboeken (Authorization + X-Voeding-Book).

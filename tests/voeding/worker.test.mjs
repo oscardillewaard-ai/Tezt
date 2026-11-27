@@ -128,3 +128,32 @@ test('OFF-proxy: respecteert de limiet per minuut', async () => {
     globalThis.fetch = echt
   }
 })
+
+test('OFF-zoeken: alleen Nederlandse producten, en dezelfde zoekterm komt uit de cache', async () => {
+  const f = workerFetch()
+  const { book, writeToken } = await nieuwDagboek(f)
+  const echtFetch = globalThis.fetch
+  const echtCaches = globalThis.caches
+  const opslag = new Map()
+  globalThis.caches = { default: { match: async (r) => opslag.get(r.url)?.clone(), put: async (r, res) => opslag.set(r.url, res) } }
+  const urls = []
+  globalThis.fetch = async (url) => {
+    urls.push(String(url))
+    return new Response(JSON.stringify({ products: [{ code: '4056489547594', product_name: 'Vlugge Japie', brands: 'Lidl', nutriments: { 'energy-kcal_100g': 306, proteins_100g: 3.1, carbohydrates_100g: 69.3, fat_100g: 0.9, fiber_100g: 3 } }] }), { status: 200 })
+  }
+  try {
+    const a = await call(f, '/voeding/off-zoek?q=Vlugge%20%20Japie', { token: writeToken, book })
+    assert.equal(a.status, 200)
+    assert.equal(a.body.products[0].naam, 'Vlugge Japie')
+    assert.equal(a.body.products[0].per100.vezel, 3)
+    const u = new URL(urls[0])
+    assert.equal(u.searchParams.get('tag_0'), 'en:netherlands')
+    assert.equal(u.searchParams.get('search_terms'), 'vlugge japie')
+    const b = await call(f, '/voeding/off-zoek?q=vlugge japie', { token: writeToken, book })
+    assert.equal(b.status, 200)
+    assert.equal(urls.length, 1, 'tweede keer uit de cache')
+  } finally {
+    globalThis.fetch = echtFetch
+    globalThis.caches = echtCaches
+  }
+})

@@ -424,3 +424,12 @@
 .v-sheet h2:focus {
   outline: none;
 }
+
+.v-offkop {
+  margin: 14px 0 2px;
+  font-size: 0.9rem;
+}
+
+.v-offstatus {
+  margin: 6px 0 8px;
+}
