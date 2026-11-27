@@ -55,13 +55,14 @@ jobs:
           git add public/sportagenda/voeding/off-nl.json
           git commit -m "Voeding: Open Food Facts-lijst (NL) bijgewerkt ($DATUM, $AANTAL producten)"
           git push --force origin "$BRANCH"
-          BODY="De maandelijkse verversing van \`public/sportagenda/voeding/off-nl.json\` (Nederlandse producten uit Open Food Facts, ODbL).
-
-          - Producten: **$AANTAL**
-          - Export opgehaald op: $DATUM
-          - De Voeding-tests zijn in de workflow gedraaid en groen.
-
-          Mergen = de nieuwe lijst gaat online (GitHub Pages). Niet mergen = de oude blijft staan."
+          BODY=$(printf '%s\n' \
+            "De maandelijkse verversing van \`public/sportagenda/voeding/off-nl.json\` (Nederlandse producten uit Open Food Facts, ODbL)." \
+            "" \
+            "- Producten: **$AANTAL**" \
+            "- Export opgehaald op: $DATUM" \
+            "- De Voeding-tests zijn in de workflow gedraaid en groen." \
+            "" \
+            "Mergen = de nieuwe lijst gaat online (GitHub Pages). Niet mergen = de oude blijft staan.")
           if [ -n "$(gh pr list --head "$BRANCH" --base "$BASIS" --state open --json number --jq '.[0].number')" ]; then
             gh pr edit "$BRANCH" --title "Voeding: Open Food Facts-lijst bijwerken ($DATUM)" --body "$BODY"
             echo "Bestaande pull request bijgewerkt."
