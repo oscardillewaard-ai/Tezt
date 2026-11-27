@@ -180,3 +180,10 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
     verkeerd, dan kan een oudere wijziging winnen. Twee apparaten die tegelijk hetzelfde item aanpassen:
     de laatste wint (geen samenvoegen binnen één training). Het Voeding-dagboek haalt op een nieuw
     apparaat deze en vorige maand op, oudere maanden niet.
+47. **Inlogscherm vóór de app** (versie 44): zonder geldige sessie toont Tarapp alleen het inlogscherm,
+    ook niet het welkomstscherm. De controle gebeurt op het apparaat, dus na één keer inloggen opent
+    Tarapp ook offline. De sessie schuift op zolang je Tarapp gebruikt (hooguit eens per week een
+    KV-schrijfactie), dus actief gebruik = ingelogd blijven. Bij uitloggen kun je alles van het apparaat
+    wissen (alleen Tarapp-sleutels; andere apps op hetzelfde github.io-adres blijven staan); dat kan alleen
+    als de laatste sync gelukt is. Eerlijk: de app-code zelf blijft openbaar op GitHub Pages; je gegevens
+    niet. Ook de code afschermen kan later met Cloudflare Pages + Access.

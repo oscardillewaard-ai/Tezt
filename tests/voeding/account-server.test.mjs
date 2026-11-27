@@ -136,3 +136,16 @@ test('te veel openstaande aanvragen: geweigerd zonder op te slaan', async () => 
   assert.equal(r.body.aangevraagd, false)
   assert.ok(!kv.data.get('toegang').includes('nummer26'))
 })
+
+test('sessie schuift op zolang je Tarapp gebruikt', async () => {
+  const kv = nepKv()
+  const e = env(kv)
+  const { sessie } = (await call(e, '/account/login', { method: 'POST', body: { idToken: await token({}) } })).body
+  const sleutel = [...kv.data.keys()].find((k) => k.startsWith('sess:'))
+  const oud = Date.now() + 20 * 86400_000 // nog 20 dagen
+  kv.data.set(sleutel, JSON.stringify({ ...JSON.parse(kv.data.get(sleutel)), exp: oud }))
+  const r = await call(e, '/account/sync', { method: 'POST', sessie, body: {} })
+  assert.ok(r.body.exp > Date.now() + 170 * 86400_000)
+  assert.equal(JSON.parse(kv.data.get(sleutel)).exp, r.body.exp)
+  assert.ok(!kv.data.get(sleutel).includes('hash'), 'hash zelf niet opgeslagen')
+})

@@ -147,7 +147,7 @@ async function api(pad, { body, sessie } = {}) {
 function sessieVerlopen() {
   bewaar(null)
   stop()
-  ctx?.showToast('Je bent uitgelogd. Log opnieuw in om te synchroniseren.')
+  ctx?.showToast('Je bent uitgelogd. Log opnieuw in om Tarapp te gebruiken.')
   ctx?.naExtern?.()
 }
 
@@ -174,6 +174,7 @@ export async function syncNu() {
     await kvSet('schaduw', uit.schaduw)
     await kvSet('rev', r.rev)
     await zetLokaal(vers, uit.records)
+    if (r.exp > s.exp) bewaar({ ...lees(), exp: r.exp })
     if (s.beheerder && (s.wachtend || 0) !== (r.wachtend || 0)) {
       bewaar({ ...lees(), wachtend: r.wachtend || 0 })
       if (r.wachtend > (s.wachtend || 0)) ctx.showToast(`Nieuwe aanvraag voor Tarapp: kijk bij Meer → Account`)
@@ -267,6 +268,7 @@ async function naInloggen(idToken) {
   // Leeg account: alles van hier erin. Leeg apparaat: alles uit het account hierheen.
   bewaar(sessie)
   await eersteKeer(accountVol ? 'account' : 'samenvoegen', account)
+  ctx.naInloggen?.()
   ctx.showToast(accountVol ? 'Ingelogd. Je gegevens uit je account staan nu hier.' : 'Ingelogd. Je gegevens staan nu veilig in je account.')
   ververs()
 }
@@ -288,6 +290,7 @@ function kiesOverzetten(login, sessie, account) {
       bewaar(sessie)
       eersteKeer(keuze, account)
         .then(() => {
+          ctx.naInloggen?.()
           ververs()
           ctx.showToast(keuze === 'account' ? 'Je account staat nu op dit apparaat.' : 'Samengevoegd. Alles staat nu in je account.')
         })
@@ -350,7 +353,8 @@ async function toonGoogleKnop(el) {
     knop.innerHTML = ''
     google.accounts.id.renderButton(knop, { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'nl', width: Math.min(320, knop.clientWidth || 320) })
   } catch (err) {
-    knop.innerHTML = `<p class="muted">${ctx.esc(err.message || 'Inloggen kan nu niet laden.')} Controleer je internet.</p>`
+    const tekst = err.status === 404 ? 'De server wordt net bijgewerkt. Probeer het over een minuutje opnieuw.' : err.status ? err.message : 'Geen verbinding. Voor de eerste keer inloggen heb je internet nodig.'
+    knop.innerHTML = `<p class="muted">${ctx.esc(tekst)}</p><button type="button" class="btn" data-acc="opnieuw">Opnieuw proberen</button>`
   }
 }
 
@@ -405,13 +409,27 @@ const PRIVACY = `
       <li>Alleen Google-accounts die Oscar heeft goedgekeurd, kunnen inloggen. Wie het zonder goedkeuring probeert, komt niet verder dan een aanvraag.</li>
       <li>Je gegevens staan versleuteld (AES-256) op de server van Tarapp bij Cloudflare in Europa en de VS. Zonder de geheime sleutel van de server is het onleesbare tekst.</li>
       <li>Google ziet alleen dát je inlogt bij Tarapp, niet wat je traint of eet.</li>
-      <li>Er wordt niets gedeeld of verkocht. Uitloggen kan altijd; je gegevens blijven dan ook op dit apparaat staan.</li>
+      <li>Er wordt niets gedeeld of verkocht. Bij uitloggen kies je of je gegevens op dit apparaat blijven of gewist worden.</li>
       <li>Niet mee: je Zepp-koppeling (die sleutel blijft op dit apparaat).</li>
     </ul>
   </details>`
 
+let gate = false
+
+function gateHtml() {
+  return `
+    <img class="welcome-logo" src="icons/icon-192.png" alt="" />
+    <h1>Tarapp</h1>
+    <p class="tagline">Je eigen sportagenda en voeding. Log in om verder te gaan.</p>
+    ${aanvraagMelding ? `<p class="account-aanvraag">⏳ ${ctx.esc(aanvraagMelding)}</p>` : ''}
+    <div id="account-google" class="account-google"><p>Laden…</p></div>
+    <p class="login-klein">Tarapp is privé. Een nieuw account kan pas inloggen nadat Oscar het heeft goedgekeurd. Na één keer inloggen werkt Tarapp ook zonder internet.</p>
+    ${PRIVACY}`
+}
+
 function html() {
   const s = lees()
+  if (!ingelogd() && gate) return gateHtml()
   if (!ingelogd()) {
     return `
       <section class="card">
@@ -451,9 +469,39 @@ function ververs(opnieuwLaden = true) {
 }
 
 /** Pagina tekenen in [el] (Meer → Account). */
+/** Inlogscherm vóór de app (app.js toont dit zolang je niet ingelogd bent). */
+export function mountGate(el, c) {
+  ctx = c
+  root = el
+  gate = true
+  ververs()
+  el.onclick = (e) => {
+    if (e.target.closest('[data-acc]')?.dataset.acc === 'opnieuw') ververs()
+  }
+}
+
+// Wat Tarapp op dit apparaat bewaart. Alleen deze sleutels: op hetzelfde adres (github.io)
+// staan ook andere apps van Oscar, die blijven ongemoeid.
+const EIGEN_SLEUTELS = /^(sportagenda\.|voeding\.|tarapp\.)/
+
+async function wisApparaat() {
+  for (const k of Object.keys(localStorage)) if (EIGEN_SLEUTELS.test(k)) localStorage.removeItem(k)
+  dbP?.then((d) => d.close()).catch(() => {})
+  await Promise.all(
+    ['tarapp-voeding', 'tarapp-account'].map(
+      (naam) =>
+        new Promise((resolve) => {
+          const req = indexedDB.deleteDatabase(naam)
+          req.onsuccess = req.onerror = req.onblocked = () => resolve()
+        }),
+    ),
+  )
+}
+
 export function mount(el, c) {
   ctx = c
   root = el
+  gate = false
   ververs()
   el.onclick = async (e) => {
     const a = e.target.closest('[data-acc]')?.dataset.acc
@@ -465,16 +513,23 @@ export function mount(el, c) {
     }
     if (a === 'backup') kvGet('backup').then((b) => b && downloadBackup(b))
     if (a === 'uitloggen') {
-      if (!confirm('Uitloggen? Je gegevens blijven op dit apparaat staan, maar synchroniseren stopt.')) return
+      if (!confirm('Uitloggen? Tarapp vraagt daarna weer om in te loggen.')) return
       const s = lees()
       await syncNu()
-      api('/account/logout', { sessie: s?.sessie, body: {} }).catch(() => {})
+      // Wissen alleen als alles net veilig in het account is gezet.
+      const wissen = !status.fout && confirm('Ook alles van dit apparaat wissen? Handig op een gedeelde computer. Je gegevens staan veilig in je account en komen terug als je weer inlogt.')
+      await api('/account/logout', { sessie: s?.sessie, body: {} }).catch(() => {})
       bewaar(null)
       stop()
-      await kvWis().catch(() => {})
       globalThis.google?.accounts?.id?.disableAutoSelect?.()
+      if (wissen) {
+        await wisApparaat()
+        location.reload()
+        return
+      }
+      await kvWis().catch(() => {})
       ctx.showToast('Uitgelogd')
-      ververs()
+      ctx.naInloggen?.()
     }
   }
 }

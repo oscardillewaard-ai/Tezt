@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '43' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '44' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -286,6 +286,17 @@ function render() {
       .pop()
     ensureRecurring(horizon)
   }
+  // Helemaal privé: eerst inloggen. De controle gebeurt op het apparaat (geldige sessie),
+  // dus na één keer inloggen opent Tarapp ook zonder internet.
+  if (!accountIngelogd()) {
+    document.body.classList.add('welcome', 'gate')
+    if (!document.getElementById('account-gate')) {
+      view.innerHTML = '<div id="account-gate" class="welcome-screen login-screen"></div>'
+      mountGate()
+    }
+    return
+  }
+  document.body.classList.remove('gate')
   const welcome = !state.settings?.welcomed
   document.body.classList.toggle('welcome', welcome)
   if (welcome) {
@@ -455,6 +466,7 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  { v: 44, items: ['🔒 Helemaal privé: Tarapp opent pas na inloggen met Google. Daarna werkt hij ook zonder internet, en je blijft ingelogd zolang je hem gebruikt', '🧹 Bij uitloggen kun je alles van het apparaat wissen (handig op een gedeelde computer)'] },
   { v: 43, items: ['🔐 Inloggen met Google (Meer → Account): je trainingen, gewicht en voeding op je telefoon én laptop, versleuteld bewaard. Je huidige gegevens zet je meteen over 💛', '🛡️ Tarapp blijft privé: een nieuw account kan pas in na goedkeuring van Oscar'] },
   { v: 42, items: ['🍽️ Voeding overzichtelijker: hele getallen in je dagboek, eetmomenten inklappen en met E·K·V de macro\'s per eetmoment zien 💛'] },
   { v: 41, items: ['🏷️ Etiket scannen leest nu ook meertalige etiketten goed, en etiketten waarop de getallen niet netjes naast de woorden staan 💛'] },
@@ -1728,9 +1740,24 @@ const accountCtx = () => ({
   },
   // Er kwam iets binnen van een ander apparaat: opnieuw tekenen (niet midden in een venster of training).
   naExtern: () => {
-    if (!sheet.open && !runSession() && !ui.active) render()
+    if (!accountIngelogd() || (!sheet.open && !runSession() && !ui.active)) render()
   },
+  // Net in- of uitgelogd: inlogscherm weg of terug.
+  naInloggen: () => render(),
 })
+
+function mountGate() {
+  const el = document.getElementById('account-gate')
+  import('./account/account.js')
+    .then((m) => m.mountGate(el, accountCtx()))
+    .catch(() => {
+      el.innerHTML = `
+        <img class="welcome-logo" src="icons/icon-192.png" alt="" />
+        <h1>Tarapp</h1>
+        <p class="tagline">Inloggen kan nu niet laden. Controleer je internet en probeer het opnieuw.</p>
+        <button class="btn primary block" onclick="location.reload()">Opnieuw proberen</button>`
+    })
+}
 
 function mountAccount() {
   const el = document.getElementById('account-root')
