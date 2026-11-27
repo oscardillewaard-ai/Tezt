@@ -232,7 +232,8 @@ function herstelGetallen(t) {
 const ETIKET = {
   vet: /(?<![a-z])(totaal\s*)?(vetten|vet|fats|fat|matières grasses|fett)(?![a-z])/g,
   kh: /(?<![a-z])(koolhydraten|koolhydraat|carbohydrates?|glucides|kohlenhydrate)(?![a-z])/g,
-  eiwit: /(?<![a-z])(eiwitten|eiwit|proteins?|protéines|eiweiß|eiweiss)(?![a-z])/g,
+  // "eiweib": OCR leest de ß vaak als B.
+  eiwit: /(?<![a-z])(eiwitten|eiwit|proteins?|protéines|eiwei(?:ß|ss|b|s))(?![a-z])/g,
   vezel: /(?<![a-z])(voedingsvezels?|vezels?|fibres?|fibers?|dietary fib(re|er)|ballaststoffe)(?![a-z])/g,
 }
 // Direct na het label moet een getal komen (eventueel na : | . - of <); anders is het lopende tekst.
@@ -269,10 +270,13 @@ function kandidaten(rest) {
   return out.filter((c) => Number.isFinite(c.v) && c.v >= 0 && c.v <= 100)
 }
 
-/** Etiketten ronden af: vanaf 10 g een heel getal, daaronder hooguit één decimaal. Anders: verdacht. */
+/**
+ * Etiketten geven hooguit één decimaal ("73,0 g", "8,3 g"; zout soms twee, maar dat lezen we niet).
+ * Twee decimalen bij een macro is dus verdacht: meestal een "g" die als "9" is gelezen ("73,09").
+ */
 function afrondStraf(c) {
   const dec = (c.raw.split(/[.,]/)[1] || '').length
-  return (c.v >= 10 && dec > 0) || dec > 1 ? 1 : 0
+  return dec > 1 ? 1 : 0
 }
 
 /** Beste combinatie van kandidaten: past het best bij de kcal (4/4/9), met zo min mogelijk aannames. */

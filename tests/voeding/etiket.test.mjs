@@ -145,3 +145,24 @@ Mo AN Zout 0%09| 049 84 N # #`
   assert.equal(r.vezel, null) // "Zg" is niet te lezen: leeg, niet verzonnen
   assert.equal(r.controle, true)
 })
+
+// Tweede echte foto (Choco-Caramel Crisp, drietalig etiket), echte OCR-uitvoer van Tesseract.js in Tarapp.
+// Het etiket: 381 kcal, vet 3,7 g, koolhydraten 73,0 g, vezels 11,0 g, eiwitten 8,3 g.
+test('echte foto (drietalig): "EiweiB 839", "73,09" en "11,09" worden goed gelezen', () => {
+  const t = `Valeurs nutritionnelles moyennes / Gemiddelde :
+voedingswaarde / Durchschnittliche Nährwerte 7
+Pour/Per/ 1 portion /portie/ % >
+Jel00g Porton (B09)** (309)*
+Energie/Energie/Energie _ 1607KW/381kal 482W/14kal 6%
+Matières grasses / Vetten / Fett 3,79 tlg 2%
+- dont addes gras saturés / waarvan verzadigde
+| vetzuren / davon gesättigte Fettsäuren 0,99 039 1%
+# Glucides / Koolhydraten / Kohlenhydrate 73,09 2199 8% |
+3 - dont sucres / waarvan suikers / |
+davon Zucker 23,09 69g 8% %&
+Fibres alimentaires / Vezels /Ballaststoffe 11,09 339 ë
+Â Protéines / Eiwitten / EiweiB 839 250 0
+l Sel /Zout / Salz 0,359 011g 2%`
+  const r = parseEtiket(t)
+  assert.deepEqual([r.kcal, r.vet, r.kh, r.vezel, r.eiwit, r.controle], [381, 3.7, 73, 11, 8.3, true])
+})
