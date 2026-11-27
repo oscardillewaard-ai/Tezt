@@ -142,7 +142,11 @@ Keuzes die niet (helemaal) in `docs/voeding-prompt.md` stonden, met de reden. St
 38. **Licentie:** afgeleide database onder de ODbL (`voeding/OFF-NL-LICENTIE.md`), met bronvermelding in de app.
 39. **Live meezoeken blijft** (route A), maar alleen als de lijst minder dan 5 treffers geeft, en via de Worker
     (gecachet, alleen Nederland). Barcodes: eigen product → lijst → Worker.
-40. **Verversen gaat (nog) niet automatisch.** Een maandelijkse GitHub Action die de lijst rechtstreeks op de
+40. **Verversen: elke maand een pull request** (`.github/workflows/voeding-off-nl.yml`, de 2e van de maand, of met
+    de hand via Actions → voeding-off-nl → Run workflow). De Action haalt de export, draait de tests en opent of
+    werkt bij de PR `voeding-off-nl-update` bij; mergen zet de lijst online. Eerder geprobeerd en tegengehouden:
+    rechtstreeks naar de live branch pushen.
+    Oorspronkelijke notitie: **Verversen gaat (nog) niet automatisch.** Een maandelijkse GitHub Action die de lijst rechtstreeks op de
     hoofdbranch zet en de site opnieuw neerzet, werd in deze sessie tegengehouden (automatisch pushen naar de
     live branch zonder controle). Verversen kan met de hand:
     `curl -sL https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz | node scripts/gen-voeding-off-nl.mjs -`
