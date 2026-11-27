@@ -1,6 +1,6 @@
 // Network-first: haal altijd de nieuwste versie op als er internet is, val
 // terug op de cache als je offline bent (bijv. in de gym zonder bereik).
-const CACHE = 'sportagenda-v38'
+const CACHE = 'sportagenda-v39'
 const SHELL = [
   './',
   'index.html',
@@ -26,6 +26,7 @@ const VOEDING = [
   'voeding/nevo.js',
   'voeding/backup.js',
   'voeding/scanner.js',
+  'voeding/ocr.js',
   'voeding/voeding.css',
   'voeding/vendor/barcode-detector.js',
   'voeding/vendor/zxing_reader.wasm',

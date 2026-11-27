@@ -1,0 +1,71 @@
+name: voeding-off-nl
+
+# Elke maand de lijst met Nederlandse producten uit Open Food Facts verversen
+# (public/sportagenda/voeding/off-nl.json) en als er iets veranderd is een pull request openen.
+# Er gaat niets vanzelf live: pas na het mergen van de PR zet GitHub Pages de nieuwe lijst neer.
+#
+# Eenmalig nodig: Settings -> Actions -> General -> Workflow permissions ->
+# "Allow GitHub Actions to create and approve pull requests" aanvinken.
+
+on:
+  schedule:
+    - cron: '17 3 2 * *' # de 2e van elke maand, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: voeding-off-nl
+  cancel-in-progress: false
+
+env:
+  BASIS: claude/gpx-ultrarace-trainingen-zf6zci
+  BRANCH: voeding-off-nl-update
+
+jobs:
+  verversen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASIS }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Nederlandse producten uit de Open Food Facts-export halen
+        run: node scripts/gen-voeding-off-nl.mjs
+      - name: Voeding-tests
+        run: node --test tests/voeding/*.test.mjs
+      - name: Pull request openen of bijwerken
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- public/sportagenda/voeding/off-nl.json; then
+            echo "Geen wijzigingen in de lijst; geen pull request nodig."
+            exit 0
+          fi
+          AANTAL=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/sportagenda/voeding/off-nl.json','utf8')).producten.length)")
+          DATUM=$(date -u +%Y-%m-%d)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add public/sportagenda/voeding/off-nl.json
+          git commit -m "Voeding: Open Food Facts-lijst (NL) bijgewerkt ($DATUM, $AANTAL producten)"
+          git push --force origin "$BRANCH"
+          BODY=$(printf '%s\n' \
+            "De maandelijkse verversing van \`public/sportagenda/voeding/off-nl.json\` (Nederlandse producten uit Open Food Facts, ODbL)." \
+            "" \
+            "- Producten: **$AANTAL**" \
+            "- Export opgehaald op: $DATUM" \
+            "- De Voeding-tests zijn in de workflow gedraaid en groen." \
+            "" \
+            "Mergen = de nieuwe lijst gaat online (GitHub Pages). Niet mergen = de oude blijft staan.")
+          if [ -n "$(gh pr list --head "$BRANCH" --base "$BASIS" --state open --json number --jq '.[0].number')" ]; then
+            gh pr edit "$BRANCH" --title "Voeding: Open Food Facts-lijst bijwerken ($DATUM)" --body "$BODY"
+            echo "Bestaande pull request bijgewerkt."
+          else
+            gh pr create --base "$BASIS" --head "$BRANCH" --title "Voeding: Open Food Facts-lijst bijwerken ($DATUM)" --body "$BODY"
+          fi

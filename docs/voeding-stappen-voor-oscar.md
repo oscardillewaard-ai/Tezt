@@ -59,6 +59,17 @@ jij zelf geven; dat mocht ik niet namens jou doen.
 
 Voeding werkt ook zonder deze stap, met de USDA-basisproducten.
 
+## 6. Maandelijkse verversing van de Open Food Facts-lijst toestaan (eenmalig, ±30 seconden)
+
+De Action **voeding-off-nl** opent elke maand een pull request met de nieuwste Nederlandse producten uit Open Food
+Facts. Daarvoor moet GitHub Actions pull requests mogen openen:
+
+1. github.com/oscardillewaard-ai/Tezt → **Settings** → links **Actions** → **General**.
+2. Onderaan bij **Workflow permissions**: vink **Allow GitHub Actions to create and approve pull requests** aan →
+   **Save**.
+3. Daarna krijg je elke maand (rond de 2e) een PR "Voeding: Open Food Facts-lijst bijwerken". Mergen = online.
+   Meteen proberen kan via **Actions** → **voeding-off-nl** → **Run workflow**.
+
 ---
 
 *Tara* hoeft niets te doen: zij opent Tarapp, tikt op Voeding en kiest Tara. Haar dagboek gaat niet naar Healthbridge.

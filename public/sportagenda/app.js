@@ -3,7 +3,7 @@
 // ---------- Opslag ----------
 
 const KEY = 'sportagenda.v1' // oude naam bewust behouden: hier staan de gegevens
-const APP_VERSION = '38' // ophogen bij elke release, samen met CACHE in sw.js
+const APP_VERSION = '39' // ophogen bij elke release, samen met CACHE in sw.js
 
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -452,6 +452,18 @@ function afterTick(s, big = false) {
 
 // Nieuwste bovenaan. Bij een release: APP_VERSION ophogen en hier een regel toevoegen.
 const CHANGELOG = [
+  {
+    v: 39,
+    items: [
+      '🎯 Dagdoelen in procenten: kies je kcal en de verdeling eiwit, koolhydraten en vet (samen 100%), Tarapp rekent de grammen uit',
+      '↺ Bij elke maaltijd: "Zoals gisteren" zet dezelfde maaltijd van de vorige dag er met één tik in 💛',
+      '🏷️ Etiket scannen: maak een foto van het voedingsetiket en Tarapp vult kcal, eiwit, koolhydraten en vet zelf in (alles op je telefoon)',
+      '🍽️ Eetmomenten zelf kiezen: hernoemen, toevoegen (bijv. "Na de training") en de volgorde aanpassen',
+      '🌾 Vezels: zie per product en per dag hoeveel vezels je binnenkrijgt',
+      'De terugknop van je telefoon sluit nu eerst het venster, en het toetsenbord springt niet meer vanzelf open',
+      '🔎 Ruim 62.000 Nederlandse merkproducten uit Open Food Facts (Jumbo, AH, Lidl, Plus…) zitten nu in Tarapp: zoeken en scannen werkt ook zonder internet',
+    ],
+  },
   {
     v: 38,
     items: [
@@ -1801,6 +1813,10 @@ function renderInstallCard() {
 
 // ---------- Sheets ----------
 
+// Een open venster is een stap in de geschiedenis: de terugknop van de telefoon sluit het venster
+// in plaats van de app.
+let sheetInHistory = false
+
 function openSheet(html, onSubmit) {
   sheet.innerHTML = html
   const form = sheet.querySelector('form')
@@ -1810,7 +1826,26 @@ function openSheet(html, onSubmit) {
   })
   // Een vervolgvraag kan in het al geopende venster verschijnen.
   if (!sheet.open) sheet.showModal()
+  if (!sheetInHistory) {
+    history.pushState({ tarappSheet: true }, '')
+    sheetInHistory = true
+  }
 }
+
+sheet.addEventListener('close', () => {
+  // Even wachten: opent er meteen een volgend venster, dan houdt dat dezelfde stap.
+  setTimeout(() => {
+    if (!sheetInHistory || sheet.open) return
+    sheetInHistory = false
+    if (history.state?.tarappSheet) history.back()
+  }, 0)
+})
+
+addEventListener('popstate', () => {
+  if (!sheetInHistory) return
+  sheetInHistory = false
+  if (sheet.open) closeSheet()
+})
 
 function closeSheet() {
   sheet.querySelectorAll('.toast').forEach((t) => t.remove())

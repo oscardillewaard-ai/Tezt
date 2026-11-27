@@ -8,10 +8,12 @@ import { NEVO, NEVO_BRON } from './nevo.js'
 import {
   MEALS,
   MEAL_NL,
-  MACRO_KEYS,
+  controleerProcenten,
+  gramVanProcent,
   kjNaarKcal,
   macrosVoor,
   normaliseerBarcode,
+  fold,
   num,
   per100,
   receptWaarden,
@@ -43,7 +45,7 @@ const BASIS_PRODUCTEN = BASIS.map((b) => ({
   id: `basis:${b.fdc}:${slug(b.naam)}`,
   naam: b.naam,
   merk: null,
-  per100: { kcal: b.kcal, eiwit: b.eiwit, kh: b.kh, vet: b.vet },
+  per100: { kcal: b.kcal, eiwit: b.eiwit, kh: b.kh, vet: b.vet, vezel: b.vezel },
   eenheid: b.cat === 'drank' ? 'ml' : 'g',
   portie: b.portie || null,
   bron: 'usda',
@@ -55,7 +57,7 @@ const NEVO_PRODUCTEN = NEVO.map((n) => ({
   id: `nevo:${n.code}`,
   naam: n.naam,
   merk: null,
-  per100: { kcal: n.kcal, eiwit: n.eiwit, kh: n.kh, vet: n.vet },
+  per100: { kcal: n.kcal, eiwit: n.eiwit, kh: n.kh, vet: n.vet, vezel: n.vezel },
   eenheid: n.eenheid === 'ml' ? 'ml' : 'g',
   portie: null,
   bron: 'nevo',
@@ -63,6 +65,19 @@ const NEVO_PRODUCTEN = NEVO.map((n) => ({
 }))
 
 const MEAL_TIJD = { breakfast: '08:00', lunch: '12:30', dinner: '18:30', snack: '15:30' }
+
+// ---------- Eetmomenten ----------
+// Een regel heeft een eigen eetmoment (moment) en een soort (meal) voor Healthbridge. Oudere regels
+// hebben alleen meal; die horen bij het eerste eetmoment van die soort.
+const momenten = () => inst.momenten
+const momentInfo = (id) => momenten().find((m) => m.id === id)
+function momentVan(r) {
+  if (r.moment && momentInfo(r.moment)) return r.moment
+  return (momenten().find((m) => m.soort === r.meal) || momenten()[momenten().length - 1]).id
+}
+const soortVan = (id) => momentInfo(id)?.soort || 'snack'
+const naamVan = (id) => momentInfo(id)?.naam || MEAL_NL[id] || 'Snack'
+const volgorde = (id) => momenten().findIndex((m) => m.id === id)
 const MACRO_NL = { kcal: 'kcal', eiwit: 'Eiwit', kh: 'Koolhydraten', vet: 'Vet' }
 const MACRO_KLEUR = { kcal: 'var(--accent)', eiwit: '#3b82f6', kh: '#f59e0b', vet: '#ec4899' }
 
@@ -148,6 +163,25 @@ function recentProducten(max = 25) {
   return out
 }
 
+/** Venster openen zonder dat het toetsenbord vanzelf opent: de focus gaat naar de titel. */
+function vSheet(html, onSubmit) {
+  ctx.openSheet(html.replace('<h2>', '<h2 tabindex="-1" autofocus>'), onSubmit)
+}
+
+/**
+ * Naar een subpagina van Voeding (instellingen, producten) of terug naar het dagboek. Een subpagina
+ * krijgt een stap in de geschiedenis, zodat de terugknop van de telefoon eerst terug naar het dagboek gaat.
+ */
+function naarPagina(p) {
+  if (p === pagina) return
+  if (p === 'dag' && history.state?.vPagina) return history.back()
+  if (p !== 'dag') history.pushState({ vPagina: p }, '')
+  pagina = p
+  if (p === 'instellingen') momentenConcept = null
+  teken()
+  window.scrollTo(0, 0)
+}
+
 function bewaarInst() {
   db.bewaarInstellingen(inst)
 }
@@ -172,7 +206,7 @@ async function laad() {
 
 async function laadRegels() {
   alleRegels = await db.alle('dagboek')
-  regels = alleRegels.filter((r) => r.date === dag && !r.deleted).sort((a, b) => MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal) || a.time.localeCompare(b.time))
+  regels = alleRegels.filter((r) => r.date === dag && !r.deleted).sort((a, b) => volgorde(momentVan(a)) - volgorde(momentVan(b)) || a.time.localeCompare(b.time))
 }
 
 // ---------- Mount ----------
@@ -185,6 +219,7 @@ export async function mount(el, context) {
   root.addEventListener('click', onClick)
   root.addEventListener('submit', onSubmit)
   root.addEventListener('change', onChange)
+  root.addEventListener('input', onInput)
   if (!geladen) {
     teken()
     laadPromise ||= (async () => {
@@ -193,11 +228,26 @@ export async function mount(el, context) {
       } catch (err) {
         foutMelding = err?.message || 'onbekende fout'
       }
+      // Na een sync: alleen opnieuw tekenen als er nieuwe regels zijn én je op de dagpagina staat.
+      // Anders alleen de statusregel bijwerken, zodat wat je net intypt (bijv. bij Doelen) blijft staan.
       opWijziging(async (changed) => {
         if (changed) await laadRegels()
-        if (root?.isConnected) teken()
+        if (!root?.isConnected) return
+        if (changed && pagina === 'dag' && !ctx.sheet.open) return teken()
+        const el = root.querySelector('#v-sync')
+        if (el) el.textContent = syncTekst()
+        const lbl = root.querySelector('[data-page="instellingen"] .pref-value')
+        if (lbl) lbl.textContent = syncLabel()
       })
       addEventListener('online', () => inst?.persoon && syncNu(inst))
+      // Terugknop van de telefoon: van een subpagina terug naar het dagboek.
+      addEventListener('popstate', (e) => {
+        const p = e.state?.vPagina || 'dag'
+        if (p === pagina || !root?.isConnected) return
+        pagina = p
+        teken()
+        window.scrollTo(0, 0)
+      })
       if (inst?.persoon) syncNu(inst)
       vraagSwOmVoedingBestanden()
     })()
@@ -274,25 +324,29 @@ function voortgang(key, waarde, doel) {
 function tekenDag() {
   const items = regels.map((r) => ({ r, m: macrosVoor(r.per100, r.grams) }))
   // Een lege dag is 0 gegeten (niet onbekend).
-  const tot = items.length ? somMacros(items.map((x) => x.m)) : { kcal: 0, eiwit: 0, kh: 0, vet: 0 }
+  const tot = items.length ? somMacros(items.map((x) => x.m)) : { kcal: 0, eiwit: 0, kh: 0, vet: 0, vezel: 0 }
+  const vezelOnbekend = items.filter((x) => x.m.vezel === null).length
   const doel = inst.doelen
   const rest = doel.kcal ? doel.kcal - (tot.kcal || 0) : null
-  const meals = MEALS.map((meal) => {
-    const list = items.filter((x) => x.r.meal === meal)
+  const meals = momenten().map(({ id: meal, naam }) => {
+    const list = items.filter((x) => momentVan(x.r) === meal)
     const sum = somMacros(list.map((x) => x.m))
     return `
       <section class="card v-meal">
-        <div class="v-meal-head"><h3>${MEAL_NL[meal]}</h3><span class="muted">${list.length ? `${fmt(sum.kcal)} kcal` : ''}</span></div>
+        <div class="v-meal-head"><h3>${esc(naam)}</h3><span class="muted">${list.length ? `${fmt(sum.kcal)} kcal` : ''}</span></div>
         ${list
           .map(
             ({ r, m }) => `
           <button type="button" class="v-row" data-v="bewerk" data-id="${esc(r.id)}">
-            <span class="v-row-main"><span class="v-name">${esc(r.name)}${r.brand ? ` <small>${esc(r.brand)}</small>` : ''}</span><small class="muted">${gramTekst(r.grams, r.unit)} · E ${fmt(m.eiwit, 1)} · K ${fmt(m.kh, 1)} · V ${fmt(m.vet, 1)}</small></span>
+            <span class="v-row-main"><span class="v-name">${esc(r.name)}${r.brand ? ` <small>${esc(r.brand)}</small>` : ''}</span><small class="muted">${gramTekst(r.grams, r.unit)} · E ${fmt(m.eiwit, 1)} · K ${fmt(m.kh, 1)} · V ${fmt(m.vet, 1)}${m.vezel === null ? '' : ` · Vz ${fmt(m.vezel, 1)}`}</small></span>
             <span class="v-kcal">${fmt(m.kcal)}</span>
           </button>`,
           )
           .join('')}
-        <button type="button" class="linkbtn v-add" data-v="toevoegen" data-meal="${meal}">+ Toevoegen</button>
+        <div class="v-meal-acties">
+          <button type="button" class="linkbtn v-add" data-v="toevoegen" data-meal="${meal}">+ Toevoegen</button>
+          ${vorigeMaaltijd(meal).length ? `<button type="button" class="linkbtn v-gisteren" data-v="gisteren" data-meal="${meal}">↺ Zoals ${esc(dagLabel(verschuif(dag, -1)).toLowerCase())}</button>` : ''}
+        </div>
       </section>`
   }).join('')
   return `
@@ -308,6 +362,7 @@ function tekenDag() {
       </div>
       ${voortgang('kcal', tot.kcal, doel.kcal)}
       ${['eiwit', 'kh', 'vet'].map((k) => voortgang(k, tot[k], doel[k])).join('')}
+      <div class="v-vezel"><span>Vezels</span><span><strong>${vezelOnbekend && tot.vezel !== null ? '≥ ' : ''}${fmt(tot.vezel ?? 0, 1)} g</strong>${vezelOnbekend ? `<small class="muted"> · bij ${vezelOnbekend} ${vezelOnbekend === 1 ? 'product' : 'producten'} onbekend</small>` : ''}</span></div>
     </section>
     ${meals}
     ${ctx.gewichtKaart ? ctx.gewichtKaart(dag) : ''}
@@ -363,6 +418,7 @@ function terug() {
 
 function tekenInstellingen() {
   const d = inst.doelen
+  const pct = inst.doelenPct || {}
   const fwd = db.doorsturenAan(inst)
   const naam = inst.persoon === 'oscar' ? 'Oscar' : 'Tara'
   return `
@@ -377,13 +433,24 @@ function tekenInstellingen() {
     <section class="card">
       <h2>Dagdoelen</h2>
       <form id="v-doelen">
-        <div class="row">
-          <label class="field">kcal<input name="kcal" inputmode="numeric" value="${d.kcal ?? ''}" /></label>
-          <label class="field">Eiwit (g)<input name="eiwit" inputmode="decimal" value="${d.eiwit ?? ''}" /></label>
-          <label class="field">Koolhydraten (g)<input name="kh" inputmode="decimal" value="${d.kh ?? ''}" /></label>
-          <label class="field">Vet (g)<input name="vet" inputmode="decimal" value="${d.vet ?? ''}" /></label>
+        <label class="field">kcal per dag<input name="kcal" inputmode="numeric" value="${d.kcal ?? ''}" /></label>
+        <p class="muted">Verdeling over de macro's, samen 100%:</p>
+        <div class="v-pct">
+          <label class="field">Eiwit<span class="v-pct-in"><input name="eiwit" inputmode="decimal" value="${pct.eiwit ?? ''}" />%</span></label>
+          <label class="field">Koolhydraten<span class="v-pct-in"><input name="kh" inputmode="decimal" value="${pct.kh ?? ''}" />%</span></label>
+          <label class="field">Vet<span class="v-pct-in"><input name="vet" inputmode="decimal" value="${pct.vet ?? ''}" />%</span></label>
         </div>
+        <p class="v-macrokcal" id="v-macrokcal">${doelenTekst(d.kcal, pct)}</p>
         <button type="submit" class="btn primary block">Doelen opslaan</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Eetmomenten</h2>
+      <form id="v-momenten">
+        <div id="v-momenten-lijst">${momentenLijst()}</div>
+        <button type="button" class="btn block" data-v="moment-nieuw">+ Eetmoment</button>
+        <p class="muted">De naam en volgorde kies je zelf. De soort is wat Healthbridge te zien krijgt (ontbijt, lunch, diner of snack).</p>
+        <button type="submit" class="btn primary block">Eetmomenten opslaan</button>
       </form>
     </section>
     <h3 class="pref-head">Healthbridge</h3>
@@ -459,19 +526,16 @@ async function onClick(e) {
     if (v === 'persoon') return kiesPersoon(el.dataset.p)
     if (v === 'dag') return naarDag(verschuif(dag, Number(el.dataset.n)))
     if (v === 'vandaag') return naarDag(vandaagKey())
-    if (v === 'pagina') {
-      pagina = el.dataset.page
-      teken()
-      window.scrollTo(0, 0)
-      return
-    }
+    if (v === 'pagina') return naarPagina(el.dataset.page)
+    if (v === 'moment-op' || v === 'moment-weg' || v === 'moment-nieuw') return wijzigMomenten(v, Number(el.dataset.i))
     if (v === 'toevoegen') return openToevoegen(el.dataset.meal)
     if (v === 'bewerk') {
       const r = regels.find((x) => x.id === el.dataset.id)
-      if (r) openHoeveelheid(regelAlsProduct(r), { meal: r.meal, regel: r })
+      if (r) openHoeveelheid(regelAlsProduct(r), { meal: momentVan(r), regel: r })
       return
     }
     if (v === 'vaste') return openVasteItems()
+    if (v === 'gisteren') return kopieerMaaltijd(el.dataset.meal)
     if (v === 'kopieer') return openKopieer()
     if (v === 'koppel-hb') return koppel()
     if (v === 'sync') {
@@ -488,15 +552,44 @@ async function onClick(e) {
   }
 }
 
+/** Live onder de doelen: de grammen die bij de verdeling horen, of wat er niet klopt. */
+function doelenTekst(kcal, pct) {
+  const fout = controleerProcenten(pct)
+  if (fout) return `<span class="v-fout">⚠️ ${esc(fout)}</span>`
+  if (num(kcal) === null) return 'Vul je kcal per dag in.'
+  const g = gramVanProcent(kcal, pct)
+  return `Samen 100% ✓ Dat is per dag: <strong>eiwit ${fmt(g.eiwit)} g</strong> · <strong>koolhydraten ${fmt(g.kh)} g</strong> · <strong>vet ${fmt(g.vet)} g</strong>.<br /><small>Eiwit en koolhydraten 4 kcal per gram, vet 9.</small>`
+}
+
+function leesDoelen(form) {
+  const fd = new FormData(form)
+  return { kcal: num(fd.get('kcal')), pct: { eiwit: num(fd.get('eiwit')), kh: num(fd.get('kh')), vet: num(fd.get('vet')) } }
+}
+
+function onInput(e) {
+  const form = e.target.closest('#v-doelen')
+  if (!form) return
+  const { kcal, pct } = leesDoelen(form)
+  const el = form.querySelector('#v-macrokcal')
+  if (el) el.innerHTML = doelenTekst(kcal, pct)
+}
+
 function onSubmit(e) {
+  if (e.target.id === 'v-momenten') return bewaarMomenten(e)
   if (e.target.id !== 'v-doelen') return
   e.preventDefault()
-  const fd = new FormData(e.target)
-  for (const k of MACRO_KEYS) inst.doelen[k] = num(fd.get(k))
+  const { kcal, pct } = leesDoelen(e.target)
+  const fout = kcal === null ? 'Vul je kcal per dag in.' : controleerProcenten(pct)
+  if (fout) {
+    ctx.showToast(fout)
+    return
+  }
+  const nieuw = gramVanProcent(kcal, pct)
+  inst.doelenPct = pct
+  inst.doelen = nieuw
   bewaarInst()
   ctx.showToast('Doelen opgeslagen 🎯')
-  pagina = 'dag'
-  teken()
+  naarPagina('dag')
 }
 
 function onChange(e) {
@@ -547,8 +640,9 @@ async function bewaarRegel(product, { grams, meal, regel }) {
   const r = {
     id: regel?.id || uid(),
     date: regel?.date || dag,
-    time: regel?.time || (isVandaag() ? tijdAmsterdam() : MEAL_TIJD[meal]),
-    meal,
+    time: regel?.time || (isVandaag() ? tijdAmsterdam() : MEAL_TIJD[soortVan(meal)]),
+    meal: soortVan(meal),
+    moment: meal,
     productId: product.id?.startsWith('regel:') ? regel?.productId || null : product.id,
     name: product.naam,
     brand: product.merk || null,
@@ -586,10 +680,10 @@ async function verwijderRegel(r) {
 let zoekTab = 'recent'
 
 function openToevoegen(meal) {
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
-      <h2>Toevoegen aan ${MEAL_NL[meal].toLowerCase()}</h2>
+      <h2>Toevoegen aan ${esc(naamVan(meal).toLowerCase())}</h2>
       <input type="search" name="q" class="v-search" placeholder="Zoek een product, bijv. banaan" autocomplete="off" enterkeyhint="search" />
       <div class="v-scanrow">
         <button type="button" class="btn" data-s="scan">📷 Scannen</button>
@@ -606,6 +700,7 @@ function openToevoegen(meal) {
       </div>
       <div class="v-results" id="v-results"></div>
       <div class="actions">
+        <button type="button" class="btn" data-s="etiket">🏷️ Etiket</button>
         <button type="button" class="btn" data-s="nieuw">+ Eigen product</button>
         <button type="submit" class="btn">Sluiten</button>
       </div>
@@ -615,28 +710,25 @@ function openToevoegen(meal) {
   const sheet = ctx.sheet
   const input = sheet.querySelector('.v-search')
   const results = sheet.querySelector('#v-results')
-  const lijst = (list, leeg) =>
-    list.length
-      ? list
-          .map(
-            (p) => `
-        <button type="button" class="v-result" data-s="kies" data-id="${esc(p.id)}">
-          <span><strong>${esc(p.naam)}</strong>${p.merk ? ` <small class="muted">${esc(p.merk)}</small>` : ''}<br /><small class="muted">${bronLabel(p)}</small></span>
-          <span class="v-kcal">${fmt(p.per100?.kcal)}<small> /100${p.eenheid === 'ml' ? 'ml' : 'g'}</small></span>
-        </button>`,
-          )
-          .join('')
-      : `<p class="muted">${leeg}</p>`
+  const lijst = (list, leeg) => (list.length ? list.map(resultaatRij).join('') : `<p class="muted">${leeg}</p>`)
   let zichtbaar = []
-  let offResultaten = []
+  let alleLokaal = false
   const toon = () => {
     const q = input.value.trim()
     sheet.querySelector('.v-tabs').hidden = !!q
     if (q) {
-      zichtbaar = [...zoek(alleProducten(), q), ...offResultaten.filter((o) => !producten.some((p) => p.id === o.id))]
+      const lokaal = zoek(alleProducten(), q)
+      const key = offKey(q)
+      const uitLijst = offNl && key.length >= 3 ? zoek(offNl, q, 30) : []
+      const gezien = new Set([...producten.map((p) => p.id), ...lokaal.map((p) => p.id)])
+      const off = [...uitLijst, ...(offCache.get(key) || [])].filter((o) => !gezien.has(o.id) && gezien.add(o.id))
+      zichtbaar = [...lokaal, ...off]
+      // Eerst de beste 5, zodat de merkproducten van Open Food Facts niet onder de rand verdwijnen.
+      const kort = key.length >= 3 && !alleLokaal && lokaal.length > 6
       results.innerHTML =
-        lijst(zichtbaar, `Niets gevonden voor "${esc(q)}".`) +
-        `<button type="button" class="btn block v-offzoek" data-s="off">🔎 Zoek "${esc(q)}" in Open Food Facts</button>`
+        lijst(kort ? lokaal.slice(0, 5) : lokaal, `Niets gevonden voor "${esc(q)}" in je eigen producten, NEVO en USDA.`) +
+        (kort ? `<button type="button" class="linkbtn v-meer" data-s="meer">Toon alle ${lokaal.length} uit je producten, NEVO en USDA</button>` : '') +
+        offBlok(q, key, off)
       return
     }
     if (zoekTab === 'recent') {
@@ -650,10 +742,39 @@ function openToevoegen(meal) {
       results.innerHTML = lijst(zichtbaar, 'Nog geen eigen producten of recepten.')
     }
   }
-  input.addEventListener('input', () => {
-    offResultaten = []
+  // Tijdens het typen ook Open Food Facts doorzoeken: na 0,7 s stilte en vanaf 3 letters.
+  let wacht = null
+  const zoekOffNu = async (handmatig = false) => {
+    const q = input.value.trim()
+    const key = offKey(q)
+    if (key.length < 3 || offCache.has(key)) return toon()
+    // Staat het al genoeg in de Nederlandse lijst, dan niet ook nog live zoeken.
+    await laadOffNl()
+    if (!handmatig && offNl.length && zoek(offNl, q, 5).length >= 5) return toon()
+    if (!handmatig && !offMag()) {
+      offStatus = { key, status: 'limiet' }
+      return toon()
+    }
+    offStatus = { key, status: 'busy' }
     toon()
+    try {
+      const r = await zoekOff(inst, q)
+      offCache.set(key, r.products || [])
+      if (offStatus.key === key) offStatus = { key, status: 'ok' }
+    } catch (err) {
+      if (offStatus.key === key) offStatus = { key, status: 'fout', melding: err?.status ? err.message : 'Open Food Facts is nu niet bereikbaar' }
+    }
+    // Alleen tekenen als je intussen niet verder hebt getypt.
+    if (sheet.open && offKey(input.value) === key) toon()
+  }
+  input.addEventListener('input', () => {
+    alleLokaal = false
+    if (!offNl) laadOffNl().then(() => sheet.open && toon())
+    toon()
+    clearTimeout(wacht)
+    wacht = setTimeout(() => zoekOffNu(false), 700)
   })
+  sheet.addEventListener('close', () => clearTimeout(wacht), { once: true })
   sheet.addEventListener('click', async (e) => {
     const el = e.target.closest('[data-s]')
     if (!el) return
@@ -670,22 +791,89 @@ function openToevoegen(meal) {
     } else if (s === 'scan') openScanner(meal)
     else if (s === 'intypen') openBarcodeIntypen(meal)
     else if (s === 'nieuw') openProductForm(null, { meal, naam: input.value.trim() })
-    else if (s === 'off') {
-      el.disabled = true
-      el.textContent = 'Zoeken in Open Food Facts…'
-      try {
-        const r = await zoekOff(inst, input.value.trim())
-        offResultaten = r.products || []
-        toon()
-        if (!offResultaten.length) ctx.showToast('Niets gevonden in Open Food Facts')
-      } catch (err) {
-        el.disabled = false
-        el.textContent = '🔎 Opnieuw proberen'
-        ctx.showToast(err?.status ? err.message : 'Open Food Facts is nu niet bereikbaar. Scan de barcode of maak een eigen product.')
-      }
+    else if (s === 'etiket') openProductForm(null, { meal, naam: input.value.trim(), scan: true })
+    else if (s === 'off') zoekOffNu(true)
+    else if (s === 'meer') {
+      alleLokaal = true
+      toon()
     }
   })
   toon()
+}
+
+function resultaatRij(p) {
+  return `
+        <button type="button" class="v-result" data-s="kies" data-id="${esc(p.id)}">
+          <span><strong>${esc(p.naam)}</strong>${p.merk ? ` <small class="muted">${esc(p.merk)}</small>` : ''}<br /><small class="muted">${bronLabel(p)}</small></span>
+          <span class="v-kcal">${fmt(p.per100?.kcal)}<small> /100${p.eenheid === 'ml' ? 'ml' : 'g'}</small></span>
+        </button>`
+}
+
+// ---------- Open Food Facts: de Nederlandse lijst (off-nl.json) ----------
+// ±63.000 producten die in Nederland verkocht worden, gemaakt met scripts/gen-voeding-off-nl.mjs.
+// Pas geladen bij de eerste zoekopdracht of scan; daarna werkt zoeken en scannen ook offline.
+
+let offNl = null // [product] zodra geladen; [] als er (nog) geen lijst is
+let offNlBarcode = new Map()
+let offNlPromise = null
+
+function laadOffNl() {
+  offNlPromise ||= (async () => {
+    try {
+      const res = await fetch(new URL('./off-nl.json', import.meta.url))
+      if (!res.ok) throw new Error(String(res.status))
+      const data = await res.json()
+      const k = Object.fromEntries(data.kolommen.map((c, i) => [c, i]))
+      offNl = data.producten.map((r) => {
+        const eenheid = r[k.ml] ? 'ml' : 'g'
+        const naam = r[k.naam]
+        const merk = r[k.merk] || null
+        return {
+          id: `off:${r[k.barcode]}`,
+          naam,
+          merk,
+          per100: { kcal: r[k.kcal], eiwit: r[k.eiwit], kh: r[k.kh], vet: r[k.vet], vezel: r[k.vezel] },
+          eenheid,
+          portie: r[k.portie] ? { g: r[k.portie], naam: `1 portie (${fmt(r[k.portie])} ${eenheid})` } : null,
+          bron: 'off',
+          barcode: r[k.barcode],
+          _hay: fold(`${naam} ${merk || ''}`),
+          _naam: fold(naam),
+        }
+      })
+      offNlBarcode = new Map(offNl.map((p) => [p.barcode, p]))
+    } catch {
+      offNl = [] // geen lijst of offline zonder cache: dan alleen live zoeken
+    }
+    return offNl
+  })()
+  return offNlPromise
+}
+
+// Zoekresultaten van Open Food Facts: per zoekterm onthouden (zolang de app open is) en met een rem
+// op het aantal automatische zoekopdrachten (Open Food Facts staat er 10 per minuut toe).
+const offCache = new Map()
+let offStatus = { key: '', status: '' }
+const offTijden = []
+const offKey = (q) => String(q || '').trim().toLowerCase().replace(/\s+/g, ' ')
+function offMag(now = Date.now()) {
+  while (offTijden.length && now - offTijden[0] > 60000) offTijden.shift()
+  if (offTijden.length >= 6) return false
+  offTijden.push(now)
+  return true
+}
+
+function offBlok(q, key, off) {
+  if (key.length < 3) return ''
+  const kop = '<h3 class="v-offkop">Uit Open Food Facts <small class="muted">(merkproducten)</small></h3>'
+  if (off.length) return kop + off.map(resultaatRij).join('')
+  const st = offStatus.key === key ? offStatus.status : ''
+  if (!offNl || st === 'busy') return `${kop}<p class="muted v-offstatus">Zoeken in Open Food Facts…</p>`
+  if (st === 'fout' || st === 'limiet') {
+    const uitleg = st === 'limiet' ? 'Even te veel zoekopdrachten achter elkaar.' : `${esc(offStatus.melding || 'Open Food Facts is nu niet bereikbaar')}.`
+    return `${kop}<p class="muted v-offstatus">${uitleg}</p><button type="button" class="btn block v-offzoek" data-s="off">🔎 Opnieuw zoeken in Open Food Facts</button>`
+  }
+  return `${kop}<p class="muted v-offstatus">Niets gevonden in Open Food Facts voor "${esc(q)}". Scan de barcode of het etiket.</p>`
 }
 
 function bronLabel(p) {
@@ -700,6 +888,8 @@ function bronLabel(p) {
 async function bewaarProduct(p) {
   const rec = { ...p, updatedAt: Date.now() }
   delete rec.laatsteGram
+  delete rec._hay
+  delete rec._naam
   await db.zet('producten', rec)
   producten = await db.alle('producten')
 }
@@ -715,16 +905,16 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
     product.portie ? [product.portie.g, product.portie.naam] : null,
     [100, `100 ${unit}`],
   ].filter(Boolean)
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>${esc(product.naam)}${product.merk ? ` <small class="muted">${esc(product.merk)}</small>` : ''}</h2>
-      <p class="muted">${bronLabel(product)} · per 100 ${unit}: ${fmt(product.per100?.kcal)} kcal · E ${fmt(product.per100?.eiwit, 1)} · K ${fmt(product.per100?.kh, 1)} · V ${fmt(product.per100?.vet, 1)}</p>
+      <p class="muted">${bronLabel(product)} · per 100 ${unit}: ${fmt(product.per100?.kcal)} kcal · E ${fmt(product.per100?.eiwit, 1)} · K ${fmt(product.per100?.kh, 1)} · V ${fmt(product.per100?.vet, 1)}${product.per100?.vezel == null ? '' : ` · Vz ${fmt(product.per100.vezel, 1)}`}</p>
       <label class="field">Hoeveel (${unit})<input name="gram" inputmode="decimal" value="${fmt(startGram, 1).replace(/\./g, '')}" required autocomplete="off" /></label>
       <div class="v-chips">${porties.map(([g, l]) => `<button type="button" class="btn" data-h="portie" data-g="${g}">${esc(l)}</button>`).join('')}</div>
       <div class="v-live" id="v-live"></div>
       <label class="field">Maaltijd
-        <select name="meal">${MEALS.map((m) => `<option value="${m}" ${m === meal ? 'selected' : ''}>${MEAL_NL[m]}</option>`).join('')}</select>
+        <select name="meal">${momenten().map((m) => `<option value="${esc(m.id)}" ${m.id === meal ? 'selected' : ''}>${esc(m.naam)}</option>`).join('')}</select>
       </label>
       ${kanFav ? `<label class="v-check"><input type="checkbox" name="fav" ${fav ? 'checked' : ''} /> ☆ Favoriet</label>` : ''}
       <div class="actions">
@@ -754,7 +944,7 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
   const input = sheet.querySelector('input[name="gram"]')
   const live = () => {
     const m = macrosVoor(product.per100, num(input.value))
-    sheet.querySelector('#v-live').innerHTML = `<strong>${fmt(m.kcal)} kcal</strong><span>Eiwit ${fmt(m.eiwit, 1)} g</span><span>Koolh. ${fmt(m.kh, 1)} g</span><span>Vet ${fmt(m.vet, 1)} g</span>`
+    sheet.querySelector('#v-live').innerHTML = `<strong>${fmt(m.kcal)} kcal</strong><span>Eiwit ${fmt(m.eiwit, 1)} g</span><span>Koolh. ${fmt(m.kh, 1)} g</span><span>Vet ${fmt(m.vet, 1)} g</span><span>Vezel ${fmt(m.vezel, 1)} g</span>`
   }
   input.addEventListener('input', live)
   sheet.addEventListener('click', (e) => {
@@ -769,13 +959,14 @@ function openHoeveelheid(product, { meal, regel, gram } = {}) {
     }
   })
   live()
-  setTimeout(() => input.select(), 50)
+  // Geen toetsenbord vanzelf; tik je in het veld, dan staat het getal meteen geselecteerd.
+  input.addEventListener('focus', () => input.select())
 }
 
 // ---------- Scannen en barcodes ----------
 
 async function openScanner(meal) {
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>Barcode scannen</h2>
@@ -808,7 +999,7 @@ async function openScanner(meal) {
 }
 
 function openBarcodeIntypen(meal) {
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>Barcode intypen</h2>
@@ -836,6 +1027,13 @@ async function vindBarcode(raw, meal, format) {
   }
   const lokaal = await db.productOpBarcode(code)
   if (lokaal) return openHoeveelheid(lokaal.bron === 'recept' ? receptAlsProduct(lokaal) : lokaal, { meal })
+  // Dan de Nederlandse Open Food Facts-lijst (werkt ook offline).
+  await laadOffNl()
+  const uitLijst = offNlBarcode.get(code)
+  if (uitLijst) {
+    await bewaarProduct(uitLijst)
+    return openHoeveelheid(uitLijst, { meal })
+  }
   try {
     ctx.showToast('Product opzoeken…')
     const r = await zoekBarcode(inst, code)
@@ -852,13 +1050,16 @@ async function vindBarcode(raw, meal, format) {
 
 // ---------- Eigen product ----------
 
-function openProductForm(product, { meal, barcode, naam } = {}) {
+function openProductForm(product, { meal, barcode, naam, scan = false } = {}) {
   const p = product || { naam: naam || '', per100: per100(), eenheid: 'g', barcode: barcode || null }
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>${product ? 'Product aanpassen' : 'Eigen product'}</h2>
-      ${barcode && !product ? `<p class="muted">Barcode ${esc(barcode)} is nog onbekend. Neem de waarden per 100 g of 100 ml over van het etiket.</p>` : ''}
+      ${barcode && !product ? `<p class="muted">Barcode ${esc(barcode)} is nog onbekend. Scan het etiket of neem de waarden per 100 g of 100 ml over.</p>` : ''}
+      <button type="button" class="btn block v-etiket" data-p="etiket">🏷️ Etiket scannen</button>
+      <input type="file" accept="image/*" capture="environment" id="v-etiket-foto" hidden />
+      <p class="v-etiket-status" id="v-etiket-status" hidden></p>
       <label class="field">Naam<input name="naam" value="${esc(p.naam)}" required maxlength="200" /></label>
       <label class="field">Merk (optioneel)<input name="merk" value="${esc(p.merk || '')}" maxlength="100" /></label>
       <div class="segmented" role="radiogroup" aria-label="Eenheid">
@@ -872,6 +1073,7 @@ function openProductForm(product, { meal, barcode, naam } = {}) {
         <label class="field">Eiwit (g)<input name="eiwit" inputmode="decimal" value="${p.per100.eiwit ?? ''}" /></label>
         <label class="field">Koolhydraten (g)<input name="kh" inputmode="decimal" value="${p.per100.kh ?? ''}" /></label>
         <label class="field">Vet (g)<input name="vet" inputmode="decimal" value="${p.per100.vet ?? ''}" /></label>
+        <label class="field">Vezel (g)<input name="vezel" inputmode="decimal" value="${p.per100.vezel ?? ''}" /></label>
         <label class="field">Portie (optioneel)<input name="portie" inputmode="decimal" value="${p.portie?.g ?? ''}" placeholder="bijv. 30" /></label>
       </div>
       <label class="field">Barcode (optioneel)<input name="barcode" inputmode="numeric" value="${esc(p.barcode || '')}" /></label>
@@ -894,7 +1096,7 @@ function openProductForm(product, { meal, barcode, naam } = {}) {
         id: product?.id || `eigen:${uid()}`,
         naam: n,
         merk: String(fd.get('merk') || '').trim() || null,
-        per100: { kcal: e === null ? null : round(fd.get('eunit') === 'kj' ? kjNaarKcal(e) : e, 1), eiwit: num(fd.get('eiwit')), kh: num(fd.get('kh')), vet: num(fd.get('vet')) },
+        per100: { kcal: e === null ? null : round(fd.get('eunit') === 'kj' ? kjNaarKcal(e) : e, 1), eiwit: num(fd.get('eiwit')), kh: num(fd.get('kh')), vet: num(fd.get('vet')), vezel: num(fd.get('vezel')) },
         eenheid,
         portie: portie ? { g: portie, naam: `1 portie (${fmt(portie)} ${eenheid})` } : null,
         bron: 'eigen',
@@ -910,12 +1112,65 @@ function openProductForm(product, { meal, barcode, naam } = {}) {
       return !meal
     },
   )
-  ctx.sheet.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-p="eenheid"]')
+  const sheet = ctx.sheet
+  const zetEenheid = (u) => {
+    sheet.querySelectorAll('[data-p="eenheid"]').forEach((b) => b.classList.toggle('on', b.dataset.u === u))
+    sheet.querySelector('input[name="eenheid"]').value = u
+  }
+  const foto = sheet.querySelector('#v-etiket-foto')
+  sheet.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-p]')
     if (!el) return
-    ctx.sheet.querySelectorAll('[data-p="eenheid"]').forEach((b) => b.classList.toggle('on', b === el))
-    ctx.sheet.querySelector('input[name="eenheid"]').value = el.dataset.u
+    if (el.dataset.p === 'eenheid') zetEenheid(el.dataset.u)
+    if (el.dataset.p === 'etiket') foto.click()
   })
+  foto.addEventListener('change', () => {
+    const file = foto.files?.[0]
+    foto.value = ''
+    if (file) scanEtiket(file, sheet, zetEenheid)
+  })
+  // Vanuit "Toevoegen": meteen de camera openen (nog binnen dezelfde tik).
+  if (scan) foto.click()
+}
+
+/** Foto van het etiket lezen en de gevonden waarden in het formulier zetten; jij kijkt ze na. */
+async function scanEtiket(file, sheet, zetEenheid) {
+  const status = sheet.querySelector('#v-etiket-status')
+  const knop = sheet.querySelector('[data-p="etiket"]')
+  const toon = (html, cls = '') => {
+    status.hidden = false
+    status.className = `v-etiket-status ${cls}`
+    status.innerHTML = html
+  }
+  knop.disabled = true
+  toon('Etiket lezen… 0%')
+  try {
+    const { leesEtiket } = await import('./ocr.js')
+    const { waarden: w } = await leesEtiket(file, (f) => toon(`Etiket lezen… ${Math.round(f * 100)}%`))
+    if (!sheet.open) return
+    const zet = (name, v) => {
+      if (v === null || v === undefined) return false
+      const el = sheet.querySelector(`[name="${name}"]`)
+      el.value = String(v).replace('.', ',')
+      el.classList.add('v-ingevuld')
+      return true
+    }
+    sheet.querySelector('select[name="eunit"]').value = 'kcal'
+    const gevonden = [zet('energie', w.kcal) && 'kcal', zet('eiwit', w.eiwit) && 'eiwit', zet('kh', w.kh) && 'koolhydraten', zet('vet', w.vet) && 'vet'].filter(Boolean)
+    zet('vezel', w.vezel)
+    zet('portie', w.portie)
+    zetEenheid(w.eenheid)
+    if (!gevonden.length) toon('Er is niets herkend. Probeer een scherpere foto, recht van voren en met goed licht, of vul de waarden zelf in.', 'warn')
+    else {
+      const mist = ['kcal', 'eiwit', 'koolhydraten', 'vet'].filter((x) => !gevonden.includes(x))
+      const check = w.controle === false ? ' ⚠️ De kcal passen niet goed bij de macro\'s; kijk de getallen na.' : ''
+      toon(`✓ Ingevuld uit het etiket: ${gevonden.join(', ')} (per 100 ${w.eenheid}).${mist.length ? ` Niet gevonden: ${mist.join(', ')}.` : ''}${check} Controleer de waarden voor je opslaat.`, w.controle === false || mist.length ? 'warn' : 'ok')
+    }
+  } catch {
+    if (sheet.open) toon('Het etiket lezen lukte niet (scanner kon niet laden?). Vul de waarden zelf in.', 'warn')
+  } finally {
+    knop.disabled = false
+  }
 }
 
 async function wisProduct(id) {
@@ -947,9 +1202,9 @@ function openRecept(recept) {
         </div>`,
         )
         .join('') || '<p class="muted">Voeg ingrediënten toe met de zoekbalk hieronder.</p>') +
-      `<p class="v-live"><strong>${fmt(w.perPortie.kcal)} kcal per portie</strong><span>E ${fmt(w.perPortie.eiwit, 1)} g</span><span>K ${fmt(w.perPortie.kh, 1)} g</span><span>V ${fmt(w.perPortie.vet, 1)} g</span><span class="muted">portie ${fmt(w.portieGram)} g</span></p>`
+      `<p class="v-live"><strong>${fmt(w.perPortie.kcal)} kcal per portie</strong><span>E ${fmt(w.perPortie.eiwit, 1)} g</span><span>K ${fmt(w.perPortie.kh, 1)} g</span><span>V ${fmt(w.perPortie.vet, 1)} g</span><span>Vz ${fmt(w.perPortie.vezel, 1)} g</span><span class="muted">portie ${fmt(w.portieGram)} g</span></p>`
   }
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>${recept ? 'Recept aanpassen' : 'Nieuw recept'}</h2>
@@ -1007,16 +1262,98 @@ function openRecept(recept) {
     r.ingredienten[Number(e.target.dataset.i)].gram = num(e.target.value) || 0
     const w = receptWaarden(r)
     const live = sheet.querySelector('#v-ingr .v-live')
-    if (live) live.innerHTML = `<strong>${fmt(w.perPortie.kcal)} kcal per portie</strong><span>E ${fmt(w.perPortie.eiwit, 1)} g</span><span>K ${fmt(w.perPortie.kh, 1)} g</span><span>V ${fmt(w.perPortie.vet, 1)} g</span><span class="muted">portie ${fmt(w.portieGram)} g</span>`
+    if (live) live.innerHTML = `<strong>${fmt(w.perPortie.kcal)} kcal per portie</strong><span>E ${fmt(w.perPortie.eiwit, 1)} g</span><span>K ${fmt(w.perPortie.kh, 1)} g</span><span>V ${fmt(w.perPortie.vet, 1)} g</span><span>Vz ${fmt(w.perPortie.vezel, 1)} g</span><span class="muted">portie ${fmt(w.portieGram)} g</span>`
   })
   tekenIngr()
+}
+
+// ---------- Eetmomenten aanpassen ----------
+
+let momentenConcept = null // werkversie tijdens het aanpassen; pas bij "Opslaan" bewaard
+
+function momentenLijst() {
+  momentenConcept ||= momenten().map((m) => ({ ...m }))
+  return momentenConcept
+    .map(
+      (m, i) => `
+    <div class="v-moment">
+      <input name="naam" aria-label="Naam eetmoment" value="${esc(m.naam)}" maxlength="40" placeholder="Bijv. Na de training" />
+      <select name="soort" aria-label="Soort voor Healthbridge">${MEALS.map((k) => `<option value="${k}" ${k === m.soort ? 'selected' : ''}>${MEAL_NL[k]}</option>`).join('')}</select>
+      <button type="button" class="btn" data-v="moment-op" data-i="${i}" aria-label="${esc(m.naam)} omhoog" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="btn danger" data-v="moment-weg" data-i="${i}" aria-label="${esc(m.naam)} verwijderen" ${momentenConcept.length <= 1 ? 'disabled' : ''}>✕</button>
+    </div>`,
+    )
+    .join('')
+}
+
+/** Wat er in het formulier staat terug in de werkversie zetten (zodat getypte namen blijven). */
+function leesMomentenForm() {
+  const rijen = root.querySelectorAll('#v-momenten .v-moment')
+  rijen.forEach((rij, i) => {
+    if (!momentenConcept[i]) return
+    momentenConcept[i].naam = rij.querySelector('[name="naam"]').value
+    momentenConcept[i].soort = rij.querySelector('[name="soort"]').value
+  })
+}
+
+function wijzigMomenten(actie, i) {
+  leesMomentenForm()
+  if (actie === 'moment-op' && i > 0) [momentenConcept[i - 1], momentenConcept[i]] = [momentenConcept[i], momentenConcept[i - 1]]
+  if (actie === 'moment-weg' && momentenConcept.length > 1) momentenConcept.splice(i, 1)
+  if (actie === 'moment-nieuw') momentenConcept.push({ id: `m-${uid().slice(0, 8)}`, naam: '', soort: 'snack' })
+  root.querySelector('#v-momenten-lijst').innerHTML = momentenLijst()
+  if (actie === 'moment-nieuw') root.querySelector('#v-momenten .v-moment:last-child [name="naam"]')?.focus()
+}
+
+function bewaarMomenten(e) {
+  e.preventDefault()
+  leesMomentenForm()
+  if (momentenConcept.some((m) => !m.naam.trim())) {
+    ctx.showToast('Geef elk eetmoment een naam')
+    return
+  }
+  const weg = momenten().filter((m) => !momentenConcept.some((c) => c.id === m.id) && regels.concat(alleRegels).some((r) => !r.deleted && r.moment === m.id))
+  if (weg.length && !confirm(`Wat al bij ${weg.map((m) => m.naam).join(', ')} staat, komt bij een ander eetmoment van dezelfde soort. Doorgaan?`)) return
+  inst.momenten = db.schoonMomenten(momentenConcept)
+  momentenConcept = null
+  bewaarInst()
+  laadRegels().then(() => {
+    ctx.showToast('Eetmomenten opgeslagen 🍽️')
+    naarPagina('dag')
+  })
+}
+
+// ---------- Maaltijd van de vorige dag ----------
+
+function vorigeMaaltijd(meal) {
+  const prev = verschuif(dag, -1)
+  return alleRegels.filter((r) => r.date === prev && momentVan(r) === meal && !r.deleted)
+}
+
+async function kopieerMaaltijd(meal) {
+  const bron = vorigeMaaltijd(meal)
+  if (!bron.length) return
+  const nu = Date.now()
+  const tijd = isVandaag() ? tijdAmsterdam() : MEAL_TIJD[soortVan(meal)]
+  const nieuw = bron.map((r, i) => ({ ...r, id: uid(), date: dag, time: tijd, moment: meal, meal: soortVan(meal), updatedAt: nu + i, dirty: 1 }))
+  await db.zetVeel('dagboek', nieuw)
+  await laadRegels()
+  teken()
+  syncStraks(inst)
+  ctx.showToast(`${naamVan(meal)} van ${dagLabel(verschuif(dag, -1)).toLowerCase()} overgenomen (${nieuw.length}) ↺`, async () => {
+    const t = Date.now()
+    await db.zetVeel('dagboek', nieuw.map((r, i) => ({ id: r.id, date: r.date, updatedAt: t + i, deleted: true, dirty: 1 })))
+    await laadRegels()
+    teken()
+    syncStraks(inst)
+  })
 }
 
 // ---------- Vaste items en dag kopiëren ----------
 
 function openVasteItems() {
   const items = inst.vasteItems
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>⭐ Vaste items</h2>
@@ -1026,7 +1363,7 @@ function openVasteItems() {
           ? items
               .map(
                 (it, n) => `
-        <label class="v-check v-vast"><input type="checkbox" name="i${n}" checked /> <span class="grow">${esc(it.naam)} <small class="muted">${gramTekst(it.grams, it.unit)} · ${MEAL_NL[it.meal].toLowerCase()}</small></span></label>`,
+        <label class="v-check v-vast"><input type="checkbox" name="i${n}" checked /> <span class="grow">${esc(it.naam)} <small class="muted">${gramTekst(it.grams, it.unit)} · ${esc(naamVan(it.meal).toLowerCase())}</small></span></label>`,
               )
               .join('')
           : '<p class="muted">Nog geen vaste items. Zet je dag zoals je hem vaak eet en neem hem hieronder over.</p>'
@@ -1042,14 +1379,14 @@ function openVasteItems() {
         for (const it of kies) {
           const p = productVanId(it.productId)
           const prod = p ? (p.bron === 'recept' ? receptAlsProduct(p) : p) : { id: it.productId, naam: it.naam, merk: it.merk, per100: it.per100, eenheid: it.unit, bron: it.source, barcode: it.barcode }
-          await bewaarRegel(prod, { grams: it.grams, meal: it.meal })
+          await bewaarRegel(prod, { grams: it.grams, meal: momentInfo(it.meal) ? it.meal : momentVan({ meal: it.meal }) })
         }
         if (kies.length) ctx.showToast(`${kies.length} vaste ${kies.length === 1 ? 'item' : 'items'} toegevoegd ⭐`)
       })()
     },
   )
   ctx.sheet.querySelector('[data-f="neem"]').addEventListener('click', () => {
-    inst.vasteItems = regels.map((r) => ({ productId: r.productId || `regel:${r.id}`, naam: r.name, merk: r.brand, grams: r.grams, unit: r.unit, meal: r.meal, per100: r.per100, source: r.source, barcode: r.barcode }))
+    inst.vasteItems = regels.map((r) => ({ productId: r.productId || `regel:${r.id}`, naam: r.name, merk: r.brand, grams: r.grams, unit: r.unit, meal: momentVan(r), per100: r.per100, source: r.source, barcode: r.barcode }))
     bewaarInst()
     ctx.closeSheet()
     ctx.showToast('Vaste items opgeslagen ⭐')
@@ -1058,7 +1395,7 @@ function openVasteItems() {
 
 function openKopieer() {
   const gisteren = verschuif(dag, -1)
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>📋 Dag kopiëren</h2>
@@ -1097,7 +1434,7 @@ async function koppel() {
     return
   }
   const u = new URL(link)
-  ctx.openSheet(
+  vSheet(
     `
     <form method="dialog" class="v-sheet">
       <h2>🔗 Koppel met Healthbridge</h2>

@@ -306,3 +306,130 @@
 .v-welkom .actions .btn {
   font-size: 1.05rem;
 }
+
+.v-meal-acties {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+
+.v-meal-acties .v-add {
+  margin-top: 0;
+}
+
+.v-gisteren {
+  color: var(--muted);
+}
+
+.v-macrokcal {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.v-macrokcal small {
+  color: var(--muted);
+}
+
+.v-fout {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.v-pct {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.v-pct-in {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+}
+
+.v-pct-in input {
+  margin-top: 4px;
+  text-align: right;
+}
+
+.v-etiket {
+  margin-bottom: 10px;
+}
+
+.v-etiket-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.88rem;
+}
+
+.v-etiket-status.ok {
+  background: var(--done-soft);
+}
+
+.v-etiket-status.warn {
+  border: 1px solid var(--accent);
+}
+
+.v-sheet input.v-ingevuld {
+  border-color: var(--done);
+  box-shadow: 0 0 0 1px var(--done);
+}
+
+.v-vezel {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.v-vezel strong {
+  color: var(--text);
+}
+
+.v-moment {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.v-moment input,
+.v-moment select {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.v-moment .btn {
+  padding: 8px 11px;
+}
+
+.v-sheet h2:focus {
+  outline: none;
+}
+
+.v-offkop {
+  margin: 14px 0 2px;
+  font-size: 0.9rem;
+}
+
+.v-offstatus {
+  margin: 6px 0 8px;
+}
